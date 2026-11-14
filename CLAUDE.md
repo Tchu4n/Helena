@@ -26,7 +26,8 @@ Os guias em `docs/referencias/` foram escritos para Next.js 15 e Tailwind 3. Ond
 
 - A especificação versionada é a fonte da verdade. Mudou o comportamento: altera primeiro a spec, depois o teste, depois o código.
 - Teste antes do código, derivado da spec. Nunca alterar a asserção de um teste para fazê-lo passar.
-- Um ramo por tarefa; commits pequenos, em português.
+- Quem faz os commits é o dono. O agente deixa as mudanças no diretório de trabalho, lista os arquivos alterados e pode sugerir a mensagem, em português.
+- Nenhum ramo é criado sem avisar o dono antes e receber o ok.
 - Sem dependência nova para poucas linhas. `zod` e `server-only` entram quando a primeira Server Action e o primeiro arquivo de acesso a dados forem escritos.
 - Decisão visual se mostra ao dono em página, não se descreve em texto. Material de referência se lê por inteiro antes de concluir.
 
