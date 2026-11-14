@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 264 48" role="img" aria-label="Helena">
+  <!-- placeholder: letras desenhadas com traços, sem depender de fonte instalada -->
+  <g fill="none" stroke="#121212" stroke-width="2" stroke-miterlimit="2">
+    <path d="M1 0V40M25 0V40M1 20H25"/>
+    <path d="M70 1H49V39H70M49 20H66"/>
+    <path d="M93 0V39H114"/>
+    <path d="M158 1H137V39H158M137 20H154"/>
+    <path d="M181 40V1L205 39V0"/>
+    <path d="M228 40L242 1L256 40M233 26H251"/>
+  </g>
+</svg>
