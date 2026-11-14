@@ -15,9 +15,17 @@
   --radius-controle: 9999px;
 }
 
+/* inline porque estas variáveis só existem em tempo de execução (next/font) */
+@theme inline {
+  --font-serif: var(--font-playfair);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
   background: var(--color-fundo);
   color: var(--color-tinta);
+  font-family: var(--font-sans);
 }
 
 :focus-visible {
