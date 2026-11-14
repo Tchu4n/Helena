@@ -1,26 +1,26 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Tokens do design system. Fonte: docs/DESIGN.md, seção 3. */
+@theme {
+  --color-fundo: #FAF8F5;
+  --color-superficie: #EDE8E1;
+  --color-cartao: #FFFFFF;
+  --color-tinta: #121212;
+  --color-suave: #66625C;
+  --color-controle: #857D72;
+  --color-linha: #D9D3CA;
+  --color-oferta: #9A3412;
+  --color-beneficio: #17692F;
+  --color-erro: #B42318;
+  --radius-controle: 9999px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-fundo);
+  color: var(--color-tinta);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-tinta);
+  outline-offset: 2px;
 }
