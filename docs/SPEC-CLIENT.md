@@ -600,6 +600,6 @@ Os requisitos não fechavam estes pontos. O dono decidiu em 14/11/2026; os cená
 | 14 | Cancelamento antes do envio | Fora do lançamento |
 | 15 | Medida de desempenho | Conteúdo principal visível (LCP) em até 3 s em 4G lento simulado (`GER-08`) |
 
-**Fechado no contrato (`contrato/openapi.yaml`):** o prazo de cada modalidade, inclusive o horário limite do motoboy, vem como texto pronto da API; o catálogo é paginado (24 por página, máximo 48). A ordenação entra no lançamento por decisão do dono (`CAT-09`).
+**Fechado no contrato (`contract/openapi.yaml`):** o prazo de cada modalidade, inclusive o horário limite do motoboy, vem como texto pronto da API; o catálogo é paginado (24 por página, máximo 48). A ordenação entra no lançamento por decisão do dono (`CAT-09`).
 
 **Fora do lançamento** (aparecem em fluxogramas ou referências, mas não nos requisitos): avaliações de produto, produtos relacionados, lista de favoritos (o coração do card em `DESIGN.md` fica sem cenário até haver regra de onde guardar), sugestões automáticas na busca, login social, carteiras digitais (Apple Pay, Google Pay), boleto.

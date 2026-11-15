@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test \"testes/**/*.test.mjs\"",
-    "simulado": "npx @stoplight/prism-cli@5 mock contrato/openapi.yaml -p 4010"
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "mock": "npx @stoplight/prism-cli@5 mock contract/openapi.yaml -p 4010"
   },
   "dependencies": {
     "next": "16.4.6",

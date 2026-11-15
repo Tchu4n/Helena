@@ -17,7 +17,7 @@ Estas regras não têm exceção. Se uma tarefa só fecha quebrando uma delas, o
 - NUNCA usar uma API do Next de memória; ler antes o guia em `node_modules/next/dist/docs/`.
 
 **Código**
-- NUNCA nome próprio em inglês (variável, função, componente, pasta, arquivo, teste), salvo o que a ferramenta exige.
+- NUNCA nome em português no código (variável, função, componente, pasta, arquivo, teste, campo do contrato, tabela ou coluna do banco), nem palavra inglesa rebuscada. O nome de cada termo do negócio está em `docs/GLOSSARIO.md`.
 - NUNCA acessar o SQL Server pelo front; só a API, pelo lado do servidor.
 - NUNCA escrever à mão os tipos da API nem mudar o contrato de forma não aditiva.
 - NUNCA importar de dentro de outro domínio; só pelo `index.ts` dele.
@@ -39,27 +39,30 @@ Estas regras não têm exceção. Se uma tarefa só fecha quebrando uma delas, o
 - NUNCA travar o checkout porque a API de frete caiu.
 
 **Design**
-- NUNCA cor fora dos tokens, nem `oferta` em botão ou link, nem sombra, nem classe `dark:`.
+- NUNCA cor fora dos tokens, nem `sale` em botão ou link, nem sombra, nem classe `dark:`.
 - NUNCA usar cor como único sinal, nem alvo de toque menor que 48px.
 
 ## Idioma
 
-- Tudo que for possível fica em PT-BR, para o dono auditar à mão: tokens, variáveis, funções, componentes, pastas e arquivos próprios, comentários, nomes de teste, mensagens de commit e documentos.
-- Identificadores sem acento nem cedilha (`superficie`, `cartao`). Texto visível e comentários com acentuação normal.
-- Só fica em inglês o que a ferramenta exige: `page.tsx`, `layout.tsx`, `route.ts`, `proxy.ts`, `@theme`, `--font-sans`, script `test`.
+Decisão do dono em 15/11/2026, substituindo a regra anterior de código em português:
+
+- **Código em inglês simples:** variáveis, funções, componentes, pastas, arquivos, testes, tokens, campos e rotas do contrato, tabelas e colunas do banco, e os comentários. Preferir a palavra comum à técnica (`preparing`, não `fulfillment`), para que devs iniciantes leiam sem dificuldade.
+- **Glossário obrigatório:** `docs/GLOSSARIO.md` liga cada termo do negócio ao nome no código. Termo novo entra lá antes de entrar no código. Ficam como estão: `cpf`, `cep`, `pix`, `pac`, `sedex`, `whatsapp`.
+- **Em português:** o texto que a cliente vê, as rotas da loja no navegador (`/sacola`, `/produto/[slug]`), os documentos (`docs/`, `README.md`, este arquivo) e as mensagens de commit.
 
 ## Documentos
 
 | Documento | Papel |
 |---|---|
+| `docs/GLOSSARIO.md` | Termo do negócio em português → nome no código em inglês |
 | `docs/DESIGN.md` | Fonte única do design: tokens, tipografia, componentes, onde cada cor pode aparecer |
 | `docs/SPEC-CLIENT.md` | Cenários Dado/Quando/Então das 8 telas do cliente (aprovada em 14/11/2026; decisões na seção 12) |
-| `contrato/openapi.yaml` | Contrato OpenAPI 3.0.3 da API para as telas do cliente (aprovado em 14/11/2026) |
-| `banco/esquema.sql` | DDL do SQL Server (rascunho, ainda não executado; muda para o repositório do back-end quando ele existir) |
+| `contract/openapi.yaml` | Contrato OpenAPI 3.0.3 da API para as telas do cliente (aprovado em 14/11/2026; nomes passados para o inglês em 15/11/2026, por decisão do dono, antes de existir qualquer consumidor) |
+| `database/schema.sql` | DDL do SQL Server (rascunho, ainda não executado; muda para o repositório do back-end quando ele existir) |
 | `docs/referencias/` | Material de pesquisa do dono (requisitos, guias, capturas, fluxogramas). Só local, fora do Git. Consultar, nunca commitar |
 | `docs/superpowers/plans/` | Planos de implementação já executados |
 
-Ainda faltam, nesta ordem: primeira subida do servidor simulado (`npm run simulado`), execução e aprovação do DDL em um SQL Server, credenciais de sandbox (pagamento, frete, NF-e).
+Ainda faltam, nesta ordem: primeira subida do servidor simulado (`npm run mock`), execução e aprovação do DDL em um SQL Server, credenciais de sandbox (pagamento, frete, NF-e).
 
 Os guias em `docs/referencias/` foram escritos para Next.js 15 e Tailwind 3. Onde divergirem deste arquivo ou da documentação em `node_modules/next/dist/docs/`, eles perdem.
 
@@ -76,10 +79,10 @@ Os guias em `docs/referencias/` foram escritos para Next.js 15 e Tailwind 3. Ond
 
 ```bash
 npm run dev      # servidor local
-npm test         # node:test, arquivos em testes/**/*.test.mjs
+npm test         # node:test, arquivos em tests/**/*.test.mjs
 npm run lint     # eslint (o comando `next lint` não existe mais)
 npm run build    # build de produção
-npm run simulado # API simulada (Prism) em http://localhost:4010, a partir do contrato
+npm run mock     # API simulada (Prism) em http://localhost:4010, a partir do contrato
 ```
 
 Saídas longas: filtrar antes de ler (`npm run build 2>&1 | tail -20`).
@@ -100,23 +103,23 @@ Saídas longas: filtrar antes de ler (`npm run build 2>&1 | tail -20`).
 
 ```
 src/
-  funcionalidades/<dominio>/   catalogo, sacola, checkout, conta, devolucao
-    componentes/  acoes/  consultas/  esquemas/  index.ts
-  componentes/ui/              primitivos (Botao, Campo, Selo...)
-  lib/                         cliente da API, validação de ambiente
+  features/<domain>/   catalog, cart, checkout, account, returns
+    components/  actions/  queries/  schemas/  index.ts
+  components/ui/       primitivos (Button, Field, Badge...)
+  lib/                 cliente da API, validação de ambiente
 ```
 
 - Cada domínio expõe só o que é público em `index.ts`. Proibido importar de dentro de outro domínio.
 - Componente de servidor por padrão. `"use client"` só nas folhas que precisam de evento, estado ou API do navegador.
 - Componente de cliente não importa componente de servidor; recebe por `children` ou props.
-- Arquivos de `consultas/` e de `lib/` que falam com a API começam com `import "server-only"`.
+- Arquivos de `queries/` e de `lib/` que falam com a API começam com `import "server-only"`.
 - Para o componente de cliente vai só o objeto com os campos que a tela usa, nunca a resposta inteira da API: o que vira prop vai para o HTML público.
 - Server Action, sempre nesta ordem: confere autorização, valida a entrada com Zod, executa, invalida o cache.
 - `route.ts` só para chamadas externas (confirmação de PIX, webhooks). Interação da própria tela usa Server Action.
 
 ## Front e back
 
-- O front nunca acessa o SQL Server. A camada de `consultas/` chama a API Java, do lado do servidor.
+- O front nunca acessa o SQL Server. A camada de `queries/` chama a API Java, do lado do servidor.
 - Contrato primeiro: o OpenAPI 3.x é escrito e aprovado antes das telas. Enquanto o back não existe, o front roda contra servidor simulado (Prism).
 - Todo erro da API chega no formato RFC 9457 (`application/problem+json`); a tela trata esse formato em um ponto só.
 - Mudanças no contrato são aditivas. Tipos TypeScript do cliente são gerados a partir do contrato, não escritos à mão.
@@ -151,9 +154,9 @@ src/
 
 ## Design (resumo; os detalhes estão em `docs/DESIGN.md`)
 
-- Usar só os tokens: `fundo`, `superficie`, `cartao`, `tinta`, `suave`, `controle`, `linha`, `oferta`, `beneficio`, `erro`. Nenhuma cor solta no código.
-- Botão principal sempre `tinta`. `oferta` só em selo de desconto, preço promocional, timer e aviso de últimas peças; nunca em botão ou link.
-- Controles em pílula (`rounded-controle`); fotos, tiles e cartões de canto reto; sem sombras.
+- Usar só os tokens: `background`, `surface`, `card`, `primary`, `muted`, `control`, `line`, `sale`, `success`, `error`. Nenhuma cor solta no código.
+- Botão principal sempre `primary`. `sale` só em selo de desconto, preço promocional, timer e aviso de últimas peças; nunca em botão ou link.
+- Controles em pílula (`rounded-control`); fotos, tiles e cartões de canto reto; sem sombras.
 - Títulos em `font-serif` peso 400; corpo e preços em `font-sans`; rótulos em caixa alta em `font-mono`.
 - Alvo de toque de 48px com 8px entre alvos; foco sempre visível; cor nunca é o único sinal.
 - Sem tema escuro e sem tema de alto contraste no lançamento. Não usar classes `dark:`.

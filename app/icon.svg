@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- placeholder: o H de public/logo.svg em fundo tinta, traço mais grosso para ler em 16px -->
+  <!-- placeholder: the H from public/logo.svg on the primary color, with a thicker stroke so it reads at 16px -->
   <rect width="32" height="32" fill="#121212"/>
   <path d="M10 6V26M22 6V26M10 16H22" fill="none" stroke="#FAF8F5" stroke-width="3"/>
 </svg>

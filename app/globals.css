@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
-/* Tokens do design system. Fonte: docs/DESIGN.md, seção 3. */
+/* Design system tokens. Source: docs/DESIGN.md, section 3. */
 @theme {
-  --color-fundo: #FAF8F5;
-  --color-superficie: #EDE8E1;
-  --color-cartao: #FFFFFF;
-  --color-tinta: #121212;
-  --color-suave: #66625C;
-  --color-controle: #857D72;
-  --color-linha: #D9D3CA;
-  --color-oferta: #9A3412;
-  --color-beneficio: #17692F;
-  --color-erro: #B42318;
-  --radius-controle: 9999px;
+  --color-background: #FAF8F5;
+  --color-surface: #EDE8E1;
+  --color-card: #FFFFFF;
+  --color-primary: #121212;
+  --color-muted: #66625C;
+  --color-control: #857D72;
+  --color-line: #D9D3CA;
+  --color-sale: #9A3412;
+  --color-success: #17692F;
+  --color-error: #B42318;
+  --radius-control: 9999px;
 }
 
-/* inline porque estas variáveis só existem em tempo de execução (next/font) */
+/* inline because these variables only exist at runtime (next/font) */
 @theme inline {
   --font-serif: var(--font-playfair);
   --font-sans: var(--font-geist-sans);
@@ -23,12 +23,12 @@
 }
 
 body {
-  background: var(--color-fundo);
-  color: var(--color-tinta);
+  background: var(--color-background);
+  color: var(--color-primary);
   font-family: var(--font-sans);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-tinta);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }

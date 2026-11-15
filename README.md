@@ -24,7 +24,7 @@ Navegador ──> Front-end (Next.js) ──> API REST (Java) ──> SQL Server
 ```
 
 - O front nunca acessa o banco: ele conversa só com a API, sempre do lado do servidor.
-- A API é definida primeiro, em um contrato OpenAPI (`contrato/openapi.yaml`). Enquanto o back-end não existe, o front roda contra uma API simulada gerada a partir desse contrato.
+- A API é definida primeiro, em um contrato OpenAPI (`contract/openapi.yaml`). Enquanto o back-end não existe, o front roda contra uma API simulada gerada a partir desse contrato.
 - Gateway de pagamento, frete e nota fiscal entram por integrações, que ficam simuladas até haver acesso de teste.
 
 ## Tecnologias
@@ -44,7 +44,7 @@ Requisito: Node.js 20.9 ou mais novo.
 ```bash
 npm install
 npm run dev        # loja em http://localhost:3000
-npm run simulado   # API simulada em http://localhost:4010
+npm run mock       # API simulada em http://localhost:4010
 ```
 
 | Comando | O que faz |
@@ -61,7 +61,7 @@ O comportamento vem antes do código. Cada mudança segue esta ordem:
 2. **Teste:** escrito a partir da especificação.
 3. **Código:** só o necessário para o teste passar.
 
-Nomes de variáveis, funções, componentes e arquivos ficam em português.
+O código (nomes e comentários) é escrito em inglês simples, para que qualquer dev, inclusive iniciante, consiga ler. O texto que a cliente vê e a documentação ficam em português, e o `docs/GLOSSARIO.md` liga cada termo do negócio ao nome usado no código.
 
 ## Documentação
 
@@ -69,8 +69,9 @@ Nomes de variáveis, funções, componentes e arquivos ficam em português.
 |---|---|
 | `docs/SPEC-CLIENT.md` | As 8 telas do cliente, em 103 cenários |
 | `docs/DESIGN.md` | Cores, tipografia e componentes da interface |
-| `contrato/openapi.yaml` | Contrato da API usada pelas telas do cliente |
-| `banco/esquema.sql` | Esquema do banco (rascunho) |
+| `contract/openapi.yaml` | Contrato da API usada pelas telas do cliente |
+| `database/schema.sql` | Esquema do banco (rascunho) |
+| `docs/GLOSSARIO.md` | Termo do negócio → nome usado no código |
 | `CLAUDE.md` | Regras e restrições do projeto |
 
 ## Andamento

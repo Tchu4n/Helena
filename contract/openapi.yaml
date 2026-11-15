@@ -1,0 +1,1565 @@
+openapi: 3.0.3
+info:
+  title: Helena — store API (customer screens)
+  version: 0.2.0
+  description: |
+    Contract between the front end (Next.js) and the back end (Java + SQL Server)
+    for the 8 customer screens. Derived from `docs/SPEC-CLIENT.md`; the codes in
+    parentheses (`SAC-13`) point to the scenarios there. Business terms map to
+    these names in `docs/GLOSSARIO.md`.
+
+    Conventions:
+    - Only the Next.js server calls this API, never the browser.
+    - Money is always an integer, in cents (`19900` = R$ 199,00).
+    - Dates in ISO 8601 with time zone (`2026-11-14T20:30:00-03:00`).
+    - CPF, CEP and phone travel as digits only.
+    - Every error comes as `application/problem+json` (RFC 9457). The names
+      `type`, `title`, `status`, `detail` and `instance` come from the standard;
+      the `code` field is what the front end uses to decide what to show.
+    - Text the customer reads (`title`, `message`, labels) is in Portuguese.
+    - Every response has the `X-Request-Id` header.
+    - Changes to this contract are additive. Version 0.2.0 renamed everything
+      to English (owner decision, 15/11/2026), before any consumer existed.
+servers:
+  - url: http://localhost:4010
+    description: Mock server (Prism)
+tags:
+  - name: Catalog
+  - name: Shipping
+  - name: Cart
+  - name: Checkout
+  - name: Order
+  - name: Return
+  - name: Account
+security: []
+
+paths:
+  /v1/home:
+    get:
+      tags: [Catalog]
+      operationId: getHome
+      summary: Home page content (VIT-01)
+      responses:
+        "200":
+          description: Home page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Home" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/products:
+    get:
+      tags: [Catalog]
+      operationId: listProducts
+      summary: Catalog with filters, search and sorting (CAT-01 to CAT-07, CAT-09)
+      description: |
+        In any `sort`, sold-out products come last (VIT-05). When `size` is
+        given, products without that size go to the end with
+        `soldOutInSize` (CAT-05).
+      parameters:
+        - name: category
+          in: query
+          schema: { $ref: "#/components/schemas/Category" }
+        - name: size
+          in: query
+          schema: { type: string, maxLength: 5, example: M }
+        - name: color
+          in: query
+          schema: { type: string, maxLength: 30, example: azul }
+        - name: minPrice
+          in: query
+          schema: { $ref: "#/components/schemas/Money" }
+        - name: maxPrice
+          in: query
+          schema: { $ref: "#/components/schemas/Money" }
+        - name: search
+          in: query
+          description: Free text, matched against name and category (CAT-07)
+          schema: { type: string, maxLength: 80 }
+        - name: sort
+          in: query
+          description: Grid order (CAT-09)
+          schema:
+            type: string
+            enum: [newest, lowest_price, highest_price, biggest_discount, best_sellers]
+            default: newest
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Page of products
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductPage" }
+        "422":
+          description: Invalid filter, for example minimum price above the maximum (CAT-04)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/invalid-data
+                title: Dados inválidos
+                status: 422
+                code: invalid_data
+                errors:
+                  - field: minPrice
+                    message: O preço mínimo não pode ser maior que o máximo
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/products/{slug}:
+    get:
+      tags: [Catalog]
+      operationId: getProduct
+      summary: Product screen (PRO-01 to PRO-06, PRO-13, PRO-14)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, example: jaqueta-jeans-azul }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/restock-alerts:
+    post:
+      tags: [Catalog]
+      operationId: requestRestockAlert
+      summary: Notify me when it is back (PRO-12)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewRestockAlert" }
+      responses:
+        "201":
+          description: Alert saved. Asking again for the same contact and size also returns 201.
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/shipping/quotes:
+    post:
+      tags: [Shipping]
+      operationId: quoteProductShipping
+      summary: Shipping price and delivery time on the product screen (PRO-08 to PRO-11)
+      description: |
+        If the external shipping API is down, the response is still 200, with
+        the fixed rate for the region (PRO-11). The front end does not tell the
+        two cases apart.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cep, productId]
+              properties:
+                cep: { $ref: "#/components/schemas/Cep" }
+                productId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Delivery options available for the CEP
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShippingQuote" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/carts:
+    post:
+      tags: [Cart]
+      operationId: createCart
+      summary: Creates an empty cart
+      description: The returned `id` is the cart secret; the front end keeps it in an `httpOnly` cookie (SAC-06).
+      responses:
+        "201":
+          description: Cart created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cart" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/carts/{cartId}:
+    parameters:
+      - $ref: "#/components/parameters/CartId"
+    get:
+      tags: [Cart]
+      operationId: getCart
+      summary: Cart with recalculated amounts (SAC-02, SAC-07, SAC-09, SAC-10, SAC-16, SAC-17)
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/carts/{cartId}/items:
+    parameters:
+      - $ref: "#/components/parameters/CartId"
+    post:
+      tags: [Cart]
+      operationId: addItem
+      summary: Adds a piece (PRO-07, CAT-08)
+      description: If the size is already in the cart, the quantity is added up.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productSizeId, quantity]
+              properties:
+                productSizeId: { type: string, format: uuid }
+                quantity: { type: integer, minimum: 1, example: 1 }
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/OutOfStock" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/carts/{cartId}/items/{itemId}:
+    parameters:
+      - $ref: "#/components/parameters/CartId"
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [Cart]
+      operationId: updateQuantity
+      summary: Changes the quantity of a piece (SAC-04)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity: { type: integer, minimum: 1, example: 2 }
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/OutOfStock" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Cart]
+      operationId: removeItem
+      summary: Removes a piece (SAC-05). "Undo" means adding it again.
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/carts/{cartId}/cep:
+    parameters:
+      - $ref: "#/components/parameters/CartId"
+    put:
+      tags: [Cart]
+      operationId: setCartCep
+      summary: Sets the CEP and calculates the cart shipping (SAC-08)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cep]
+              properties:
+                cep: { $ref: "#/components/schemas/Cep" }
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/carts/{cartId}/delivery:
+    parameters:
+      - $ref: "#/components/parameters/CartId"
+    put:
+      tags: [Cart]
+      operationId: chooseDelivery
+      summary: Chooses the delivery option (CHK-09)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { $ref: "#/components/schemas/DeliveryType" }
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Option not available for the CEP (for example, courier outside the metropolitan area)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/carts/{cartId}/coupon:
+    parameters:
+      - $ref: "#/components/parameters/CartId"
+    put:
+      tags: [Cart]
+      operationId: applyCoupon
+      summary: Applies a coupon; replaces the previous one, if any (SAC-11 to SAC-15)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, minLength: 1, maxLength: 20, example: MARIA10 }
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Coupon does not exist or is inactive; the cart does not change (SAC-12)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/invalid-coupon
+                title: Cupom inválido ou expirado
+                status: 422
+                code: invalid_coupon
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Cart]
+      operationId: removeCoupon
+      summary: Removes the coupon (SAC-14)
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/carts/{cartId}/customer:
+    parameters:
+      - $ref: "#/components/parameters/CartId"
+    put:
+      tags: [Checkout]
+      operationId: saveCustomerDetails
+      summary: Saves the purchase details as a lead (CHK-02 to CHK-08, CHK-10)
+      description: |
+        Called when all required fields are valid, before payment (CHK-05). A
+        CPF or e-mail that already exists does not cause an error, and the
+        response never includes data from earlier records (CHK-08).
+
+        The front end forwards the customer's IP in the `X-Forwarded-For`
+        header; the date, time and IP of each consent are recorded by the back
+        end (CHK-07).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomerDetails" }
+      responses:
+        "200": { $ref: "#/components/responses/Cart" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/orders:
+    post:
+      tags: [Checkout]
+      operationId: createOrder
+      summary: Starts payment and reserves the pieces for 15 minutes (CHK-12, CHK-13)
+      description: |
+        Requires customer details and a delivery option already saved in the
+        cart. Returns `access`, which the front end keeps in an `httpOnly`
+        cookie and sends in `X-Order-Access` on the following calls for this
+        order.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cartId]
+              properties:
+                cartId: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Order created, awaiting payment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreatedOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/OutOfStock" }
+        "422":
+          description: Incomplete cart (empty, no customer details or no delivery option chosen)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/orders/access:
+    post:
+      tags: [Order]
+      operationId: accessOrderWithoutAccount
+      summary: Look up an order by order number and e-mail (PED-05, PED-06, DEV-01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number, email]
+              properties:
+                number: { type: string, example: HL-100482 }
+                email: { type: string, format: email, maxLength: 150 }
+      responses:
+        "201":
+          description: Limited read access to this order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderAccess" }
+        "404":
+          description: Number and e-mail do not match. The response is the same for any wrong combination (PED-06).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/not-found
+                title: Não encontramos um pedido com esses dados
+                status: 404
+                code: not_found
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/orders/{number}:
+    parameters:
+      - $ref: "#/components/parameters/OrderNumber"
+    get:
+      tags: [Order]
+      operationId: getOrder
+      summary: Confirmation and tracking (PED-01 to PED-04, PED-07, PED-08, CHK-16)
+      description: |
+        With `X-Order-Access`, `delivery.address` is not sent (PED-05). With a
+        customer session, the full address is included (CTA-03).
+
+        While the PIX is on screen, the front end polls this resource at short
+        intervals to see `status` change (CHK-16).
+      security:
+        - orderAccess: []
+        - customerSession: []
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/orders/{number}/payments:
+    parameters:
+      - $ref: "#/components/parameters/OrderNumber"
+    post:
+      tags: [Checkout]
+      operationId: payOrder
+      summary: Pays with PIX or card (CHK-14 to CHK-22)
+      description: |
+        A declined card is a 201 response with `status: declined`; the
+        reservation is released right away (CHK-21). A new call, after a
+        decline or an expired reservation, reserves the pieces again if there
+        is stock; otherwise, 409 (CHK-17).
+
+        Card data does not go through here: the front end sends only the
+        `cardToken` created by the gateway fields (CHK-18).
+      security:
+        - orderAccess: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewPayment" }
+      responses:
+        "201":
+          description: Payment attempt recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Payment" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: No stock to reserve again (`out_of_stock`) or order already paid (`order_already_paid`)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/orders/{number}/return:
+    parameters:
+      - $ref: "#/components/parameters/OrderNumber"
+    post:
+      tags: [Return]
+      operationId: requestReturn
+      summary: Requests a return for the order (DEV-01 to DEV-07)
+      security:
+        - orderAccess: []
+        - customerSession: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: "#/components/schemas/ReturnReason" }
+      responses:
+        "201":
+          description: Request recorded; the order moves to `support_in_progress` (DEV-03)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Return" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The order already has a request (DEV-05)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/return-already-requested
+                title: Este pedido já tem uma solicitação de devolução
+                status: 409
+                code: return_already_requested
+        "422":
+          description: Period ended (`return_period_ended`, DEV-04), order not delivered (`order_not_delivered`, DEV-06) or missing reason
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/sessions/links:
+    post:
+      tags: [Account]
+      operationId: requestAccessLink
+      summary: Sends the access link by e-mail (CTA-01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 150 }
+      responses:
+        "202":
+          description: Same response whether or not a customer with this e-mail exists
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/sessions:
+    post:
+      tags: [Account]
+      operationId: startSession
+      summary: Starts the session with the received link or with e-mail and password (CTA-01, CTA-07)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewSession" }
+      responses:
+        "201":
+          description: Session started. The front end keeps `token` in an `httpOnly`, `Secure`, `SameSite=Lax` cookie.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        "401":
+          description: Link used, expired or invalid; or e-mail and password do not match. Same response for every case.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/sessions/current:
+    delete:
+      tags: [Account]
+      operationId: endSession
+      summary: Sign out (CTA-10)
+      security:
+        - customerSession: []
+      responses:
+        "204":
+          description: Session ended
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/account:
+    get:
+      tags: [Account]
+      operationId: getAccount
+      summary: Personal details (CTA-06)
+      security:
+        - customerSession: []
+      responses:
+        "200":
+          description: Customer details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Customer" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    patch:
+      tags: [Account]
+      operationId: updateAccount
+      summary: Fixes name, e-mail or phone; the CPF does not change (CTA-06)
+      security:
+        - customerSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                email: { type: string, format: email, maxLength: 150 }
+                phone: { $ref: "#/components/schemas/Phone" }
+      responses:
+        "200":
+          description: Details updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Customer" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "409":
+          description: E-mail already used by another customer
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/account/password:
+    put:
+      tags: [Account]
+      operationId: setPassword
+      summary: Creates or changes the optional password (CTA-07)
+      security:
+        - customerSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, format: password, minLength: 8, maxLength: 72 }
+      responses:
+        "204":
+          description: Password set
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/account/orders:
+    get:
+      tags: [Account]
+      operationId: listMyOrders
+      summary: My orders, from the newest to the oldest (CTA-03, CTA-04)
+      security:
+        - customerSession: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Page of orders
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderPage" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/account/addresses:
+    get:
+      tags: [Account]
+      operationId: listMyAddresses
+      summary: My addresses (CTA-05)
+      security:
+        - customerSession: []
+      responses:
+        "200":
+          description: Saved addresses
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items: { $ref: "#/components/schemas/SavedAddress" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Account]
+      operationId: addAddress
+      summary: Adds an address (CTA-05)
+      security:
+        - customerSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Address" }
+      responses:
+        "201":
+          description: Address saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SavedAddress" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/account/addresses/{addressId}:
+    parameters:
+      - name: addressId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [Account]
+      operationId: updateAddress
+      summary: Edits an address (CTA-05)
+      security:
+        - customerSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Address" }
+      responses:
+        "200":
+          description: Address updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SavedAddress" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Account]
+      operationId: removeAddress
+      summary: Removes an address (CTA-05)
+      security:
+        - customerSession: []
+      responses:
+        "204":
+          description: Address removed
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/account/consents:
+    get:
+      tags: [Account]
+      operationId: listConsents
+      summary: Marketing consents per channel (CTA-08)
+      security:
+        - customerSession: []
+      responses:
+        "200":
+          description: One item per channel
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 2
+                items: { $ref: "#/components/schemas/Consent" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/account/consents/{channel}:
+    put:
+      tags: [Account]
+      operationId: updateConsent
+      summary: Accepts or revokes one channel, without touching the other (CTA-08)
+      security:
+        - customerSession: []
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/MarketingChannel" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accepted, textVersion]
+              properties:
+                accepted: { type: boolean }
+                textVersion: { type: string, maxLength: 20, example: "2026-11" }
+      responses:
+        "200":
+          description: Consent updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Consent" }
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/account/data-requests:
+    post:
+      tags: [Account]
+      operationId: requestMyData
+      summary: Asks for a copy or deletion of personal data (CTA-09)
+      security:
+        - customerSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string, enum: [copy, deletion] }
+      responses:
+        "201":
+          description: Request recorded for the team to handle
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "422": { $ref: "#/components/responses/InvalidData" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+components:
+  securitySchemes:
+    customerSession:
+      type: http
+      scheme: bearer
+      description: Token returned by `POST /v1/sessions`. Resources of another customer return 404, never 403 (CTA-11).
+    orderAccess:
+      type: apiKey
+      in: header
+      name: X-Order-Access
+      description: Token for a single order, returned by `POST /v1/orders` or `POST /v1/orders/access`.
+
+  parameters:
+    CartId:
+      name: cartId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OrderNumber:
+      name: number
+      in: path
+      required: true
+      schema: { type: string, example: HL-100482 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID created by the front end for each attempt. Repeating the key returns the original response, without charging or recording again (CHK-22, DEV-07).
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPage:
+      name: perPage
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
+
+  headers:
+    X-Request-Id:
+      description: Request identifier, to trace an error in the back-end logs
+      schema: { type: string }
+
+  responses:
+    Cart:
+      description: Recalculated cart
+      headers:
+        X-Request-Id: { $ref: "#/components/headers/X-Request-Id" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Cart" }
+    InvalidData:
+      description: Invalid input; `errors` gives the field and the message
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: https://helena.example/problems/invalid-data
+            title: Dados inválidos
+            status: 422
+            code: invalid_data
+            errors:
+              - field: cpf
+                message: CPF deve ter 11 números
+    NotAuthenticated:
+      description: No valid session or access
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: https://helena.example/problems/not-authenticated
+            title: Identifique-se para continuar
+            status: 401
+            code: not_authenticated
+    NotFound:
+      description: Does not exist, or does not belong to whoever asked
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: https://helena.example/problems/not-found
+            title: Não encontrado
+            status: 404
+            code: not_found
+    OutOfStock:
+      description: Some piece does not have enough sale stock (SAC-04, CHK-13)
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: https://helena.example/problems/out-of-stock
+            title: Uma peça da sua sacola esgotou
+            status: 409
+            code: out_of_stock
+            items:
+              - productSizeId: 6f1c1a52-6f0b-4c53-9d7e-0f6a3f1d2b10
+                name: Jaqueta jeans
+                size: M
+                availableQuantity: 0
+    TooManyRequests:
+      description: Attempt limit reached
+      headers:
+        Retry-After:
+          description: Seconds until a new attempt is allowed
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: https://helena.example/problems/too-many-requests
+            title: Muitas tentativas. Aguarde um pouco e tente de novo
+            status: 429
+            code: too_many_requests
+    InternalError:
+      description: Failure in the server or in an external service (GER-06)
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: https://helena.example/problems/internal-error
+            title: Não foi possível concluir. Tente de novo
+            status: 500
+            code: internal_error
+
+  schemas:
+    Money:
+      type: integer
+      minimum: 0
+      description: Amount in cents
+      example: 19900
+    Cep:
+      type: string
+      pattern: '^\d{8}$'
+      example: "01310100"
+    Cpf:
+      type: string
+      pattern: '^\d{11}$'
+      example: "12345678909"
+    Phone:
+      type: string
+      pattern: '^\d{10,11}$'
+      description: Area code + number, digits only
+      example: "11987654321"
+    Category:
+      type: string
+      enum: [tshirts, pants, jackets, accessories]
+      example: jackets
+    DeliveryType:
+      type: string
+      enum: [courier, pac, sedex]
+      example: pac
+    MarketingChannel:
+      type: string
+      enum: [email, whatsapp]
+    ReturnReason:
+      type: string
+      enum: [wrong_size, defect, changed_mind, other]
+    OrderStatus:
+      type: string
+      enum:
+        - awaiting_payment
+        - reservation_expired
+        - payment_confirmed
+        - preparing
+        - shipped
+        - delivered
+        - support_in_progress
+      example: payment_confirmed
+
+    Problem:
+      type: object
+      description: RFC 9457. `code` is stable and is what the front end handles; `title` is text ready for the customer.
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code:
+          type: string
+          enum:
+            - invalid_data
+            - not_authenticated
+            - not_found
+            - out_of_stock
+            - invalid_coupon
+            - delivery_unavailable
+            - incomplete_cart
+            - order_already_paid
+            - return_already_requested
+            - return_period_ended
+            - order_not_delivered
+            - email_in_use
+            - too_many_requests
+            - internal_error
+        errors:
+          type: array
+          description: Present in `invalid_data`
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field: { type: string, example: cpf }
+              message: { type: string, example: CPF deve ter 11 números }
+        items:
+          type: array
+          description: Present in `out_of_stock`
+          items:
+            type: object
+            required: [productSizeId, name, size, availableQuantity]
+            properties:
+              productSizeId: { type: string, format: uuid }
+              name: { type: string }
+              size: { type: string }
+              availableQuantity: { type: integer, minimum: 0 }
+
+    InstallmentPlan:
+      type: object
+      description: Up to 6 interest-free installments, minimum installment of R$ 50,00. `maxInstallments` 1 means no installments (PRO-02, SAC-16).
+      required: [maxInstallments, installmentAmount]
+      properties:
+        maxInstallments: { type: integer, minimum: 1, maximum: 6, example: 3 }
+        installmentAmount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 6633
+
+    Photo:
+      type: object
+      required: [url, altText]
+      properties:
+        url: { type: string, format: uri, example: "https://imagens.helena.example/jaqueta-jeans-azul-1.jpg" }
+        altText: { type: string, description: Alternative text, example: Jaqueta jeans azul vista de frente }
+
+    ProductSize:
+      type: object
+      description: The stock quantity is not sent, only the two signals the screen uses.
+      required: [id, label, available, lowStock]
+      properties:
+        id: { type: string, format: uuid, description: Identifier of the product + size pair }
+        label: { type: string, example: M }
+        available: { type: boolean, example: true }
+        lowStock: { type: boolean, description: 15 units or fewer (PRO-13), example: false }
+
+    ProductSummary:
+      type: object
+      required: [id, slug, name, category, photo, price, soldOut, sizes]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string, example: jaqueta-jeans-azul }
+        name: { type: string, example: Jaqueta jeans }
+        category: { $ref: "#/components/schemas/Category" }
+        photo: { $ref: "#/components/schemas/Photo" }
+        price:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 15900
+        originalPrice:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
+          description: Price before the sale; null when there is no sale (VIT-04)
+          example: 19900
+        discountBadge: { type: string, nullable: true, example: "-20%" }
+        soldOut: { type: boolean, description: No size available (VIT-05), example: false }
+        soldOutInSize: { type: boolean, description: Only when there is a size filter (CAT-05), example: false }
+        sizes:
+          type: array
+          description: For quick buy (CAT-08)
+          items: { $ref: "#/components/schemas/ProductSize" }
+
+    Product:
+      allOf:
+        - $ref: "#/components/schemas/ProductSummary"
+        - type: object
+          required: [description, fabric, collection, color, photos, installmentPlan, otherColors]
+          properties:
+            description: { type: string, example: Jaqueta de corte reto em jeans encorpado. }
+            fabric: { type: string, example: 100% algodão }
+            collection: { type: string, example: Verão 2027 }
+            color:
+              type: object
+              required: [name, hex]
+              properties:
+                name: { type: string, example: Azul }
+                hex: { type: string, pattern: '^#[0-9A-Fa-f]{6}$', example: "#3B5B7A" }
+            otherColors:
+              type: array
+              description: The same model in another color is another product
+              items:
+                type: object
+                required: [slug, name, hex]
+                properties:
+                  slug: { type: string, example: jaqueta-jeans-preta }
+                  name: { type: string, example: Preta }
+                  hex: { type: string, example: "#1A1A1A" }
+            photos:
+              type: array
+              minItems: 1
+              items: { $ref: "#/components/schemas/Photo" }
+            installmentPlan: { $ref: "#/components/schemas/InstallmentPlan" }
+            sizeGuide:
+              type: object
+              nullable: true
+              description: Size chart for the category (PRO-06)
+              required: [columns, rows]
+              properties:
+                columns:
+                  type: array
+                  items: { type: string }
+                  example: [Tamanho, Busto (cm), Comprimento (cm)]
+                rows:
+                  type: array
+                  items:
+                    type: array
+                    items: { type: string }
+                  example: [[P, "92", "58"], [M, "96", "60"]]
+
+    AvailableFilters:
+      type: object
+      description: Options to build the filter panel (CAT-01)
+      required: [sizes, colors, minPrice, maxPrice]
+      properties:
+        sizes:
+          type: array
+          items: { type: string }
+          example: [P, M, G, GG]
+        colors:
+          type: array
+          items:
+            type: object
+            required: [value, name, hex]
+            properties:
+              value: { type: string, example: azul }
+              name: { type: string, example: Azul }
+              hex: { type: string, example: "#3B5B7A" }
+        minPrice:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 4990
+        maxPrice:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 39900
+
+    ProductPage:
+      type: object
+      required: [items, total, page, perPage, filters]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ProductSummary" }
+        total: { type: integer, minimum: 0, example: 37 }
+        page: { type: integer, minimum: 1, example: 1 }
+        perPage: { type: integer, minimum: 1, maximum: 48, example: 24 }
+        filters: { $ref: "#/components/schemas/AvailableFilters" }
+
+    Home:
+      type: object
+      required: [campaign, featured]
+      properties:
+        announcement: { type: string, nullable: true, description: Text for the announcement bar, example: Frete grátis a partir de R$ 300 }
+        campaign:
+          type: object
+          required: [title, image, link]
+          properties:
+            title: { type: string, example: Coleção Verão 2027 }
+            text: { type: string, example: Peças leves para os dias longos. }
+            image: { $ref: "#/components/schemas/Photo" }
+            link: { type: string, description: Path inside the store, example: "/catalogo?categoria=camisetas" }
+        featured:
+          type: array
+          maxItems: 12
+          items: { $ref: "#/components/schemas/ProductSummary" }
+
+    NewRestockAlert:
+      type: object
+      required: [productSizeId, channel, contact]
+      properties:
+        productSizeId: { type: string, format: uuid }
+        channel: { $ref: "#/components/schemas/MarketingChannel" }
+        contact: { type: string, maxLength: 150, description: "E-mail, or phone with digits only, depending on the channel", example: maria@exemplo.com }
+
+    DeliveryOption:
+      type: object
+      required: [type, price, free, deliveryTime]
+      properties:
+        type: { $ref: "#/components/schemas/DeliveryType" }
+        price:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          description: Amount charged; 0 when `free`
+          example: 2000
+        free: { type: boolean, description: Only the cheapest option can be free (SAC-10), example: false }
+        deliveryTime: { type: string, description: "Text ready for the screen, including the courier cut-off time", example: Chega em até 5 dias úteis }
+
+    ShippingQuote:
+      type: object
+      required: [cep, city, state, options]
+      properties:
+        cep: { $ref: "#/components/schemas/Cep" }
+        city: { type: string, example: São Paulo }
+        state: { type: string, pattern: '^[A-Z]{2}$', example: SP }
+        options:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/DeliveryOption" }
+
+    CartItem:
+      type: object
+      required: [id, productSizeId, slug, name, color, size, photo, unitPrice, quantity, maxQuantity, subtotal, soldOut]
+      properties:
+        id: { type: string, format: uuid }
+        productSizeId: { type: string, format: uuid }
+        slug: { type: string, example: jaqueta-jeans-azul }
+        name: { type: string, example: Jaqueta jeans }
+        color: { type: string, example: Azul }
+        size: { type: string, example: M }
+        photo: { $ref: "#/components/schemas/Photo" }
+        unitPrice:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 19900
+        quantity: { type: integer, minimum: 1, example: 1 }
+        maxQuantity: { type: integer, minimum: 0, description: Limit of the quantity selector (SAC-04), example: 4 }
+        subtotal:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 19900
+        soldOut: { type: boolean, description: Left out of the total until it is removed (SAC-07), example: false }
+
+    Cart:
+      type: object
+      required: [id, items, pieceCount, subtotal, discount, total, installmentPlan, amountToFreeShipping, canCheckout]
+      properties:
+        id: { type: string, format: uuid }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CartItem" }
+        pieceCount: { type: integer, minimum: 0, example: 2 }
+        subtotal:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          description: Sum of the pieces that are not sold out
+          example: 32000
+        coupon:
+          type: object
+          nullable: true
+          required: [code, percent]
+          properties:
+            code: { type: string, example: MARIA10 }
+            percent: { type: number, minimum: 0, maximum: 70, example: 10 }
+        discount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 0
+        amountToFreeShipping:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          description: How much is missing in pieces, after the discount, to reach R$ 300,00; 0 when already reached (SAC-09)
+          example: 0
+        cep:
+          allOf: [{ $ref: "#/components/schemas/Cep" }]
+          nullable: true
+        deliveryOptions:
+          type: array
+          description: Empty while there is no CEP
+          items: { $ref: "#/components/schemas/DeliveryOption" }
+        chosenDelivery:
+          allOf: [{ $ref: "#/components/schemas/DeliveryType" }]
+          nullable: true
+        shippingAmount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          nullable: true
+          description: Price of the chosen option; null while nothing is chosen
+          example: 0
+        total:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          description: subtotal − discount + shippingAmount
+          example: 32000
+        installmentPlan: { $ref: "#/components/schemas/InstallmentPlan" }
+        reservationExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Only when payment has started and a reservation is in progress (SAC-17)
+        canCheckout: { type: boolean, description: "False with an empty cart or with a sold-out piece (SAC-03, SAC-07)", example: true }
+
+    Address:
+      type: object
+      required: [cep, street, number, neighborhood, city, state]
+      properties:
+        cep: { $ref: "#/components/schemas/Cep" }
+        street: { type: string, minLength: 1, maxLength: 100, example: Avenida Paulista }
+        number: { type: string, minLength: 1, maxLength: 10, example: "1000" }
+        complement: { type: string, maxLength: 40, nullable: true, example: Apto 12 }
+        neighborhood: { type: string, minLength: 1, maxLength: 60, example: Bela Vista }
+        city: { type: string, minLength: 1, maxLength: 60, example: São Paulo }
+        state: { type: string, pattern: '^[A-Z]{2}$', example: SP }
+
+    SavedAddress:
+      allOf:
+        - $ref: "#/components/schemas/Address"
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string, format: uuid }
+
+    CustomerDetails:
+      type: object
+      required: [name, cpf, email, phone, address, consents]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100, example: Maria Souza }
+        cpf: { $ref: "#/components/schemas/Cpf" }
+        email: { type: string, format: email, maxLength: 150, example: maria@exemplo.com }
+        phone: { $ref: "#/components/schemas/Phone" }
+        address: { $ref: "#/components/schemas/Address" }
+        consents:
+          type: object
+          description: One consent per channel, both false by default (CHK-07)
+          required: [email, whatsapp, textVersion]
+          properties:
+            email: { type: boolean, example: false }
+            whatsapp: { type: boolean, example: false }
+            textVersion: { type: string, maxLength: 20, example: "2026-11" }
+
+    OrderStep:
+      type: object
+      required: [step, completedAt]
+      properties:
+        step:
+          type: string
+          enum: [payment_confirmed, preparing, shipped, delivered]
+        completedAt: { type: string, format: date-time, nullable: true }
+
+    Return:
+      type: object
+      required: [reason, status, requestedAt]
+      properties:
+        reason: { $ref: "#/components/schemas/ReturnReason" }
+        status:
+          type: string
+          enum: [requested, in_progress, completed, rejected]
+          example: requested
+        requestedAt: { type: string, format: date-time }
+
+    Payment:
+      type: object
+      required: [id, method, status]
+      properties:
+        id: { type: string, format: uuid }
+        method: { type: string, enum: [pix, card], example: pix }
+        status: { type: string, enum: [pending, approved, declined], example: pending }
+        installments: { type: integer, minimum: 1, maximum: 6, nullable: true, example: null }
+        message: { type: string, nullable: true, description: Text for the customer when declined (CHK-21) }
+        pix:
+          type: object
+          nullable: true
+          description: "Only for `method: pix` while `pending` (CHK-15)"
+          required: [pixCode, qrCode, expiresAt]
+          properties:
+            pixCode: { type: string, description: PIX copy-and-paste code, example: 00020126580014br.gov.bcb.pix0136exemplo5204000053039865802BR6304ABCD }
+            qrCode: { type: string, description: PNG image as a data URI }
+            expiresAt: { type: string, format: date-time }
+
+    NewPayment:
+      type: object
+      required: [method]
+      properties:
+        method: { type: string, enum: [pix, card] }
+        cardToken: { type: string, description: Required for card; created by the gateway in the browser }
+        installments: { type: integer, minimum: 1, maximum: 6, description: Required for card; limited by the order `installmentPlan` (CHK-19) }
+
+    Order:
+      type: object
+      required: [number, createdAt, status, steps, items, subtotal, discount, shippingAmount, total, installmentPlan, delivery, maskedEmail, returnAvailability]
+      properties:
+        number: { type: string, example: HL-100482 }
+        createdAt: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        steps:
+          type: array
+          description: Always the four of them, in order (PED-03)
+          items: { $ref: "#/components/schemas/OrderStep" }
+        items:
+          type: array
+          items:
+            type: object
+            required: [name, color, size, photo, unitPrice, quantity]
+            properties:
+              name: { type: string, example: Jaqueta jeans }
+              color: { type: string, example: Azul }
+              size: { type: string, example: M }
+              photo: { $ref: "#/components/schemas/Photo" }
+              unitPrice:
+                allOf: [{ $ref: "#/components/schemas/Money" }]
+              quantity: { type: integer, minimum: 1, example: 1 }
+        subtotal:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 32000
+        coupon: { type: string, nullable: true, example: null }
+        discount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 0
+        shippingAmount:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 0
+        total:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 32000
+        installmentPlan: { $ref: "#/components/schemas/InstallmentPlan" }
+        reservationExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: End of the reservation while `awaiting_payment` (CHK-12)
+        payment:
+          allOf: [{ $ref: "#/components/schemas/Payment" }]
+          nullable: true
+          description: Latest attempt
+        delivery:
+          type: object
+          required: [type, deliveryTime, city, state]
+          properties:
+            type: { $ref: "#/components/schemas/DeliveryType" }
+            deliveryTime: { type: string, example: Chega em até 5 dias úteis }
+            city: { type: string, example: São Paulo }
+            state: { type: string, example: SP }
+            address:
+              allOf: [{ $ref: "#/components/schemas/Address" }]
+              description: Only with a customer session (PED-05)
+            trackingCode: { type: string, nullable: true, description: "PAC and Sedex, after shipping (PED-04)", example: null }
+            trackingLink: { type: string, format: uri, nullable: true, example: null }
+            deliveredAt: { type: string, format: date-time, nullable: true }
+        maskedEmail: { type: string, example: "m***@exemplo.com" }
+        return:
+          allOf: [{ $ref: "#/components/schemas/Return" }]
+          nullable: true
+        returnAvailability:
+          type: object
+          description: The back end decides; the screen only enables or explains (PED-08, DEV-04, DEV-06)
+          required: [allowed]
+          properties:
+            allowed: { type: boolean, example: false }
+            deadline: { type: string, format: date, nullable: true, description: Last day to request }
+            reason:
+              type: string
+              nullable: true
+              enum: [order_not_delivered, return_period_ended, return_already_requested, null]
+
+    CreatedOrder:
+      type: object
+      required: [access, order]
+      properties:
+        access: { type: string, description: Value for the `X-Order-Access` header }
+        order: { $ref: "#/components/schemas/Order" }
+
+    OrderAccess:
+      type: object
+      required: [access, expiresAt]
+      properties:
+        access: { type: string }
+        expiresAt: { type: string, format: date-time }
+
+    OrderSummary:
+      type: object
+      required: [number, createdAt, status, total]
+      properties:
+        number: { type: string, example: HL-100482 }
+        createdAt: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        total:
+          allOf: [{ $ref: "#/components/schemas/Money" }]
+          example: 32000
+
+    OrderPage:
+      type: object
+      required: [items, total, page, perPage]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OrderSummary" }
+        total: { type: integer, minimum: 0, example: 1 }
+        page: { type: integer, minimum: 1, example: 1 }
+        perPage: { type: integer, minimum: 1, maximum: 48, example: 24 }
+
+    NewSession:
+      type: object
+      description: Send `linkToken`, or `email` and `password`.
+      properties:
+        linkToken: { type: string, description: "Single use, short-lived" }
+        email: { type: string, format: email, maxLength: 150 }
+        password: { type: string, format: password, maxLength: 72 }
+
+    Session:
+      type: object
+      required: [token, expiresAt]
+      properties:
+        token: { type: string }
+        expiresAt: { type: string, format: date-time }
+
+    Customer:
+      type: object
+      required: [name, email, phone, maskedCpf, hasPassword]
+      properties:
+        name: { type: string, example: Maria Souza }
+        email: { type: string, format: email, example: maria@exemplo.com }
+        phone: { $ref: "#/components/schemas/Phone" }
+        maskedCpf: { type: string, example: "***.456.789-**" }
+        hasPassword: { type: boolean, example: false }
+
+    Consent:
+      type: object
+      required: [channel, accepted]
+      properties:
+        channel: { $ref: "#/components/schemas/MarketingChannel" }
+        accepted: { type: boolean, example: false }
+        recordedAt: { type: string, format: date-time, nullable: true }
