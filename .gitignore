@@ -42,3 +42,17 @@ next-env.d.ts
 
 # material de pesquisa e referencias (fica so local)
 /docs/referencias/
+
+# certificados e chaves (o certificado A1 da NF-e é .pfx)
+*.pfx
+*.p12
+*.key
+
+# backups e arquivos do SQL Server
+*.bak
+*.mdf
+*.ldf
+
+# configurações locais do Claude Code
+.claude/settings.local.json
+CLAUDE.local.md
