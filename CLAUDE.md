@@ -4,6 +4,44 @@
 
 Loja virtual de moda (camisetas, calças, jaquetas, acessórios) para 18 a 30 anos, que compram pelo celular a partir do Instagram. MVP com orçamento enxuto. Este repositório é o front-end em Next.js; o back-end será Java + SQL Server, em repositório próprio, e ainda não existe. Ordem de trabalho: telas do cliente primeiro, painel administrativo depois.
 
+## Restrições (valem acima de tudo)
+
+Estas regras não têm exceção. Se uma tarefa só fecha quebrando uma delas, o agente para e pergunta ao dono. O motivo e o detalhe de cada uma estão nas seções abaixo.
+
+**Processo**
+- NUNCA fazer commit nem criar ramo; isso é do dono.
+- NUNCA escrever código de comportamento que não esteja na spec. Primeiro a spec, depois o teste, depois o código.
+- NUNCA alterar a asserção de um teste para ele passar.
+- NUNCA commitar nada de `docs/referencias/`.
+- NUNCA adicionar dependência sem necessidade clara e sem avisar o dono.
+- NUNCA usar uma API do Next de memória; ler antes o guia em `node_modules/next/dist/docs/`.
+
+**Código**
+- NUNCA nome próprio em inglês (variável, função, componente, pasta, arquivo, teste), salvo o que a ferramenta exige.
+- NUNCA acessar o SQL Server pelo front; só a API, pelo lado do servidor.
+- NUNCA escrever à mão os tipos da API nem mudar o contrato de forma não aditiva.
+- NUNCA importar de dentro de outro domínio; só pelo `index.ts` dele.
+- NUNCA colocar regra de negócio, validação ou estilo extenso em `app/`.
+- NUNCA passar a resposta inteira da API para componente de cliente.
+
+**Segurança e privacidade**
+- NUNCA confiar só no `proxy.ts`: toda Server Action, `route.ts` e consulta protegida confere a autorização.
+- NUNCA token em `localStorage` nem segredo em variável `NEXT_PUBLIC_`.
+- NUNCA dado de cartão passando pelo nosso servidor ou gravado em qualquer lugar.
+- NUNCA caixa de marketing ou de cookie pré-marcada, nem "Aceitar" com mais destaque que "Rejeitar".
+- NUNCA pedir à cliente um dado que a venda e a nota fiscal não exigem.
+- NUNCA mostrar ou preencher dados de um cadastro existente para quem não está identificada.
+
+**Negócio**
+- NUNCA cobrar sem reserva de estoque válida; se a peça zerou, bloquear antes do pagamento.
+- NUNCA exigir conta, senha ou CAPTCHA para comprar.
+- NUNCA aceitar mais de um cupom por compra.
+- NUNCA travar o checkout porque a API de frete caiu.
+
+**Design**
+- NUNCA cor fora dos tokens, nem `oferta` em botão ou link, nem sombra, nem classe `dark:`.
+- NUNCA usar cor como único sinal, nem alvo de toque menor que 48px.
+
 ## Idioma
 
 - Tudo que for possível fica em PT-BR, para o dono auditar à mão: tokens, variáveis, funções, componentes, pastas e arquivos próprios, comentários, nomes de teste, mensagens de commit e documentos.
