@@ -1,0 +1,1558 @@
+openapi: 3.0.3
+info:
+  title: Helena — API da loja (telas do cliente)
+  version: 0.1.0
+  description: |
+    Contrato entre o front-end (Next.js) e o back-end (Java + SQL Server) para as
+    8 telas do cliente. Derivado de `docs/SPEC-CLIENT.md`; os códigos entre
+    parênteses (`SAC-13`) apontam para os cenários de lá.
+
+    Convenções:
+    - Quem chama esta API é o servidor do Next, nunca o navegador.
+    - Dinheiro é sempre inteiro, em centavos (`19900` = R$ 199,00).
+    - Datas em ISO 8601 com fuso (`2026-11-14T20:30:00-03:00`).
+    - CPF, CEP e telefone trafegam só com dígitos.
+    - Todo erro vem como `application/problem+json` (RFC 9457). Os nomes
+      `type`, `title`, `status`, `detail` e `instance` são da norma; o campo
+      `codigo` é o que o front usa para decidir o que mostrar.
+    - Toda resposta traz o cabeçalho `X-Request-Id`.
+    - Mudanças neste contrato são aditivas.
+servers:
+  - url: http://localhost:4010
+    description: Servidor simulado (Prism)
+tags:
+  - name: Catálogo
+  - name: Frete
+  - name: Sacola
+  - name: Checkout
+  - name: Pedido
+  - name: Devolução
+  - name: Conta
+security: []
+
+paths:
+  /v1/vitrine:
+    get:
+      tags: [Catálogo]
+      operationId: obterVitrine
+      summary: Conteúdo da página inicial (VIT-01)
+      responses:
+        "200":
+          description: Vitrine
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vitrine" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/produtos:
+    get:
+      tags: [Catálogo]
+      operationId: listarProdutos
+      summary: Catálogo com filtros, busca e ordenação (CAT-01 a CAT-07, CAT-09)
+      description: |
+        Em qualquer `ordem`, os esgotados vêm por último (VIT-05). Com `tamanho`
+        informado, quem não tem aquele tamanho vai para o fim com
+        `esgotadoNoTamanho` (CAT-05).
+      parameters:
+        - name: categoria
+          in: query
+          schema: { $ref: "#/components/schemas/Categoria" }
+        - name: tamanho
+          in: query
+          schema: { type: string, maxLength: 5, example: M }
+        - name: cor
+          in: query
+          schema: { type: string, maxLength: 30, example: azul }
+        - name: precoMin
+          in: query
+          schema: { $ref: "#/components/schemas/Dinheiro" }
+        - name: precoMax
+          in: query
+          schema: { $ref: "#/components/schemas/Dinheiro" }
+        - name: busca
+          in: query
+          description: Texto livre, comparado com nome e categoria (CAT-07)
+          schema: { type: string, maxLength: 80 }
+        - name: ordem
+          in: query
+          description: Ordenação da grade (CAT-09)
+          schema:
+            type: string
+            enum: [novidades, menor_preco, maior_preco, maior_desconto, mais_vendidos]
+            default: novidades
+        - $ref: "#/components/parameters/Pagina"
+        - $ref: "#/components/parameters/PorPagina"
+      responses:
+        "200":
+          description: Página de produtos
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginaDeProdutos" }
+        "422":
+          description: Filtro inválido, por exemplo preço mínimo maior que o máximo (CAT-04)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+              example:
+                type: https://helena.example/problemas/dados-invalidos
+                title: Dados inválidos
+                status: 422
+                codigo: dados_invalidos
+                erros:
+                  - campo: precoMin
+                    mensagem: O preço mínimo não pode ser maior que o máximo
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/produtos/{slug}:
+    get:
+      tags: [Catálogo]
+      operationId: obterProduto
+      summary: Tela de produto (PRO-01 a PRO-06, PRO-13, PRO-14)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, example: jaqueta-jeans-azul }
+      responses:
+        "200":
+          description: Produto
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Produto" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/avisos-de-reposicao:
+    post:
+      tags: [Catálogo]
+      operationId: pedirAvisoDeReposicao
+      summary: Avise-me quando chegar (PRO-12)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NovoAvisoDeReposicao" }
+      responses:
+        "201":
+          description: Aviso registrado. Pedir de novo para o mesmo contato e tamanho também responde 201.
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "429": { $ref: "#/components/responses/MuitasRequisicoes" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/fretes/cotacoes:
+    post:
+      tags: [Frete]
+      operationId: cotarFreteDoProduto
+      summary: Frete e prazo na tela do produto (PRO-08 a PRO-11)
+      description: |
+        Se a API externa de frete cair, a resposta continua sendo 200, com a taxa
+        fixa da região (PRO-11). O front não distingue os dois casos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cep, produtoId]
+              properties:
+                cep: { $ref: "#/components/schemas/Cep" }
+                produtoId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Modalidades disponíveis para o CEP
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CotacaoDeFrete" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sacolas:
+    post:
+      tags: [Sacola]
+      operationId: criarSacola
+      summary: Cria uma sacola vazia
+      description: O `id` devolvido é o segredo da sacola; o front guarda em cookie `httpOnly` (SAC-06).
+      responses:
+        "201":
+          description: Sacola criada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sacola" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sacolas/{sacolaId}:
+    parameters:
+      - $ref: "#/components/parameters/SacolaId"
+    get:
+      tags: [Sacola]
+      operationId: obterSacola
+      summary: Sacola com valores recalculados (SAC-02, SAC-07, SAC-09, SAC-10, SAC-16, SAC-17)
+      responses:
+        "200": { $ref: "#/components/responses/Sacola" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sacolas/{sacolaId}/itens:
+    parameters:
+      - $ref: "#/components/parameters/SacolaId"
+    post:
+      tags: [Sacola]
+      operationId: adicionarItem
+      summary: Adiciona uma peça (PRO-07, CAT-08)
+      description: Se o tamanho já está na sacola, soma a quantidade.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [produtoTamanhoId, quantidade]
+              properties:
+                produtoTamanhoId: { type: string, format: uuid }
+                quantidade: { type: integer, minimum: 1, example: 1 }
+      responses:
+        "200": { $ref: "#/components/responses/Sacola" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "409": { $ref: "#/components/responses/EstoqueInsuficiente" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sacolas/{sacolaId}/itens/{itemId}:
+    parameters:
+      - $ref: "#/components/parameters/SacolaId"
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [Sacola]
+      operationId: alterarQuantidade
+      summary: Altera a quantidade de uma peça (SAC-04)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantidade]
+              properties:
+                quantidade: { type: integer, minimum: 1, example: 2 }
+      responses:
+        "200": { $ref: "#/components/responses/Sacola" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "409": { $ref: "#/components/responses/EstoqueInsuficiente" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+    delete:
+      tags: [Sacola]
+      operationId: removerItem
+      summary: Remove uma peça (SAC-05). "Desfazer" é adicionar de novo.
+      responses:
+        "200": { $ref: "#/components/responses/Sacola" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sacolas/{sacolaId}/cep:
+    parameters:
+      - $ref: "#/components/parameters/SacolaId"
+    put:
+      tags: [Sacola]
+      operationId: definirCepDaSacola
+      summary: Informa o CEP e calcula o frete da sacola (SAC-08)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cep]
+              properties:
+                cep: { $ref: "#/components/schemas/Cep" }
+      responses:
+        "200": { $ref: "#/components/responses/Sacola" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sacolas/{sacolaId}/entrega:
+    parameters:
+      - $ref: "#/components/parameters/SacolaId"
+    put:
+      tags: [Sacola]
+      operationId: escolherEntrega
+      summary: Escolhe a modalidade de entrega (CHK-09)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo]
+              properties:
+                tipo: { $ref: "#/components/schemas/TipoDeFrete" }
+      responses:
+        "200": { $ref: "#/components/responses/Sacola" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "422":
+          description: Modalidade indisponível para o CEP (por exemplo, motoboy fora da região metropolitana)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sacolas/{sacolaId}/cupom:
+    parameters:
+      - $ref: "#/components/parameters/SacolaId"
+    put:
+      tags: [Sacola]
+      operationId: aplicarCupom
+      summary: Aplica um cupom; substitui o anterior, se houver (SAC-11 a SAC-15)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codigo]
+              properties:
+                codigo: { type: string, minLength: 1, maxLength: 20, example: MARIA10 }
+      responses:
+        "200": { $ref: "#/components/responses/Sacola" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "422":
+          description: Cupom inexistente ou inativo; a sacola não muda (SAC-12)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+              example:
+                type: https://helena.example/problemas/cupom-invalido
+                title: Cupom inválido ou expirado
+                status: 422
+                codigo: cupom_invalido
+        "429": { $ref: "#/components/responses/MuitasRequisicoes" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+    delete:
+      tags: [Sacola]
+      operationId: removerCupom
+      summary: Remove o cupom (SAC-14)
+      responses:
+        "200": { $ref: "#/components/responses/Sacola" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sacolas/{sacolaId}/cliente:
+    parameters:
+      - $ref: "#/components/parameters/SacolaId"
+    put:
+      tags: [Checkout]
+      operationId: salvarDadosDaCliente
+      summary: Salva os dados da compra como lead (CHK-02 a CHK-08, CHK-10)
+      description: |
+        Chamado quando todos os campos obrigatórios estão válidos, antes do
+        pagamento (CHK-05). CPF ou e-mail já existentes não geram erro, e a
+        resposta nunca traz dados de cadastros anteriores (CHK-08).
+
+        O front repassa o IP da cliente no cabeçalho `X-Forwarded-For`; data,
+        hora e IP dos aceites são registrados pelo back-end (CHK-07).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DadosDaCliente" }
+      responses:
+        "200": { $ref: "#/components/responses/Sacola" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/pedidos:
+    post:
+      tags: [Checkout]
+      operationId: criarPedido
+      summary: Inicia o pagamento e reserva as peças por 15 minutos (CHK-12, CHK-13)
+      description: |
+        Exige dados da cliente e modalidade de entrega já salvos na sacola.
+        Devolve o `acesso`, que o front guarda em cookie `httpOnly` e envia em
+        `X-Acesso-Pedido` nas chamadas seguintes deste pedido.
+      parameters:
+        - $ref: "#/components/parameters/ChaveDeIdempotencia"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sacolaId]
+              properties:
+                sacolaId: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Pedido criado, aguardando pagamento
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PedidoCriado" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "409": { $ref: "#/components/responses/EstoqueInsuficiente" }
+        "422":
+          description: Sacola incompleta (vazia, sem dados da cliente ou sem entrega escolhida)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/pedidos/acessos:
+    post:
+      tags: [Pedido]
+      operationId: acessarPedidoSemConta
+      summary: Consulta por número do pedido e e-mail (PED-05, PED-06, DEV-01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [numero, email]
+              properties:
+                numero: { type: string, example: HL-100482 }
+                email: { type: string, format: email, maxLength: 150 }
+      responses:
+        "201":
+          description: Acesso de leitura reduzida a esse pedido
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AcessoAoPedido" }
+        "404":
+          description: Número e e-mail não conferem. A resposta é a mesma para qualquer combinação errada (PED-06).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+              example:
+                type: https://helena.example/problemas/nao-encontrado
+                title: Não encontramos um pedido com esses dados
+                status: 404
+                codigo: nao_encontrado
+        "429": { $ref: "#/components/responses/MuitasRequisicoes" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/pedidos/{numero}:
+    parameters:
+      - $ref: "#/components/parameters/NumeroDoPedido"
+    get:
+      tags: [Pedido]
+      operationId: obterPedido
+      summary: Confirmação e acompanhamento (PED-01 a PED-04, PED-07, PED-08, CHK-16)
+      description: |
+        Com `X-Acesso-Pedido`, `entrega.endereco` não é enviado (PED-05). Com
+        sessão da cliente, vem o endereço completo (CTA-03).
+
+        Enquanto o PIX está na tela, o front consulta este recurso em intervalos
+        curtos para ver `status` mudar (CHK-16).
+      security:
+        - acessoAoPedido: []
+        - sessaoDaCliente: []
+      responses:
+        "200":
+          description: Pedido
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pedido" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/pedidos/{numero}/pagamentos:
+    parameters:
+      - $ref: "#/components/parameters/NumeroDoPedido"
+    post:
+      tags: [Checkout]
+      operationId: pagarPedido
+      summary: Paga com PIX ou cartão (CHK-14 a CHK-22)
+      description: |
+        Recusa do cartão é uma resposta 201 com `status: recusado`; a reserva é
+        liberada na hora (CHK-21). Uma nova chamada, depois de recusa ou de
+        reserva expirada, refaz a reserva se houver estoque; senão, 409 (CHK-17).
+
+        Dados do cartão não passam por aqui: o front envia só o
+        `tokenDoCartao` gerado pelos campos do gateway (CHK-18).
+      security:
+        - acessoAoPedido: []
+      parameters:
+        - $ref: "#/components/parameters/ChaveDeIdempotencia"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NovoPagamento" }
+      responses:
+        "201":
+          description: Tentativa de pagamento registrada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pagamento" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "409":
+          description: Sem estoque para refazer a reserva (`estoque_insuficiente`) ou pedido já pago (`pedido_ja_pago`)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/pedidos/{numero}/devolucao:
+    parameters:
+      - $ref: "#/components/parameters/NumeroDoPedido"
+    post:
+      tags: [Devolução]
+      operationId: solicitarDevolucao
+      summary: Solicita a devolução do pedido (DEV-01 a DEV-07)
+      security:
+        - acessoAoPedido: []
+        - sessaoDaCliente: []
+      parameters:
+        - $ref: "#/components/parameters/ChaveDeIdempotencia"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo: { $ref: "#/components/schemas/MotivoDaDevolucao" }
+      responses:
+        "201":
+          description: Solicitação registrada; o pedido passa a `suporte_em_andamento` (DEV-03)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Devolucao" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "409":
+          description: O pedido já tem uma solicitação (DEV-05)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+              example:
+                type: https://helena.example/problemas/devolucao-ja-solicitada
+                title: Este pedido já tem uma solicitação de devolução
+                status: 409
+                codigo: devolucao_ja_solicitada
+        "422":
+          description: Prazo encerrado (`prazo_de_devolucao_encerrado`, DEV-04), pedido não entregue (`pedido_nao_entregue`, DEV-06) ou motivo ausente
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sessoes/links:
+    post:
+      tags: [Conta]
+      operationId: pedirLinkDeAcesso
+      summary: Envia o link de acesso por e-mail (CTA-01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 150 }
+      responses:
+        "202":
+          description: Resposta idêntica exista ou não uma cliente com esse e-mail
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "429": { $ref: "#/components/responses/MuitasRequisicoes" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sessoes:
+    post:
+      tags: [Conta]
+      operationId: abrirSessao
+      summary: Abre a sessão com o link recebido ou com e-mail e senha (CTA-01, CTA-07)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NovaSessao" }
+      responses:
+        "201":
+          description: Sessão aberta. O front guarda `token` em cookie `httpOnly`, `Secure`, `SameSite=Lax`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sessao" }
+        "401":
+          description: Link usado, expirado ou inválido; ou e-mail e senha não conferem. Mesma resposta para todos os casos.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+        "429": { $ref: "#/components/responses/MuitasRequisicoes" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/sessoes/atual:
+    delete:
+      tags: [Conta]
+      operationId: encerrarSessao
+      summary: Sair (CTA-10)
+      security:
+        - sessaoDaCliente: []
+      responses:
+        "204":
+          description: Sessão encerrada
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/conta:
+    get:
+      tags: [Conta]
+      operationId: obterConta
+      summary: Dados pessoais (CTA-06)
+      security:
+        - sessaoDaCliente: []
+      responses:
+        "200":
+          description: Dados da cliente
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cliente" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+    patch:
+      tags: [Conta]
+      operationId: corrigirConta
+      summary: Corrige nome, e-mail ou telefone; CPF não muda (CTA-06)
+      security:
+        - sessaoDaCliente: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                nome: { type: string, minLength: 1, maxLength: 100 }
+                email: { type: string, format: email, maxLength: 150 }
+                telefone: { $ref: "#/components/schemas/Telefone" }
+      responses:
+        "200":
+          description: Dados atualizados
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cliente" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "409":
+          description: E-mail já usado por outra cliente
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/conta/senha:
+    put:
+      tags: [Conta]
+      operationId: definirSenha
+      summary: Cria ou troca a senha opcional (CTA-07)
+      security:
+        - sessaoDaCliente: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [senha]
+              properties:
+                senha: { type: string, format: password, minLength: 8, maxLength: 72 }
+      responses:
+        "204":
+          description: Senha definida
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/conta/pedidos:
+    get:
+      tags: [Conta]
+      operationId: listarMeusPedidos
+      summary: Meus pedidos, do mais recente ao mais antigo (CTA-03, CTA-04)
+      security:
+        - sessaoDaCliente: []
+      parameters:
+        - $ref: "#/components/parameters/Pagina"
+        - $ref: "#/components/parameters/PorPagina"
+      responses:
+        "200":
+          description: Página de pedidos
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginaDePedidos" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/conta/enderecos:
+    get:
+      tags: [Conta]
+      operationId: listarMeusEnderecos
+      summary: Meus endereços (CTA-05)
+      security:
+        - sessaoDaCliente: []
+      responses:
+        "200":
+          description: Endereços salvos
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items: { $ref: "#/components/schemas/EnderecoSalvo" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+    post:
+      tags: [Conta]
+      operationId: adicionarEndereco
+      summary: Adiciona um endereço (CTA-05)
+      security:
+        - sessaoDaCliente: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Endereco" }
+      responses:
+        "201":
+          description: Endereço salvo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnderecoSalvo" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/conta/enderecos/{enderecoId}:
+    parameters:
+      - name: enderecoId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [Conta]
+      operationId: editarEndereco
+      summary: Edita um endereço (CTA-05)
+      security:
+        - sessaoDaCliente: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Endereco" }
+      responses:
+        "200":
+          description: Endereço atualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnderecoSalvo" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+    delete:
+      tags: [Conta]
+      operationId: removerEndereco
+      summary: Remove um endereço (CTA-05)
+      security:
+        - sessaoDaCliente: []
+      responses:
+        "204":
+          description: Endereço removido
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "404": { $ref: "#/components/responses/NaoEncontrado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/conta/consentimentos:
+    get:
+      tags: [Conta]
+      operationId: listarConsentimentos
+      summary: Aceites de marketing por canal (CTA-08)
+      security:
+        - sessaoDaCliente: []
+      responses:
+        "200":
+          description: Um item por canal
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 2
+                items: { $ref: "#/components/schemas/Consentimento" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/conta/consentimentos/{canal}:
+    put:
+      tags: [Conta]
+      operationId: alterarConsentimento
+      summary: Aceita ou revoga um canal, sem afetar o outro (CTA-08)
+      security:
+        - sessaoDaCliente: []
+      parameters:
+        - name: canal
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/CanalDeMarketing" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [aceito, versaoDoTexto]
+              properties:
+                aceito: { type: boolean }
+                versaoDoTexto: { type: string, maxLength: 20, example: "2026-11" }
+      responses:
+        "200":
+          description: Consentimento atualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Consentimento" }
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+  /v1/conta/solicitacoes-de-dados:
+    post:
+      tags: [Conta]
+      operationId: solicitarMeusDados
+      summary: Pede cópia ou exclusão dos dados (CTA-09)
+      security:
+        - sessaoDaCliente: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo]
+              properties:
+                tipo: { type: string, enum: [copia, exclusao] }
+      responses:
+        "201":
+          description: Solicitação registrada para atendimento pela equipe
+        "401": { $ref: "#/components/responses/NaoAutenticado" }
+        "422": { $ref: "#/components/responses/DadosInvalidos" }
+        "429": { $ref: "#/components/responses/MuitasRequisicoes" }
+        "500": { $ref: "#/components/responses/ErroInterno" }
+
+components:
+  securitySchemes:
+    sessaoDaCliente:
+      type: http
+      scheme: bearer
+      description: Token devolvido por `POST /v1/sessoes`. Recursos de outra cliente respondem 404, nunca 403 (CTA-11).
+    acessoAoPedido:
+      type: apiKey
+      in: header
+      name: X-Acesso-Pedido
+      description: Token de um único pedido, devolvido por `POST /v1/pedidos` ou `POST /v1/pedidos/acessos`.
+
+  parameters:
+    SacolaId:
+      name: sacolaId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    NumeroDoPedido:
+      name: numero
+      in: path
+      required: true
+      schema: { type: string, example: HL-100482 }
+    ChaveDeIdempotencia:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID gerado pelo front por tentativa. Repetir a chave devolve a resposta original, sem cobrar nem registrar de novo (CHK-22, DEV-07).
+      schema: { type: string, format: uuid }
+    Pagina:
+      name: pagina
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PorPagina:
+      name: porPagina
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
+
+  headers:
+    X-Request-Id:
+      description: Identificador da requisição, para rastrear um erro nos registros do back-end
+      schema: { type: string }
+
+  responses:
+    Sacola:
+      description: Sacola recalculada
+      headers:
+        X-Request-Id: { $ref: "#/components/headers/X-Request-Id" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Sacola" }
+    DadosInvalidos:
+      description: Entrada inválida; `erros` diz o campo e a mensagem
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problema" }
+          example:
+            type: https://helena.example/problemas/dados-invalidos
+            title: Dados inválidos
+            status: 422
+            codigo: dados_invalidos
+            erros:
+              - campo: cpf
+                mensagem: CPF deve ter 11 números
+    NaoAutenticado:
+      description: Sem sessão ou acesso válido
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problema" }
+          example:
+            type: https://helena.example/problemas/nao-autenticado
+            title: Identifique-se para continuar
+            status: 401
+            codigo: nao_autenticado
+    NaoEncontrado:
+      description: Não existe, ou não pertence a quem pediu
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problema" }
+          example:
+            type: https://helena.example/problemas/nao-encontrado
+            title: Não encontrado
+            status: 404
+            codigo: nao_encontrado
+    EstoqueInsuficiente:
+      description: Alguma peça não tem estoque de vitrine suficiente (SAC-04, CHK-13)
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problema" }
+          example:
+            type: https://helena.example/problemas/estoque-insuficiente
+            title: Uma peça da sua sacola esgotou
+            status: 409
+            codigo: estoque_insuficiente
+            itens:
+              - produtoTamanhoId: 6f1c1a52-6f0b-4c53-9d7e-0f6a3f1d2b10
+                nome: Jaqueta jeans
+                tamanho: M
+                quantidadeDisponivel: 0
+    MuitasRequisicoes:
+      description: Limite de tentativas atingido
+      headers:
+        Retry-After:
+          description: Segundos até poder tentar de novo
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problema" }
+          example:
+            type: https://helena.example/problemas/muitas-requisicoes
+            title: Muitas tentativas. Aguarde um pouco e tente de novo
+            status: 429
+            codigo: muitas_requisicoes
+    ErroInterno:
+      description: Falha do servidor ou de um serviço externo (GER-06)
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problema" }
+          example:
+            type: https://helena.example/problemas/erro-interno
+            title: Não foi possível concluir. Tente de novo
+            status: 500
+            codigo: erro_interno
+
+  schemas:
+    Dinheiro:
+      type: integer
+      minimum: 0
+      description: Valor em centavos
+      example: 19900
+    Cep:
+      type: string
+      pattern: '^\d{8}$'
+      example: "01310100"
+    Cpf:
+      type: string
+      pattern: '^\d{11}$'
+      example: "12345678909"
+    Telefone:
+      type: string
+      pattern: '^\d{10,11}$'
+      description: DDD + número, só dígitos
+      example: "11987654321"
+    Categoria:
+      type: string
+      enum: [camisetas, calcas, jaquetas, acessorios]
+      example: jaquetas
+    TipoDeFrete:
+      type: string
+      enum: [motoboy, pac, sedex]
+      example: pac
+    CanalDeMarketing:
+      type: string
+      enum: [email, whatsapp]
+    MotivoDaDevolucao:
+      type: string
+      enum: [tamanho_incorreto, defeito, arrependimento, outro]
+    StatusDoPedido:
+      type: string
+      enum:
+        - aguardando_pagamento
+        - reserva_expirada
+        - pagamento_confirmado
+        - em_separacao
+        - enviado
+        - entregue
+        - suporte_em_andamento
+      example: pagamento_confirmado
+
+    Problema:
+      type: object
+      description: RFC 9457. `codigo` é estável e é o que o front trata; `title` é texto pronto para a cliente.
+      required: [type, title, status, codigo]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        codigo:
+          type: string
+          enum:
+            - dados_invalidos
+            - nao_autenticado
+            - nao_encontrado
+            - estoque_insuficiente
+            - cupom_invalido
+            - entrega_indisponivel
+            - sacola_incompleta
+            - pedido_ja_pago
+            - devolucao_ja_solicitada
+            - prazo_de_devolucao_encerrado
+            - pedido_nao_entregue
+            - email_em_uso
+            - muitas_requisicoes
+            - erro_interno
+        erros:
+          type: array
+          description: Presente em `dados_invalidos`
+          items:
+            type: object
+            required: [campo, mensagem]
+            properties:
+              campo: { type: string, example: cpf }
+              mensagem: { type: string, example: CPF deve ter 11 números }
+        itens:
+          type: array
+          description: Presente em `estoque_insuficiente`
+          items:
+            type: object
+            required: [produtoTamanhoId, nome, tamanho, quantidadeDisponivel]
+            properties:
+              produtoTamanhoId: { type: string, format: uuid }
+              nome: { type: string }
+              tamanho: { type: string }
+              quantidadeDisponivel: { type: integer, minimum: 0 }
+
+    Parcelamento:
+      type: object
+      description: Até 6x sem juros, parcela mínima de R$ 50,00. `maximoDeParcelas` 1 significa sem parcelamento (PRO-02, SAC-16).
+      required: [maximoDeParcelas, valorDaParcela]
+      properties:
+        maximoDeParcelas: { type: integer, minimum: 1, maximum: 6, example: 3 }
+        valorDaParcela:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 6633
+
+    Foto:
+      type: object
+      required: [url, descricao]
+      properties:
+        url: { type: string, format: uri, example: "https://imagens.helena.example/jaqueta-jeans-azul-1.jpg" }
+        descricao: { type: string, description: Texto alternativo, example: Jaqueta jeans azul vista de frente }
+
+    TamanhoDoProduto:
+      type: object
+      description: A quantidade em estoque não é enviada, só os dois sinais que a tela usa.
+      required: [id, rotulo, disponivel, ultimasPecas]
+      properties:
+        id: { type: string, format: uuid, description: Identificador do par produto + tamanho }
+        rotulo: { type: string, example: M }
+        disponivel: { type: boolean, example: true }
+        ultimasPecas: { type: boolean, description: 15 unidades ou menos (PRO-13), example: false }
+
+    ProdutoResumo:
+      type: object
+      required: [id, slug, nome, categoria, foto, preco, esgotado, tamanhos]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string, example: jaqueta-jeans-azul }
+        nome: { type: string, example: Jaqueta jeans }
+        categoria: { $ref: "#/components/schemas/Categoria" }
+        foto: { $ref: "#/components/schemas/Foto" }
+        preco:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 15900
+        precoOriginal:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          nullable: true
+          description: Preço antes da promoção; nulo se não há promoção (VIT-04)
+          example: 19900
+        seloDeDesconto: { type: string, nullable: true, example: "-20%" }
+        esgotado: { type: boolean, description: Nenhum tamanho disponível (VIT-05), example: false }
+        esgotadoNoTamanho: { type: boolean, description: Só quando há filtro de tamanho (CAT-05), example: false }
+        tamanhos:
+          type: array
+          description: Para a compra rápida (CAT-08)
+          items: { $ref: "#/components/schemas/TamanhoDoProduto" }
+
+    Produto:
+      allOf:
+        - $ref: "#/components/schemas/ProdutoResumo"
+        - type: object
+          required: [descricao, tecido, colecao, cor, fotos, parcelamento, outrasCores]
+          properties:
+            descricao: { type: string, example: Jaqueta de corte reto em jeans encorpado. }
+            tecido: { type: string, example: 100% algodão }
+            colecao: { type: string, example: Verão 2027 }
+            cor:
+              type: object
+              required: [nome, hex]
+              properties:
+                nome: { type: string, example: Azul }
+                hex: { type: string, pattern: '^#[0-9A-Fa-f]{6}$', example: "#3B5B7A" }
+            outrasCores:
+              type: array
+              description: O mesmo modelo em outra cor é outro produto
+              items:
+                type: object
+                required: [slug, nome, hex]
+                properties:
+                  slug: { type: string, example: jaqueta-jeans-preta }
+                  nome: { type: string, example: Preta }
+                  hex: { type: string, example: "#1A1A1A" }
+            fotos:
+              type: array
+              minItems: 1
+              items: { $ref: "#/components/schemas/Foto" }
+            parcelamento: { $ref: "#/components/schemas/Parcelamento" }
+            guiaDeMedidas:
+              type: object
+              nullable: true
+              description: Tabela de medidas da categoria (PRO-06)
+              required: [colunas, linhas]
+              properties:
+                colunas:
+                  type: array
+                  items: { type: string }
+                  example: [Tamanho, Busto (cm), Comprimento (cm)]
+                linhas:
+                  type: array
+                  items:
+                    type: array
+                    items: { type: string }
+                  example: [[P, "92", "58"], [M, "96", "60"]]
+
+    FiltrosDisponiveis:
+      type: object
+      description: Opções para montar o painel de filtros (CAT-01)
+      required: [tamanhos, cores, precoMin, precoMax]
+      properties:
+        tamanhos:
+          type: array
+          items: { type: string }
+          example: [P, M, G, GG]
+        cores:
+          type: array
+          items:
+            type: object
+            required: [valor, nome, hex]
+            properties:
+              valor: { type: string, example: azul }
+              nome: { type: string, example: Azul }
+              hex: { type: string, example: "#3B5B7A" }
+        precoMin:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 4990
+        precoMax:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 39900
+
+    PaginaDeProdutos:
+      type: object
+      required: [itens, total, pagina, porPagina, filtros]
+      properties:
+        itens:
+          type: array
+          items: { $ref: "#/components/schemas/ProdutoResumo" }
+        total: { type: integer, minimum: 0, example: 37 }
+        pagina: { type: integer, minimum: 1, example: 1 }
+        porPagina: { type: integer, minimum: 1, maximum: 48, example: 24 }
+        filtros: { $ref: "#/components/schemas/FiltrosDisponiveis" }
+
+    Vitrine:
+      type: object
+      required: [campanha, destaques]
+      properties:
+        anuncio: { type: string, nullable: true, description: Texto da barra de anúncio, example: Frete grátis a partir de R$ 300 }
+        campanha:
+          type: object
+          required: [titulo, imagem, destino]
+          properties:
+            titulo: { type: string, example: Coleção Verão 2027 }
+            texto: { type: string, example: Peças leves para os dias longos. }
+            imagem: { $ref: "#/components/schemas/Foto" }
+            destino: { type: string, description: Caminho dentro da loja, example: "/catalogo?categoria=camisetas" }
+        destaques:
+          type: array
+          maxItems: 12
+          items: { $ref: "#/components/schemas/ProdutoResumo" }
+
+    NovoAvisoDeReposicao:
+      type: object
+      required: [produtoTamanhoId, canal, contato]
+      properties:
+        produtoTamanhoId: { type: string, format: uuid }
+        canal: { $ref: "#/components/schemas/CanalDeMarketing" }
+        contato: { type: string, maxLength: 150, description: "E-mail ou telefone só com dígitos, conforme o canal", example: maria@exemplo.com }
+
+    OpcaoDeFrete:
+      type: object
+      required: [tipo, valor, gratis, prazo]
+      properties:
+        tipo: { $ref: "#/components/schemas/TipoDeFrete" }
+        valor:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          description: Valor cobrado; 0 quando `gratis`
+          example: 2000
+        gratis: { type: boolean, description: Só a modalidade mais barata pode vir grátis (SAC-10), example: false }
+        prazo: { type: string, description: "Texto pronto para a tela, inclusive o horário limite do motoboy", example: Chega em até 5 dias úteis }
+
+    CotacaoDeFrete:
+      type: object
+      required: [cep, cidade, uf, opcoes]
+      properties:
+        cep: { $ref: "#/components/schemas/Cep" }
+        cidade: { type: string, example: São Paulo }
+        uf: { type: string, pattern: '^[A-Z]{2}$', example: SP }
+        opcoes:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/OpcaoDeFrete" }
+
+    ItemDaSacola:
+      type: object
+      required: [id, produtoTamanhoId, slug, nome, cor, tamanho, foto, precoUnitario, quantidade, quantidadeMaxima, subtotal, esgotado]
+      properties:
+        id: { type: string, format: uuid }
+        produtoTamanhoId: { type: string, format: uuid }
+        slug: { type: string, example: jaqueta-jeans-azul }
+        nome: { type: string, example: Jaqueta jeans }
+        cor: { type: string, example: Azul }
+        tamanho: { type: string, example: M }
+        foto: { $ref: "#/components/schemas/Foto" }
+        precoUnitario:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 19900
+        quantidade: { type: integer, minimum: 1, example: 1 }
+        quantidadeMaxima: { type: integer, minimum: 0, description: Limite do seletor de quantidade (SAC-04), example: 4 }
+        subtotal:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 19900
+        esgotado: { type: boolean, description: Fica fora do total até ser removido (SAC-07), example: false }
+
+    Sacola:
+      type: object
+      required: [id, itens, quantidadeDePecas, subtotal, desconto, total, parcelamento, faltaParaFreteGratis, podeFinalizar]
+      properties:
+        id: { type: string, format: uuid }
+        itens:
+          type: array
+          items: { $ref: "#/components/schemas/ItemDaSacola" }
+        quantidadeDePecas: { type: integer, minimum: 0, example: 2 }
+        subtotal:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          description: Soma das peças não esgotadas
+          example: 32000
+        cupom:
+          type: object
+          nullable: true
+          required: [codigo, percentual]
+          properties:
+            codigo: { type: string, example: MARIA10 }
+            percentual: { type: number, minimum: 0, maximum: 70, example: 10 }
+        desconto:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 0
+        faltaParaFreteGratis:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          description: Quanto falta em peças, já com o desconto, para chegar a R$ 300,00; 0 quando já chegou (SAC-09)
+          example: 0
+        cep:
+          allOf: [{ $ref: "#/components/schemas/Cep" }]
+          nullable: true
+        opcoesDeFrete:
+          type: array
+          description: Vazio enquanto não há CEP
+          items: { $ref: "#/components/schemas/OpcaoDeFrete" }
+        entregaEscolhida:
+          allOf: [{ $ref: "#/components/schemas/TipoDeFrete" }]
+          nullable: true
+        frete:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          nullable: true
+          description: Valor da modalidade escolhida; nulo enquanto não há escolha
+          example: 0
+        total:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          description: subtotal − desconto + frete
+          example: 32000
+        parcelamento: { $ref: "#/components/schemas/Parcelamento" }
+        reservaExpiraEm:
+          type: string
+          format: date-time
+          nullable: true
+          description: Só quando há pagamento iniciado e reserva em andamento (SAC-17)
+        podeFinalizar: { type: boolean, description: "Falso com sacola vazia ou com peça esgotada (SAC-03, SAC-07)", example: true }
+
+    Endereco:
+      type: object
+      required: [cep, logradouro, numero, bairro, cidade, uf]
+      properties:
+        cep: { $ref: "#/components/schemas/Cep" }
+        logradouro: { type: string, minLength: 1, maxLength: 100, example: Avenida Paulista }
+        numero: { type: string, minLength: 1, maxLength: 10, example: "1000" }
+        complemento: { type: string, maxLength: 40, nullable: true, example: Apto 12 }
+        bairro: { type: string, minLength: 1, maxLength: 60, example: Bela Vista }
+        cidade: { type: string, minLength: 1, maxLength: 60, example: São Paulo }
+        uf: { type: string, pattern: '^[A-Z]{2}$', example: SP }
+
+    EnderecoSalvo:
+      allOf:
+        - $ref: "#/components/schemas/Endereco"
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string, format: uuid }
+
+    DadosDaCliente:
+      type: object
+      required: [nome, cpf, email, telefone, endereco, aceites]
+      properties:
+        nome: { type: string, minLength: 1, maxLength: 100, example: Maria Souza }
+        cpf: { $ref: "#/components/schemas/Cpf" }
+        email: { type: string, format: email, maxLength: 150, example: maria@exemplo.com }
+        telefone: { $ref: "#/components/schemas/Telefone" }
+        endereco: { $ref: "#/components/schemas/Endereco" }
+        aceites:
+          type: object
+          description: Um aceite por canal, ambos falsos por padrão (CHK-07)
+          required: [email, whatsapp, versaoDoTexto]
+          properties:
+            email: { type: boolean, example: false }
+            whatsapp: { type: boolean, example: false }
+            versaoDoTexto: { type: string, maxLength: 20, example: "2026-11" }
+
+    EtapaDoPedido:
+      type: object
+      required: [etapa, concluidaEm]
+      properties:
+        etapa:
+          type: string
+          enum: [pagamento_confirmado, em_separacao, enviado, entregue]
+        concluidaEm: { type: string, format: date-time, nullable: true }
+
+    Devolucao:
+      type: object
+      required: [motivo, status, solicitadaEm]
+      properties:
+        motivo: { $ref: "#/components/schemas/MotivoDaDevolucao" }
+        status:
+          type: string
+          enum: [solicitada, em_tratativa, concluida, rejeitada]
+          example: solicitada
+        solicitadaEm: { type: string, format: date-time }
+
+    Pagamento:
+      type: object
+      required: [id, forma, status]
+      properties:
+        id: { type: string, format: uuid }
+        forma: { type: string, enum: [pix, cartao], example: pix }
+        status: { type: string, enum: [pendente, aprovado, recusado], example: pendente }
+        parcelas: { type: integer, minimum: 1, maximum: 6, nullable: true, example: null }
+        mensagem: { type: string, nullable: true, description: Texto para a cliente quando recusado (CHK-21) }
+        pix:
+          type: object
+          nullable: true
+          description: "Só para `forma: pix` enquanto `pendente` (CHK-15)"
+          required: [copiaECola, qrCode, expiraEm]
+          properties:
+            copiaECola: { type: string, example: 00020126580014br.gov.bcb.pix0136exemplo5204000053039865802BR6304ABCD }
+            qrCode: { type: string, description: Imagem PNG em data URI }
+            expiraEm: { type: string, format: date-time }
+
+    NovoPagamento:
+      type: object
+      required: [forma]
+      properties:
+        forma: { type: string, enum: [pix, cartao] }
+        tokenDoCartao: { type: string, description: Obrigatório para cartão; gerado pelo gateway no navegador }
+        parcelas: { type: integer, minimum: 1, maximum: 6, description: Obrigatório para cartão; limitado pelo `parcelamento` do pedido (CHK-19) }
+
+    Pedido:
+      type: object
+      required: [numero, criadoEm, status, etapas, itens, subtotal, desconto, frete, total, parcelamento, entrega, emailMascarado, devolucaoDisponivel]
+      properties:
+        numero: { type: string, example: HL-100482 }
+        criadoEm: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/StatusDoPedido" }
+        etapas:
+          type: array
+          description: Sempre as quatro, na ordem (PED-03)
+          items: { $ref: "#/components/schemas/EtapaDoPedido" }
+        itens:
+          type: array
+          items:
+            type: object
+            required: [nome, cor, tamanho, foto, precoUnitario, quantidade]
+            properties:
+              nome: { type: string, example: Jaqueta jeans }
+              cor: { type: string, example: Azul }
+              tamanho: { type: string, example: M }
+              foto: { $ref: "#/components/schemas/Foto" }
+              precoUnitario:
+                allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+              quantidade: { type: integer, minimum: 1, example: 1 }
+        subtotal:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 32000
+        cupom: { type: string, nullable: true, example: null }
+        desconto:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 0
+        frete:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 0
+        total:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 32000
+        parcelamento: { $ref: "#/components/schemas/Parcelamento" }
+        reservaExpiraEm:
+          type: string
+          format: date-time
+          nullable: true
+          description: Fim da reserva enquanto `aguardando_pagamento` (CHK-12)
+        pagamento:
+          allOf: [{ $ref: "#/components/schemas/Pagamento" }]
+          nullable: true
+          description: Última tentativa
+        entrega:
+          type: object
+          required: [tipo, prazo, cidade, uf]
+          properties:
+            tipo: { $ref: "#/components/schemas/TipoDeFrete" }
+            prazo: { type: string, example: Chega em até 5 dias úteis }
+            cidade: { type: string, example: São Paulo }
+            uf: { type: string, example: SP }
+            endereco:
+              allOf: [{ $ref: "#/components/schemas/Endereco" }]
+              description: Só com sessão da cliente (PED-05)
+            codigoDeRastreio: { type: string, nullable: true, description: "PAC e Sedex, depois de enviado (PED-04)", example: null }
+            linkDeRastreio: { type: string, format: uri, nullable: true, example: null }
+            entregueEm: { type: string, format: date-time, nullable: true }
+        emailMascarado: { type: string, example: "m***@exemplo.com" }
+        devolucao:
+          allOf: [{ $ref: "#/components/schemas/Devolucao" }]
+          nullable: true
+        devolucaoDisponivel:
+          type: object
+          description: O back-end decide; a tela só habilita ou explica (PED-08, DEV-04, DEV-06)
+          required: [pode]
+          properties:
+            pode: { type: boolean, example: false }
+            prazoFinal: { type: string, format: date, nullable: true, description: Último dia para solicitar }
+            motivo:
+              type: string
+              nullable: true
+              enum: [pedido_nao_entregue, prazo_de_devolucao_encerrado, devolucao_ja_solicitada, null]
+
+    PedidoCriado:
+      type: object
+      required: [acesso, pedido]
+      properties:
+        acesso: { type: string, description: Valor para o cabeçalho `X-Acesso-Pedido` }
+        pedido: { $ref: "#/components/schemas/Pedido" }
+
+    AcessoAoPedido:
+      type: object
+      required: [acesso, expiraEm]
+      properties:
+        acesso: { type: string }
+        expiraEm: { type: string, format: date-time }
+
+    PedidoResumo:
+      type: object
+      required: [numero, criadoEm, status, total]
+      properties:
+        numero: { type: string, example: HL-100482 }
+        criadoEm: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/StatusDoPedido" }
+        total:
+          allOf: [{ $ref: "#/components/schemas/Dinheiro" }]
+          example: 32000
+
+    PaginaDePedidos:
+      type: object
+      required: [itens, total, pagina, porPagina]
+      properties:
+        itens:
+          type: array
+          items: { $ref: "#/components/schemas/PedidoResumo" }
+        total: { type: integer, minimum: 0, example: 1 }
+        pagina: { type: integer, minimum: 1, example: 1 }
+        porPagina: { type: integer, minimum: 1, maximum: 48, example: 24 }
+
+    NovaSessao:
+      type: object
+      description: Informe `tokenDoLink`, ou `email` e `senha`.
+      properties:
+        tokenDoLink: { type: string, description: "Uso único, com validade curta" }
+        email: { type: string, format: email, maxLength: 150 }
+        senha: { type: string, format: password, maxLength: 72 }
+
+    Sessao:
+      type: object
+      required: [token, expiraEm]
+      properties:
+        token: { type: string }
+        expiraEm: { type: string, format: date-time }
+
+    Cliente:
+      type: object
+      required: [nome, email, telefone, cpfMascarado, temSenha]
+      properties:
+        nome: { type: string, example: Maria Souza }
+        email: { type: string, format: email, example: maria@exemplo.com }
+        telefone: { $ref: "#/components/schemas/Telefone" }
+        cpfMascarado: { type: string, example: "***.456.789-**" }
+        temSenha: { type: boolean, example: false }
+
+    Consentimento:
+      type: object
+      required: [canal, aceito]
+      properties:
+        canal: { $ref: "#/components/schemas/CanalDeMarketing" }
+        aceito: { type: boolean, example: false }
+        registradoEm: { type: string, format: date-time, nullable: true }

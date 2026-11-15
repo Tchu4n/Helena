@@ -15,10 +15,13 @@ Loja virtual de moda (camisetas, calças, jaquetas, acessórios) para 18 a 30 an
 | Documento | Papel |
 |---|---|
 | `docs/DESIGN.md` | Fonte única do design: tokens, tipografia, componentes, onde cada cor pode aparecer |
+| `docs/SPEC-CLIENT.md` | Cenários Dado/Quando/Então das 8 telas do cliente (aprovada em 14/11/2026; decisões na seção 12) |
+| `contrato/openapi.yaml` | Contrato OpenAPI 3.0.3 da API para as telas do cliente (aprovado em 14/11/2026) |
+| `banco/esquema.sql` | DDL do SQL Server (rascunho, ainda não executado; muda para o repositório do back-end quando ele existir) |
 | `docs/referencias/` | Material de pesquisa do dono (requisitos, guias, capturas, fluxogramas). Só local, fora do Git. Consultar, nunca commitar |
 | `docs/superpowers/plans/` | Planos de implementação já executados |
 
-Ainda faltam, nesta ordem: `SPEC-CLIENT.md` (cenários Dado/Quando/Então das 8 telas do cliente), contrato OpenAPI 3.x com servidor simulado, DDL do SQL Server, credenciais de sandbox (pagamento, frete, NF-e).
+Ainda faltam, nesta ordem: primeira subida do servidor simulado (`npm run simulado`), execução e aprovação do DDL em um SQL Server, credenciais de sandbox (pagamento, frete, NF-e).
 
 Os guias em `docs/referencias/` foram escritos para Next.js 15 e Tailwind 3. Onde divergirem deste arquivo ou da documentação em `node_modules/next/dist/docs/`, eles perdem.
 
@@ -38,6 +41,7 @@ npm run dev      # servidor local
 npm test         # node:test, arquivos em testes/**/*.test.mjs
 npm run lint     # eslint (o comando `next lint` não existe mais)
 npm run build    # build de produção
+npm run simulado # API simulada (Prism) em http://localhost:4010, a partir do contrato
 ```
 
 Saídas longas: filtrar antes de ler (`npm run build 2>&1 | tail -20`).
@@ -91,7 +95,8 @@ src/
 - **Reserva:** a peça fica reservada por 15 minutos a partir do início do pagamento (validade do PIX). Expirou, o estoque volta e a tela avisa.
 - **Estoque:** o site mostra só o estoque de vitrine. Tamanho esgotado aparece riscado; produto esgotado vai para o fim da grade com marcação. Se zerar durante o checkout, bloquear antes de cobrar.
 - **Pagamento:** PIX com confirmação na hora, ou cartão em até 6x sem juros com parcela mínima de R$ 50,00 (o número de parcelas se ajusta ao total).
-- **Benefício:** um só por compra, cupom OU frete grátis. Frete grátis vale para pedidos a partir de R$ 300,00 na região atendida; se o cupom derrubar o total abaixo disso, o frete é recalculado.
+- **Benefício:** cupom e frete grátis podem se acumular; um cupom por compra. Frete grátis vale para R$ 300,00 ou mais em peças, já com o desconto do cupom, em qualquer CEP do Brasil, só na modalidade mais barata; se o cupom derrubar o valor abaixo disso, o frete é recalculado.
+- **Últimas peças:** aviso quando o tamanho tem 15 unidades ou menos no estoque de vitrine.
 - **Frete:** por CEP (8 dígitos), com motoboy no mesmo dia na região metropolitana, PAC ou Sedex. Se a API de frete cair, aplica-se taxa fixa por região e o checkout não trava. Frete e prazo aparecem na página do produto e na sacola, antes do checkout.
 - **Cadastro:** compra sem conta e sem senha. Campos obrigatórios: nome, CPF (11 dígitos), e-mail, telefone, endereço. Os dados são salvos como lead assim que preenchidos, antes do pagamento.
 - **Devolução:** pedido pela própria cliente, com motivo obrigatório, até 7 dias corridos após a entrega; uma solicitação por pedido.
