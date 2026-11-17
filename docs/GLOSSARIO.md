@@ -103,7 +103,7 @@ Os documentos estão em português e o código está em inglês. Esta tabela fix
 | Português | Código |
 |---|---|
 | funcionalidades, por domínio | `src/features/<domain>/` |
-| domínios: catálogo, sacola, checkout, conta, devolução | `catalog`, `cart`, `checkout`, `account`, `returns` |
+| domínios: catálogo, sacola, checkout, conta, devolução, privacidade (cookies e consentimentos) | `catalog`, `cart`, `checkout`, `account`, `returns`, `privacy` |
 | componentes, ações, consultas, esquemas | `components/`, `actions/`, `queries/`, `schemas/` |
 | primitivos: Botão, Campo, Selo | `src/components/ui/`: `Button`, `Field`, `Badge` |
 | testes | `tests/` |

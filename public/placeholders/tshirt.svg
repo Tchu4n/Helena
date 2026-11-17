@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <!-- placeholder product photo: t-shirt, until real photos exist -->
+  <rect width="300" height="400" fill="#EDE8E1"/>
+  <g fill="none" stroke="#121212" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M105 115 L135 98 Q150 116 165 98 L195 115 L232 150 L208 176 L195 165 V305 H105 V165 L92 176 L68 150 Z"/>
+    <path d="M135 98 Q150 128 165 98"/>
+  </g>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <!-- placeholder product photo: jacket, until real photos exist -->
+  <rect width="300" height="400" fill="#EDE8E1"/>
+  <g fill="none" stroke="#121212" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M108 104 L134 92 L150 116 L166 92 L192 104 L226 136 L238 268 L214 271 L200 170 V308 H100 V170 L86 271 L62 268 L74 136 Z"/>
+    <path d="M150 116 V308"/>
+    <path d="M134 92 L140 150 L150 116 L160 150 L166 92"/>
+    <path d="M114 230 H136 M164 230 H186"/>
+  </g>
+</svg>

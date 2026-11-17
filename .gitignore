@@ -56,3 +56,10 @@ next-env.d.ts
 # configurações locais do Claude Code
 .claude/settings.local.json
 CLAUDE.local.md
+
+# área de trabalho local dos planos (superpowers)
+/.superpowers/
+
+# playwright
+/test-results/
+/playwright-report/

@@ -62,7 +62,7 @@ Decisão do dono em 15/11/2026, substituindo a regra anterior de código em port
 | `docs/referencias/` | Material de pesquisa do dono (requisitos, guias, capturas, fluxogramas). Só local, fora do Git. Consultar, nunca commitar |
 | `docs/superpowers/plans/` | Planos de implementação já executados |
 
-Ainda faltam, nesta ordem: primeira subida do servidor simulado (`npm run mock`), execução e aprovação do DDL em um SQL Server, credenciais de sandbox (pagamento, frete, NF-e).
+Ainda faltam: execução e aprovação do DDL em um SQL Server, credenciais de sandbox (pagamento, frete, NF-e). O servidor simulado subiu e respondeu conforme o contrato em 15/11/2026.
 
 Os guias em `docs/referencias/` foram escritos para Next.js 15 e Tailwind 3. Onde divergirem deste arquivo ou da documentação em `node_modules/next/dist/docs/`, eles perdem.
 
@@ -72,7 +72,7 @@ Os guias em `docs/referencias/` foram escritos para Next.js 15 e Tailwind 3. Ond
 - Teste antes do código, derivado da spec. Nunca alterar a asserção de um teste para fazê-lo passar.
 - Quem faz os commits é o dono. O agente deixa as mudanças no diretório de trabalho, lista os arquivos alterados e pode sugerir a mensagem, em português.
 - Nenhum ramo é criado sem avisar o dono antes e receber o ok.
-- Sem dependência nova para poucas linhas. `zod` e `server-only` entram quando a primeira Server Action e o primeiro arquivo de acesso a dados forem escritos.
+- Sem dependência nova para poucas linhas. Já instaladas com o ok do dono (15/11/2026): `zod`, `server-only` e `openapi-typescript`.
 - Decisão visual se mostra ao dono em página, não se descreve em texto. Material de referência se lê por inteiro antes de concluir.
 
 ## Comandos
@@ -83,6 +83,7 @@ npm test         # node:test, arquivos em tests/**/*.test.mjs
 npm run lint     # eslint (o comando `next lint` não existe mais)
 npm run build    # build de produção
 npm run mock     # API simulada (Prism) em http://localhost:4010, a partir do contrato
+npm run types    # gera src/lib/api-types.ts a partir do contrato (um teste falha se ficar desatualizado)
 ```
 
 Saídas longas: filtrar antes de ler (`npm run build 2>&1 | tail -20`).
@@ -103,7 +104,7 @@ Saídas longas: filtrar antes de ler (`npm run build 2>&1 | tail -20`).
 
 ```
 src/
-  features/<domain>/   catalog, cart, checkout, account, returns
+  features/<domain>/   catalog, cart, checkout, account, returns, privacy
     components/  actions/  queries/  schemas/  index.ts
   components/ui/       primitivos (Button, Field, Badge...)
   lib/                 cliente da API, validação de ambiente
@@ -122,7 +123,7 @@ src/
 - O front nunca acessa o SQL Server. A camada de `queries/` chama a API Java, do lado do servidor.
 - Contrato primeiro: o OpenAPI 3.x é escrito e aprovado antes das telas. Enquanto o back não existe, o front roda contra servidor simulado (Prism).
 - Todo erro da API chega no formato RFC 9457 (`application/problem+json`); a tela trata esse formato em um ponto só.
-- Mudanças no contrato são aditivas. Tipos TypeScript do cliente são gerados a partir do contrato, não escritos à mão.
+- Mudanças no contrato são aditivas. Tipos TypeScript do cliente são gerados a partir do contrato (`npm run types`), não escritos à mão.
 
 ## Segurança
 

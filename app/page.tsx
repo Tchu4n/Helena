@@ -1,19 +1,30 @@
-import Image from "next/image";
+import { Suspense } from "react";
+import { ErrorMessage } from "@/src/components/ui";
+import { BenefitsStrip, Campaign, CategoryTiles, getHome, ProductGrid } from "@/src/features/catalog";
 
-// Temporary page until the home page exists. Uses only the tokens from docs/DESIGN.md.
+// VIT-01 order: campaign, benefits, categories, "Em destaque" (bar and header come from the layout).
+async function HomeContent() {
+  const home = await getHome();
+  if (!home.ok) return <ErrorMessage title={home.problem.title} retryHref="/" />;
+  return (
+    <div className="flex flex-col gap-8 pb-8">
+      <Campaign campaign={home.data.campaign} />
+      <BenefitsStrip />
+      <CategoryTiles />
+      <section aria-labelledby="featured-title" className="flex flex-col gap-4 px-4">
+        <h2 id="featured-title" className="font-serif text-2xl font-normal md:text-[2rem]">
+          Em destaque
+        </h2>
+        <ProductGrid products={home.data.featured} />
+      </section>
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
-    <main className="flex min-h-full flex-1 flex-col items-center justify-center gap-6 px-6 py-24 text-center">
-      <Image src="/logo.svg" alt="Helena" width={160} height={29} priority />
-      <p className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.08em] text-muted">
-        Em breve
-      </p>
-      <h1 className="font-serif text-[1.75rem] font-normal leading-[1.2] text-balance md:text-[2.5rem]">
-        A loja está sendo preparada
-      </h1>
-      <p className="max-w-[40ch] text-base leading-normal text-pretty text-muted">
-        Moda para vestir todo dia, com entrega rápida e troca em 7 dias.
-      </p>
-    </main>
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   );
 }

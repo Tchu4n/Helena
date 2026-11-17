@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <!-- placeholder product photo: accessory (bag), until real photos exist -->
+  <rect width="300" height="400" fill="#EDE8E1"/>
+  <g fill="none" stroke="#121212" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M92 180 H208 L220 304 H80 Z"/>
+    <path d="M120 180 Q120 128 150 128 Q180 128 180 180"/>
+    <path d="M86 222 H214"/>
+  </g>
+</svg>

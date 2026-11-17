@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400">
+  <!-- placeholder product photo: sneaker, until real photos exist -->
+  <rect width="300" height="400" fill="#EDE8E1"/>
+  <g fill="none" stroke="#121212" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M62 262 Q60 212 92 206 L140 196 Q168 214 196 228 L236 240 Q252 248 250 262 Z"/>
+    <path d="M62 262 V276 H250 V262"/>
+    <path d="M140 196 Q150 230 196 228"/>
+    <path d="M150 206 L162 200 M160 214 L172 208 M170 221 L182 215"/>
+  </g>
+</svg>
