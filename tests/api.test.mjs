@@ -4,8 +4,16 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 
 let lastUrl = "";
-const server = createServer((req, res) => {
+let lastRequest = null;
+const server = createServer(async (req, res) => {
   lastUrl = req.url;
+  let raw = "";
+  for await (const chunk of req) raw += chunk;
+  lastRequest = { method: req.method, type: req.headers["content-type"], body: raw };
+  if (req.url.startsWith("/created")) {
+    res.writeHead(201);
+    return res.end();
+  }
   if (req.url.startsWith("/ok")) {
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ hello: "world" }));
@@ -21,11 +29,11 @@ const server = createServer((req, res) => {
   // /slow never answers
 });
 
-let apiGet;
+let apiGet, apiPost, apiPut;
 before(async () => {
   await new Promise((resolve) => server.listen(0, resolve));
   process.env.API_URL = `http://localhost:${server.address().port}`;
-  ({ apiGet } = await import("../src/lib/api.ts"));
+  ({ apiGet, apiPost, apiPut } = await import("../src/lib/api.ts"));
 });
 after(() => server.close());
 
@@ -58,4 +66,41 @@ test("GER-06 a 500 without JSON becomes internal_error", async () => {
 test("undefined query values are left out of the URL", async () => {
   await apiGet("/ok", { category: "pants", size: undefined, page: 2 });
   assert.equal(lastUrl, "/ok?category=pants&page=2");
+});
+
+test("apiPost sends JSON and returns data", async () => {
+  const result = await apiPost("/ok", { cep: "01310100" });
+  assert.deepEqual(result, { ok: true, data: { hello: "world" } });
+  assert.equal(lastRequest.method, "POST");
+  assert.equal(lastRequest.type, "application/json");
+  assert.deepEqual(JSON.parse(lastRequest.body), { cep: "01310100" });
+});
+
+test("apiPost maps problem+json", async () => {
+  const result = await apiPost("/invalid", {});
+  assert.equal(result.ok, false);
+  assert.equal(result.problem.code, "invalid_data");
+});
+
+test("apiPost accepts 201 without body", async () => {
+  assert.deepEqual(await apiPost("/created", {}), { ok: true, data: null });
+});
+
+test("GER-06 apiPost timeout becomes internal_error", { timeout: 10_000 }, async () => {
+  const result = await apiPost("/slow", {});
+  assert.equal(result.ok, false);
+  assert.equal(result.problem.code, "internal_error");
+});
+
+test("apiPut sends PUT with JSON", async () => {
+  await apiPut("/ok", { cep: "01310100" });
+  assert.equal(lastRequest.method, "PUT");
+  assert.deepEqual(JSON.parse(lastRequest.body), { cep: "01310100" });
+});
+
+test("apiPost without body sends no body (createCart has no request body)", async () => {
+  await apiPost("/ok");
+  assert.equal(lastRequest.method, "POST");
+  assert.equal(lastRequest.body, "");
+  assert.equal(lastRequest.type, undefined);
 });

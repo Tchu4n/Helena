@@ -1,154 +1,147 @@
-# Base do design system — Plano de implementação
+# Base design system — Implementation plan
 
-> **Para quem executa (agente):** SUB-SKILL OBRIGATÓRIA: use superpowers:subagent-driven-development (recomendada) ou superpowers:executing-plans para implementar este plano tarefa por tarefa. Os passos usam caixas (`- [ ]`) para acompanhamento.
+> **Status:** done. Rewritten on 2026-11-19 with the current names (English code and docs) and without git steps, which are the owner's job.
 
-**Objetivo:** Colocar no projeto os tokens de cor, forma e tipografia do design system, com um teste que impede regressão de contraste, e trocar a página inicial do scaffold por uma provisória da Helena.
+> **For the agent running it:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task by task. Steps use checkboxes (`- [ ]`) for tracking.
 
-**Arquitetura:** Os tokens vivem em `app/globals.css` dentro de `@theme` (Tailwind 4), o que gera as classes utilitárias (`bg-fundo`, `text-tinta`, `rounded-controle`...). As fontes entram por `next/font/google` em `app/layout.tsx` e são ligadas ao Tailwind por `@theme inline`. O teste de contraste lê o próprio `globals.css`, então não existe segunda cópia dos valores.
+**Goal:** Put the design system color, shape and type tokens into the project, with a test that blocks contrast regressions, and replace the scaffold home page with a temporary Helena page.
 
-**Stack:** Next.js 16.4.6 (App Router), React 19.3, Tailwind CSS 4.3.3, TypeScript, testes com `node:test` (embutido no Node 26, sem dependência nova).
+**Architecture:** Tokens live in `app/globals.css` inside `@theme` (Tailwind 4), which generates the utility classes (`bg-background`, `text-primary`, `rounded-control`...). Fonts come in through `next/font/google` in `app/layout.tsx` and are wired to Tailwind with `@theme inline`. The contrast test reads `globals.css` itself, so there is no second copy of the values.
+
+**Stack:** Next.js 16.4.6 (App Router), React 19.3, Tailwind CSS 4.3.3, TypeScript, tests with `node:test` (built into Node 26, no new dependency).
 
 **Spec:** `docs/DESIGN.md`
 
-## Restrições globais
+## Global constraints
 
-- Tudo que for possível no código fica em PT-BR: tokens, variáveis, funções, arquivos próprios, comentários, nomes de teste e mensagens de commit. Identificadores sem acento nem cedilha. Só fica em inglês o que a ferramenta exige (`page.tsx`, `layout.tsx`, `@theme`, `--font-sans`, script `test`).
-- Antes de escrever código Next, ler o guia correspondente em `node_modules/next/dist/docs/` (regra do `AGENTS.md`). Fontes: `01-app/01-getting-started/13-fonts.md`.
-- Nenhuma dependência nova.
-- Valores exatos dos tokens: `fundo #FAF8F5`, `superficie #EDE8E1`, `cartao #FFFFFF`, `tinta #121212`, `suave #66625C`, `controle #857D72`, `linha #D9D3CA`, `oferta #9A3412`, `beneficio #17692F`, `erro #B42318`, `--radius-controle: 9999px`.
-- Contraste mínimo: 4,5:1 para texto; 3:1 para borda de controle.
-- Sem tema escuro e sem tema de alto contraste.
-- Sem sombras; fotos, tiles e cartões de canto reto.
-- Trabalhar no ramo `base-design-system`, não em `main`.
+- Code and docs in plain English, names from `docs/GLOSSARY.md`; only the text the customer sees stays in Portuguese. Commit messages in Portuguese.
+- Before writing Next code, read the matching guide in `node_modules/next/dist/docs/` (rule in `AGENTS.md`). Fonts: `01-app/01-getting-started/13-fonts.md`.
+- No new dependency.
+- Exact token values: `background #FAF8F5`, `surface #EDE8E1`, `card #FFFFFF`, `primary #121212`, `muted #66625C`, `control #857D72`, `line #D9D3CA`, `sale #9A3412`, `success #17692F`, `error #B42318`, `--radius-control: 9999px`.
+- Minimum contrast: 4.5:1 for text; 3:1 for control borders.
+- No dark theme and no high-contrast theme.
+- No shadows; photos, tiles and cards with square corners.
+- No commits and no branches: leave the changes in the working tree, list the changed files and suggest the message, in Portuguese.
 
-## Foco de revisão
+## Review focus
 
-- **Celular em tema escuro:** a loja deve aparecer clara, igual ao tema claro. Coberto pelo teste `nao tem tema escuro automatico` (Tarefa 1).
-- **Alguém troca uma cor depois:** qualquer par texto/fundo abaixo do mínimo deve quebrar o teste, não passar despercebido. Coberto pelos testes de contraste (Tarefa 1).
-- **Playfair Display não carrega:** os títulos devem cair em uma serifada do sistema, não em sem serifa. Coberto pelo teste `titulos tem fonte reserva serifada` (Tarefa 2).
-- **Texto ampliado em 200% no aparelho:** nada cortado na página provisória; conferência manual no Passo 4 da Tarefa 3.
-- **Navegação por teclado:** foco visível em qualquer elemento interativo. Coberto pelo teste `foco visivel definido` (Tarefa 1).
+- **Phone in dark theme:** the store must look light, same as the light theme. Covered by the test `no automatic dark theme` (Task 1).
+- **Someone changes a color later:** any text/background pair below the minimum must break the test, not slip by. Covered by the contrast tests (Task 1).
+- **Playfair Display doesn't load:** headings must fall back to a system serif, not a sans-serif. Covered by the test `headings have a serif fallback font` (Task 2).
+- **Text zoomed to 200% on the device:** nothing cut off on the temporary page; manual check in Step 4 of Task 3.
+- **Keyboard navigation:** visible focus on every interactive element. Covered by the test `visible focus is defined` (Task 1).
 
 ---
 
-### Tarefa 1: Tokens de cor e forma com teste de contraste
+### Task 1: Color and shape tokens with contrast test
 
-**Arquivos:**
-- Criar: `testes/contraste.test.mjs`
-- Modificar: `app/globals.css` (arquivo inteiro), `package.json` (bloco `scripts`)
+**Files:**
+- Create: `tests/contrast.test.mjs`
+- Modify: `app/globals.css` (whole file), `package.json` (`scripts` block)
 
 **Interfaces:**
-- Consome: nada.
-- Produz: classes Tailwind `bg-fundo`, `bg-superficie`, `bg-cartao`, `text-tinta`, `text-suave`, `border-controle`, `border-linha`, `text-oferta`, `bg-oferta`, `text-beneficio`, `text-erro`, `rounded-controle`; script `npm test`.
+- Uses: nothing.
+- Produces: Tailwind classes `bg-background`, `bg-surface`, `bg-card`, `text-primary`, `text-muted`, `border-control`, `border-line`, `text-sale`, `bg-sale`, `text-success`, `text-error`, `rounded-control`; script `npm test`.
 
-- [ ] **Passo 1: Criar o ramo**
+- [ ] **Step 1: Write the failing test**
 
-```bash
-git switch -c base-design-system
-```
-
-- [ ] **Passo 2: Escrever o teste que falha**
-
-Em `testes/contraste.test.mjs`, com `node:test` e `node:assert/strict`. O teste lê `app/globals.css` e extrai cada `--color-<nome>: #RRGGBB` para um mapa `tokens`. A função `contraste(corA, corB)` segue a fórmula de luminância relativa da WCAG 2.1 (a mesma do manual de UX, seção 5).
+In `tests/contrast.test.mjs`, with `node:test` and `node:assert/strict`. The test reads `app/globals.css` and pulls each `--color-<name>: #RRGGBB` into a `tokens` map. The function `contrast(colorA, colorB)` follows the WCAG 2.1 relative luminance formula (the same as the UX handbook, section 5).
 
 ```js
-const ESPERADO = {
-  fundo: "#FAF8F5", superficie: "#EDE8E1", cartao: "#FFFFFF", tinta: "#121212", suave: "#66625C",
-  controle: "#857D72", linha: "#D9D3CA", oferta: "#9A3412", beneficio: "#17692F", erro: "#B42318",
+const EXPECTED = {
+  background: "#FAF8F5", surface: "#EDE8E1", card: "#FFFFFF", primary: "#121212", muted: "#66625C",
+  control: "#857D72", line: "#D9D3CA", sale: "#9A3412", success: "#17692F", error: "#B42318",
 };
-const TEXTO = ["tinta", "suave", "oferta", "beneficio", "erro"];
-const FUNDOS = ["fundo", "superficie", "cartao"];
+const TEXT = ["primary", "muted", "sale", "success", "error"];
+const BACKGROUNDS = ["background", "surface", "card"];
 
-test("tokens tem os valores do DESIGN.md", () => assert.deepEqual(tokens, ESPERADO));
+test("tokens match DESIGN.md", () => assert.deepEqual(tokens, EXPECTED));
 
-for (const t of TEXTO) for (const f of FUNDOS)
-  test(`texto ${t} sobre ${f} tem contraste >= 4.5`, () => assert.ok(contraste(tokens[t], tokens[f]) >= 4.5));
+for (const t of TEXT) for (const b of BACKGROUNDS)
+  test(`${t} text on ${b} has contrast >= 4.5`, () => assert.ok(contrast(tokens[t], tokens[b]) >= 4.5));
 
-for (const f of FUNDOS)
-  test(`borda controle sobre ${f} tem contraste >= 3`, () => assert.ok(contraste(tokens.controle, tokens[f]) >= 3));
+for (const b of BACKGROUNDS)
+  test(`control border on ${b} has contrast >= 3`, () => assert.ok(contrast(tokens.control, tokens[b]) >= 3));
 
-test("texto do botao (fundo sobre tinta) tem contraste >= 4.5", () => assert.ok(contraste(tokens.fundo, tokens.tinta) >= 4.5));
-test("texto do selo (cartao sobre oferta) tem contraste >= 4.5", () => assert.ok(contraste(tokens.cartao, tokens.oferta) >= 4.5));
-test("raio dos controles e pilula", () => assert.match(css, /--radius-controle:\s*9999px/));
-test("nao tem tema escuro automatico", () => assert.doesNotMatch(css, /prefers-color-scheme/));
-test("foco visivel definido", () => assert.match(css, /:focus-visible\s*\{[^}]*outline:\s*2px solid/));
+test("button text (background on primary) has contrast >= 4.5", () => assert.ok(contrast(tokens.background, tokens.primary) >= 4.5));
+test("badge text (card on sale) has contrast >= 4.5", () => assert.ok(contrast(tokens.card, tokens.sale) >= 4.5));
+test("controls use a pill radius", () => assert.match(css, /--radius-control:\s*9999px/));
+test("no automatic dark theme", () => assert.doesNotMatch(css, /prefers-color-scheme/));
+test("visible focus is defined", () => assert.match(css, /:focus-visible\s*\{[^}]*outline:\s*2px solid/));
 ```
 
-- [ ] **Passo 3: Adicionar o script e ver o teste falhar**
+- [ ] **Step 2: Add the script and watch the test fail**
 
-Em `package.json`, dentro de `scripts`: `"test": "node --test \"testes/**/*.test.mjs\""`.
+In `package.json`, inside `scripts`: `"test": "node --test \"tests/**/*.test.mjs\""`.
 
-Rodar: `npm test`
-Esperado: FALHA em `tokens tem os valores do DESIGN.md` (o mapa vem só com `background` e `foreground`) e em `nao tem tema escuro automatico`.
+Run: `npm test`
+Expected: FAIL on `tokens match DESIGN.md` (the map only has `background` and `foreground`) and on `no automatic dark theme`.
 
-- [ ] **Passo 4: Reescrever `app/globals.css`**
+- [ ] **Step 3: Rewrite `app/globals.css`**
 
-Conteúdo: `@import "tailwindcss";`, um bloco `@theme` com os dez `--color-*` e `--radius-controle` das Restrições globais, e as regras de base abaixo. Remover `:root`, o `@theme inline` antigo e o bloco `prefers-color-scheme` do scaffold.
+Content: `@import "tailwindcss";`, a `@theme` block with the ten `--color-*` and `--radius-control` from the Global constraints, and the base rules below. Remove `:root`, the old `@theme inline` and the scaffold's `prefers-color-scheme` block.
 
 ```css
 body {
-  background: var(--color-fundo);
-  color: var(--color-tinta);
+  background: var(--color-background);
+  color: var(--color-primary);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-tinta);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 ```
 
-- [ ] **Passo 5: Ver o teste passar**
+- [ ] **Step 4: Watch the test pass**
 
-Rodar: `npm test`
-Esperado: todos os testes passam (24 no total), 0 falhas.
+Run: `npm test`
+Expected: all tests pass (24 in total), 0 failures.
 
-- [ ] **Passo 6: Commit**
+- [ ] **Step 5: Hand over to the owner**
 
-```bash
-git add testes/contraste.test.mjs app/globals.css package.json docs/DESIGN.md docs/superpowers/plans/2026-11-14-base-design-system.md public/logo.svg .gitignore
-git commit -m "Adiciona tokens do design system e teste de contraste"
-```
+List the changed files (`tests/contrast.test.mjs`, `app/globals.css`, `package.json`, `docs/DESIGN.md`, this plan, `public/logo.svg`, `.gitignore`). Suggested message: `Adiciona tokens do design system e teste de contraste`.
 
 ---
 
-### Tarefa 2: Fontes e idioma
+### Task 2: Fonts and language
 
-**Arquivos:**
-- Criar: `testes/fontes.test.mjs`
-- Modificar: `app/layout.tsx`, `app/globals.css` (acrescenta bloco `@theme inline` e a regra de `body`)
+**Files:**
+- Create: `tests/fonts.test.mjs`
+- Modify: `app/layout.tsx`, `app/globals.css` (adds the `@theme inline` block and the `body` rule)
 
 **Interfaces:**
-- Consome: `app/globals.css` da Tarefa 1.
-- Produz: classes `font-serif` (Playfair Display), `font-sans` (Geist), `font-mono` (Geist Mono); variáveis CSS `--font-playfair`, `--font-geist-sans`, `--font-geist-mono` no `<html>`.
+- Uses: `app/globals.css` from Task 1.
+- Produces: classes `font-serif` (Playfair Display), `font-sans` (Geist), `font-mono` (Geist Mono); CSS variables `--font-playfair`, `--font-geist-sans`, `--font-geist-mono` on `<html>`.
 
-- [ ] **Passo 1: Escrever o teste que falha**
+- [ ] **Step 1: Write the failing test**
 
-Em `testes/fontes.test.mjs`, lendo `app/layout.tsx` e `app/globals.css` como texto:
+In `tests/fonts.test.mjs`, reading `app/layout.tsx` and `app/globals.css` as text:
 
 ```js
-test("pagina declara portugues do Brasil", () => assert.match(layout, /lang="pt-BR"/));
-test("titulos usam Playfair Display", () => assert.match(css, /--font-serif:\s*var\(--font-playfair\)/));
-test("titulos tem fonte reserva serifada", () => assert.match(layout, /fallback:\s*\[\s*"Georgia",\s*"serif"\s*\]/));
-test("corpo usa a fonte sem serifa", () => assert.match(css, /body\s*\{[^}]*font-family:\s*var\(--font-sans\)/));
+test("page declares Brazilian Portuguese", () => assert.match(layout, /lang="pt-BR"/));
+test("headings use Playfair Display", () => assert.match(css, /--font-serif:\s*var\(--font-playfair\)/));
+test("headings have a serif fallback font", () => assert.match(layout, /fallback:\s*\[\s*"Georgia",\s*"serif"\s*\]/));
+test("body uses the sans-serif font", () => assert.match(css, /body\s*\{[^}]*font-family:\s*var\(--font-sans\)/));
 ```
 
-- [ ] **Passo 2: Ver o teste falhar**
+- [ ] **Step 2: Watch the test fail**
 
-Rodar: `npm test`
-Esperado: FALHA nos quatro testes de `fontes.test.mjs`.
+Run: `npm test`
+Expected: FAIL on the four tests in `fonts.test.mjs`.
 
-- [ ] **Passo 3: Alterar `app/layout.tsx`**
+- [ ] **Step 3: Change `app/layout.tsx`**
 
-- Importar `Playfair_Display` de `next/font/google` junto de `Geist` e `Geist_Mono`.
-- `const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"], weight: "400", display: "swap", fallback: ["Georgia", "serif"] })`.
-- Acrescentar `playfair.variable` ao `className` do `<html>` e trocar `lang="en"` por `lang="pt-BR"`.
+- Import `Playfair_Display` from `next/font/google` along with `Geist` and `Geist_Mono`.
+- `const headingFont = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"], weight: "400", display: "swap", fallback: ["Georgia", "serif"] })`.
+- Name the other two by role: `bodyFont` (Geist) and `labelFont` (Geist Mono).
+- Add `headingFont.variable` to the `<html>` `className` and change `lang="en"` to `lang="pt-BR"` (the store text is Portuguese).
 - `metadata`: `title: "Helena"`, `description: "Moda para o dia a dia. Loja em construção."`.
-- Renomear as constantes para PT-BR: `geistSans` → `fonteCorpo`, `geistMono` → `fonteRotulo`, `playfair` → `fonteTitulo`.
 
-- [ ] **Passo 4: Ligar as fontes ao Tailwind em `app/globals.css`**
+- [ ] **Step 4: Wire the fonts to Tailwind in `app/globals.css`**
 
 ```css
-/* inline porque estas variáveis só existem em tempo de execução (next/font) */
+/* inline because these variables only exist at runtime (next/font) */
 @theme inline {
   --font-serif: var(--font-playfair);
   --font-sans: var(--font-geist-sans);
@@ -156,65 +149,59 @@ Esperado: FALHA nos quatro testes de `fontes.test.mjs`.
 }
 ```
 
-E acrescentar `font-family: var(--font-sans);` à regra `body`.
+And add `font-family: var(--font-sans);` to the `body` rule.
 
-- [ ] **Passo 5: Ver o teste passar e o projeto compilar**
+- [ ] **Step 5: Watch the test pass and the project build**
 
-Rodar: `npm test && npm run lint && npm run build`
-Esperado: testes passam; lint sem erros; build termina com `✓ Compiled successfully`.
+Run: `npm test && npm run lint && npm run build`
+Expected: tests pass; lint with no errors; build ends with `✓ Compiled successfully`.
 
-- [ ] **Passo 6: Commit**
+- [ ] **Step 6: Hand over to the owner**
 
-```bash
-git add testes/fontes.test.mjs app/layout.tsx app/globals.css
-git commit -m "Adiciona Playfair Display e define idioma pt-BR"
-```
+List the changed files (`tests/fonts.test.mjs`, `app/layout.tsx`, `app/globals.css`). Suggested message: `Adiciona Playfair Display e define idioma pt-BR`.
 
 ---
 
-### Tarefa 3: Página inicial provisória
+### Task 3: Temporary home page
 
-**Arquivos:**
-- Modificar: `app/page.tsx` (arquivo inteiro)
-- Remover: `public/next.svg`, `public/vercel.svg`, `public/file.svg`, `public/globe.svg`, `public/window.svg`
+**Files:**
+- Modify: `app/page.tsx` (whole file)
+- Delete: `public/next.svg`, `public/vercel.svg`, `public/file.svg`, `public/globe.svg`, `public/window.svg`
 
 **Interfaces:**
-- Consome: classes de token da Tarefa 1 e de fonte da Tarefa 2; `public/logo.svg`.
-- Produz: nada que outras tarefas usem.
+- Uses: token classes from Task 1 and font classes from Task 2; `public/logo.svg`.
+- Produces: nothing other tasks use.
 
-- [ ] **Passo 1: Reescrever `app/page.tsx`**
+- [ ] **Step 1: Rewrite `app/page.tsx`**
 
-Componente `PaginaInicial` (export default), sem `"use client"`. Conteúdo, centralizado, com `min-height` (nunca altura fixa):
+Component `HomePage` (default export), no `"use client"`. Centered content, with `min-height` (never a fixed height):
 
-- `Image` de `next/image` apontando para `/logo.svg`, com `alt="Helena"`, `width={160}` e `height={29}` (a proporção do SVG é 264:48).
-- Rótulo `Em breve` com `font-mono`, caixa alta, `text-suave`, espaçamento `0.08em`.
-- `<h1>` `A loja está sendo preparada` com `font-serif`, peso 400, 28px no celular e 40px a partir de `md`.
-- Parágrafo `Moda para vestir todo dia, com entrega rápida e troca em 7 dias.` com `text-suave`, largura máxima de 40 caracteres.
+- `Image` from `next/image` pointing to `/logo.svg`, with `alt="Helena"`, `width={160}` and `height={29}` (the SVG ratio is 264:48).
+- Label `Em breve` in `font-mono`, uppercase, `text-muted`, `0.08em` tracking.
+- `<h1>` `A loja está sendo preparada` in `font-serif`, weight 400, 28px on the phone and 40px from `md` up.
+- Paragraph `Moda para vestir todo dia, com entrega rápida e troca em 7 dias.` in `text-muted`, max width of 40 characters.
 
-Nenhuma classe `dark:` e nenhuma cor fora dos tokens.
+No `dark:` class and no color outside the tokens.
 
-- [ ] **Passo 2: Remover os SVGs do scaffold**
-
-```bash
-git rm public/next.svg public/vercel.svg public/file.svg public/globe.svg public/window.svg
-```
-
-- [ ] **Passo 3: Conferir que não sobrou referência**
-
-Rodar: `grep -rnE "dark:|next\.svg|vercel\.svg|zinc-" app/`
-Esperado: nenhuma linha.
-
-Rodar: `npm test && npm run lint && npm run build`
-Esperado: tudo passa.
-
-- [ ] **Passo 4: Conferir no navegador**
-
-Rodar `npm run dev` e abrir `http://localhost:3000` em largura de celular (390px).
-Esperado: fundo `#FAF8F5`, logo, título em serifa. Com o zoom de texto do navegador em 200%, nada cortado. Com o sistema em tema escuro, a página continua clara.
-
-- [ ] **Passo 5: Commit**
+- [ ] **Step 2: Delete the scaffold SVGs**
 
 ```bash
-git add app/page.tsx
-git commit -m "Troca a pagina do scaffold por pagina provisoria da Helena"
+rm public/next.svg public/vercel.svg public/file.svg public/globe.svg public/window.svg
 ```
+
+- [ ] **Step 3: Check nothing still points to them**
+
+Run: `grep -rnE "dark:|next\.svg|vercel\.svg|zinc-" app/`
+Expected: no lines.
+
+Run: `npm test && npm run lint && npm run build`
+Expected: everything passes.
+
+- [ ] **Step 4: Check in the browser**
+
+Run `npm run dev` and open `http://localhost:3000` at phone width (390px).
+Expected: `#FAF8F5` background, logo, serif heading. With the browser text zoom at 200%, nothing cut off. With the system in dark theme, the page stays light.
+
+- [ ] **Step 5: Hand over to the owner**
+
+List the changed files (`app/page.tsx` and the deleted SVGs). Suggested message: `Troca a pagina do scaffold por pagina provisoria da Helena`.

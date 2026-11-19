@@ -1,28 +1,50 @@
-# Glossário: termo do negócio → nome no código
+# Glossary: business term → name in the code
 
-Os documentos estão em português e o código está em inglês. Esta tabela fixa a tradução de cada termo, para que todo mundo use o mesmo nome. Termo novo entra aqui antes de entrar no código.
+The business is talked about in Portuguese (by the owner, the customer and the store text); code and docs are in English. This table fixes the name of each term, so everyone uses the same one. A new term goes here before it goes into the code.
 
-**Critério:** inglês simples, de palavras que um dev iniciante já conhece. Na dúvida entre a palavra técnica e a comum, vale a comum (`preparing`, não `fulfillment`).
+**Rule:** plain English, with words a beginner dev already knows. When torn between the technical word and the common one, pick the common one (`preparing`, not `fulfillment`).
 
-**Formato dos nomes:**
-- TypeScript e contrato da API: `camelCase` para campos e funções, `PascalCase` para tipos e componentes.
-- Banco de dados: `snake_case`, tabela no singular, chave como `customer_id`. Palavras reservadas do SQL Server não viram nome de tabela: `customer_order`, `admin_user`, `return_request`.
-- Valores de enumeração: `snake_case` minúsculo (`wrong_size`).
-- Rotas da API: plural, minúsculas, com hífen (`/v1/restock-alerts`).
+**Name format:**
+- TypeScript and API contract: `camelCase` for fields and functions, `PascalCase` for types and components.
+- Database: `snake_case`, singular table names, keys like `customer_id`. SQL Server reserved words don't become table names: `customer_order`, `admin_user`, `return_request`.
+- Enum values: lowercase `snake_case` (`wrong_size`).
+- API routes: plural, lowercase, hyphenated (`/v1/restock-alerts`).
 
-**Ficam como estão**, por não terem equivalente em inglês: `cpf`, `cep`, `pix`, `pac`, `sedex`, `whatsapp`. As rotas que a cliente vê no navegador também continuam em português (`/sacola`, `/produto/[slug]`), porque fazem parte da loja e não do código.
+**Kept as they are**, since they have no English equivalent: `cpf`, `cep`, `pix`, `pac`, `sedex`, `whatsapp`.
 
-## Loja e catálogo
+**What the customer sees stays in Portuguese:** screen text, store routes in the browser (`/sacola`, `/produto/[slug]`) and their query parameters (table below). Everything else is in English.
 
-| Português | Código |
+## Store URLs (customer sees them, so Portuguese)
+
+| Store URL | Code |
 |---|---|
-| vitrine (página inicial) | `home` |
+| `/` (vitrine) | `HomePage` |
+| `/catalogo` | `CatalogPage` |
+| `/buscar` | `SearchPage` |
+| `/produto/[slug]` | `ProductPage` |
+| `/sacola` | cart page |
+| `/cookies` | `CookiesPage` |
+| `?categoria=` | `category` |
+| `?tamanho=` | `size` |
+| `?cor=` | `color` |
+| `?precoMin=`, `?precoMax=` | `minPrice`, `maxPrice` |
+| `?busca=` | `search` |
+| `?ordem=` | `sort` |
+| `?pagina=` | `page` |
+| `ordem`: `novidades`, `menor-preco`, `maior-preco`, `maior-desconto`, `mais-vendidos` | `newest`, `lowest_price`, `highest_price`, `biggest_discount`, `best_sellers` |
+| `categoria`: `camisetas`, `calcas`, `jaquetas`, `acessorios` | `tshirts`, `pants`, `jackets`, `accessories` |
+
+## Store and catalog
+
+| Portuguese | Code |
+|---|---|
+| vitrine (home page) | `home` |
 | campanha | `campaign` |
 | barra de anúncio | `announcement` |
 | destaques | `featured` |
 | catálogo | `catalog` |
 | produto | `product` |
-| tamanho do produto (variação) | `productSize` / `product_size` |
+| tamanho do produto (variant) | `productSize` / `product_size` |
 | foto | `photo` |
 | guia de medidas | `sizeGuide` / `size_guide` |
 | categoria: camisetas, calças, jaquetas, acessórios | `category`: `tshirts`, `pants`, `jackets`, `accessories` |
@@ -36,20 +58,20 @@ Os documentos estão em português e o código está em inglês. Esta tabela fix
 | ordem: novidades, menor preço, maior preço, maior desconto, mais vendidos | `newest`, `lowest_price`, `highest_price`, `biggest_discount`, `best_sellers` |
 | busca | `search` |
 
-## Estoque
+## Stock
 
-| Português | Código |
+| Portuguese | Code |
 |---|---|
-| estoque financeiro (total da nota) | `totalStock` / `total_stock` |
-| estoque de vitrine (liberado para venda) | `saleStock` / `sale_stock` |
+| estoque financeiro (invoice total) | `totalStock` / `total_stock` |
+| estoque de vitrine (released for sale) | `saleStock` / `sale_stock` |
 | quantidade reservada | `reservedStock` / `reserved_stock` |
 | quantidade com defeito | `damagedStock` / `damaged_stock` |
 | estoque mínimo | `minStock` / `min_stock` |
 | reserva (status: reservada, confirmada, expirada) | `reservation` (`reserved`, `confirmed`, `expired`) |
 
-## Sacola, frete e checkout
+## Bag, shipping and checkout
 
-| Português | Código |
+| Portuguese | Code |
 |---|---|
 | sacola, item da sacola | `cart`, `cartItem` / `cart_item` |
 | quantidade | `quantity` |
@@ -64,11 +86,11 @@ Os documentos estão em português e o código está em inglês. Esta tabela fix
 | cliente, lead | `customer`, `lead` |
 | dados da cliente | `customerDetails` |
 
-## Pedido e pagamento
+## Order and payment
 
-| Português | Código |
+| Portuguese | Code |
 |---|---|
-| pedido, item do pedido, número do pedido | `order`, `orderItem`, `orderNumber` (tabela `customer_order`, porque `order` é palavra reservada no SQL) |
+| pedido, item do pedido, número do pedido | `order`, `orderItem`, `orderNumber` (table `customer_order`, because `order` is a SQL reserved word) |
 | etapas: pagamento confirmado, em separação, enviado, entregue | `payment_confirmed`, `preparing`, `shipped`, `delivered` |
 | aguardando pagamento, suporte em andamento | `awaiting_payment`, `support_in_progress` |
 | pagamento: PIX, cartão | `payment`: `pix`, `card` |
@@ -77,20 +99,20 @@ Os documentos estão em português e o código está em inglês. Esta tabela fix
 | código do PIX (copia e cola) | `pixCode` |
 | código de rastreio | `trackingCode` |
 | nota fiscal (status: emitida, erro) | `invoice` (`issued`, `error`) |
-| etiqueta (formato térmica) | `shippingLabel` / `shipping_label` (`thermal`) |
+| etiqueta (thermal format) | `shippingLabel` / `shipping_label` (`thermal`) |
 
-## Devolução
+## Returns
 
-| Português | Código |
+| Portuguese | Code |
 |---|---|
-| devolução | `return` (tabela `return_request`, porque `return` é palavra reservada no SQL e no TypeScript) |
+| devolução | `return` (table `return_request`, because `return` is a reserved word in SQL and TypeScript) |
 | motivo: tamanho incorreto, defeito, arrependimento, outro | `reason`: `wrong_size`, `defect`, `changed_mind`, `other` |
 | status: solicitada, em tratativa, concluída, rejeitada | `requested`, `in_progress`, `completed`, `rejected` |
 | prazo final | `deadline` |
 
-## Conta, privacidade e painel
+## Account, privacy and admin
 
-| Português | Código |
+| Portuguese | Code |
 |---|---|
 | conta, sessão, link de acesso | `account`, `session`, `accessLink` |
 | consentimento, canal, versão do texto | `consent`, `channel`, `textVersion` |
@@ -98,28 +120,28 @@ Os documentos estão em português e o código está em inglês. Esta tabela fix
 | usuário do painel; perfis: administrador, atendimento, operacional | `adminUser` / `admin_user`; `admin`, `support`, `operations` |
 | notificação: confirmação, rastreio, estoque reposto; envio: enviado, falha | `notification`: `confirmation`, `tracking`, `back_in_stock`; `sent`, `failed` |
 
-## Pastas do front
+## Front-end folders
 
-| Português | Código |
+| Meaning | Code |
 |---|---|
-| funcionalidades, por domínio | `src/features/<domain>/` |
-| domínios: catálogo, sacola, checkout, conta, devolução, privacidade (cookies e consentimentos) | `catalog`, `cart`, `checkout`, `account`, `returns`, `privacy` |
-| componentes, ações, consultas, esquemas | `components/`, `actions/`, `queries/`, `schemas/` |
-| primitivos: Botão, Campo, Selo | `src/components/ui/`: `Button`, `Field`, `Badge` |
-| testes | `tests/` |
+| features, by domain | `src/features/<domain>/` |
+| domains: catalog, bag, checkout, account, returns, privacy (cookies and consents) | `catalog`, `cart`, `checkout`, `account`, `returns`, `privacy` |
+| components, actions, queries, schemas | `components/`, `actions/`, `queries/`, `schemas/` |
+| primitives: button, field, badge | `src/components/ui/`: `Button`, `Field`, `Badge` |
+| tests | `tests/` |
 
-## Tokens de cor
+## Color tokens
 
-| Português (antes) | Token | Uso |
+| Old Portuguese name | Token | Use |
 |---|---|---|
-| fundo | `background` | fundo da página |
-| superfície | `surface` | atrás das fotos de produto, rodapé, avisos |
-| cartão | `card` | cartões da sacola, painel, campos |
-| tinta | `primary` | texto, ícones, botão principal |
-| suave | `muted` | legendas, preço riscado |
-| controle | `control` | borda de campos e chips |
-| linha | `line` | divisores decorativos |
-| oferta | `sale` | selo de desconto, preço promocional, timer, últimas peças |
-| benefício | `success` | frete grátis, prazo calculado, PIX e pedido confirmados |
-| erro | `error` | erros |
-| raio dos controles | `rounded-control` | pílula |
+| fundo | `background` | page background |
+| superfície | `surface` | behind product photos, footer, notices |
+| cartão | `card` | bag cards, panel, fields |
+| tinta | `primary` | text, icons, main button |
+| suave | `muted` | captions, struck-through price |
+| controle | `control` | border of fields and chips |
+| linha | `line` | decorative dividers |
+| oferta | `sale` | discount badge, sale price, timer, low stock |
+| benefício | `success` | free shipping, calculated delivery time, PIX and order confirmed |
+| erro | `error` | errors |
+| raio dos controles | `rounded-control` | pill |

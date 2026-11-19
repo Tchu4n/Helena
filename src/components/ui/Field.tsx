@@ -29,7 +29,7 @@ export function Field({ label, name, type = "text", defaultValue, error, inputMo
         maxLength={maxLength}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className={`min-h-12 rounded-control border bg-card px-4 text-base ${error ? "border-2 border-error" : "border-control"}`}
+        className={`min-h-12 w-full min-w-0 rounded-control border bg-card px-4 text-base ${error ? "border-2 border-error" : "border-control"}`}
       />
       {error && (
         <p id={errorId} className="flex items-start gap-1 text-sm text-error">

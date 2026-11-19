@@ -6,7 +6,7 @@ info:
     Contract between the front end (Next.js) and the back end (Java + SQL Server)
     for the 8 customer screens. Derived from `docs/SPEC-CLIENT.md`; the codes in
     parentheses (`SAC-13`) point to the scenarios there. Business terms map to
-    these names in `docs/GLOSSARIO.md`.
+    these names in `docs/GLOSSARY.md`.
 
     Conventions:
     - Only the Next.js server calls this API, never the browser.

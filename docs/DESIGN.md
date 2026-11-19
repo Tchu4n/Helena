@@ -1,119 +1,119 @@
 # Design system — Helena
 
-Fonte única do design da loja. Substitui `docs/referencias/DESIGN.md`, que fica só como referência histórica (ele tratava o azul de alto contraste como cor principal e mirava Next 15 / Tailwind 3).
+Single source of the store's design. It replaces `docs/referencias/DESIGN.md`, which stays only as a historical reference (it treated high-contrast blue as the main color and targeted Next 15 / Tailwind 3).
 
-Decisões fechadas com o dono do projeto em 14/11/2026, a partir das 17 capturas de referência, dos fluxogramas de telas, do manual de UX/UI e dos requisitos.
+Decisions settled with the project owner on 2026-11-14, from the 17 reference screenshots, the screen flowcharts, the UX/UI handbook and the requirements.
 
-## 1. Intenção
+## 1. Intent
 
-Loja de moda para 18 a 30 anos, comprando pelo celular a partir do Instagram. O design busca o equilíbrio entre a finesse das marcas de luxo (Miu Miu, Hermès) e a conversão das varejistas (Hering, Renner).
+Fashion store for ages 18 to 30, buying on the phone from Instagram. The design balances the finesse of luxury brands (Miu Miu, Hermès) with the conversion of retailers (Hering, Renner).
 
-**Princípio: editorial no repouso, varejo na ação.** A página parada é calma: fundo quente, muito respiro, quase sem cor. Os sinais de conversão existem, mas só nos lugares fixos listados na seção 4.
+**Principle: editorial at rest, retail in action.** A still page is calm: warm background, lots of space, almost no color. Conversion signals exist, but only in the fixed places listed in section 4.
 
-- **Objetivos:** produto em primeiro plano; compra com poucos toques e uma mão só; frete e prazo visíveis antes do checkout; contraste AA em tudo.
-- **Fora do lançamento:** tema escuro e tema de alto contraste (seção 8).
-- **O que seria um fracasso:** parecer loja de promoção (cor de oferta em botões ou espalhada pela página), ou parecer vitrine de luxo em que a cliente não acha tamanho, preço e frete.
+- **Goals:** product first; buying in a few taps with one hand; shipping cost and time visible before checkout; AA contrast everywhere.
+- **Not in the launch:** dark theme and high-contrast theme (section 8).
+- **What failure looks like:** looking like a discount store (sale color on buttons or spread across the page), or looking like a luxury showcase where the customer can't find size, price and shipping.
 
-## 2. Decisões fechadas
+## 2. Settled decisions
 
-| Decisão | Escolha |
+| Decision | Choice |
 |---|---|
-| Fundo | Quente (`#FAF8F5`) |
-| Cor de oferta | Terracota (`#9A3412`) |
-| Formato dos controles | Pílula |
-| Fonte dos títulos | Playfair Display |
-| Navegação no celular | Abas inferiores |
-| Sacola | Painel ao adicionar a peça + página como passo 1 da compra |
-| Botão principal | Preto sólido, nunca colorido |
-| Ordem de trabalho | Telas do cliente primeiro; admin depois |
+| Background | Warm (`#FAF8F5`) |
+| Sale color | Terracotta (`#9A3412`) |
+| Control shape | Pill |
+| Heading font | Playfair Display |
+| Phone navigation | Bottom tabs |
+| Bag | Panel when adding the item + page as step 1 of checkout |
+| Main button | Solid black, never colored |
+| Work order | Customer screens first; admin later |
 
 ## 3. Tokens
 
-### Cor
+### Color
 
-| Token | Valor | Uso | Contraste sobre fundo / superfície |
+| Token | Value | Use | Contrast on background / surface |
 |---|---|---|---|
-| `background` | `#FAF8F5` | fundo da página | — |
-| `surface` | `#EDE8E1` | atrás das fotos de produto, rodapé, avisos | — |
-| `card` | `#FFFFFF` | cartões da sacola, painel, campos | — |
-| `primary` | `#121212` | texto, ícones, botão principal | 17,7 / 15,4 |
-| `muted` | `#66625C` | legendas, preço riscado | 5,7 / 5,0 |
-| `control` | `#857D72` | borda de campos e chips (mínimo 3:1) | 3,8 / 3,3 |
-| `line` | `#D9D3CA` | divisores decorativos; nunca texto nem borda de controle | 1,4 |
-| `sale` | `#9A3412` | ver seção 4 | 6,9 / 6,0 |
-| `success` | `#17692F` | ver seção 4 | 6,4 / 5,6 |
-| `error` | `#B42318` | erro, sempre com ícone e texto | 6,2 / 5,4 |
+| `background` | `#FAF8F5` | page background | — |
+| `surface` | `#EDE8E1` | behind product photos, footer, notices | — |
+| `card` | `#FFFFFF` | bag cards, panel, fields | — |
+| `primary` | `#121212` | text, icons, main button | 17.7 / 15.4 |
+| `muted` | `#66625C` | captions, struck-through price | 5.7 / 5.0 |
+| `control` | `#857D72` | border of fields and chips (3:1 minimum) | 3.8 / 3.3 |
+| `line` | `#D9D3CA` | decorative dividers; never text or control border | 1.4 |
+| `sale` | `#9A3412` | see section 4 | 6.9 / 6.0 |
+| `success` | `#17692F` | see section 4 | 6.4 / 5.6 |
+| `error` | `#B42318` | error, always with icon and text | 6.2 / 5.4 |
 
-Texto branco sobre `sale` dá 7,3:1. Texto `background` sobre `primary` dá 17,7:1.
+White text on `sale` gives 7.3:1. `background` text on `primary` gives 17.7:1.
 
-### Tipografia
+### Type
 
-| Papel | Fonte | Peso |
+| Role | Font | Weight |
 |---|---|---|
-| Títulos | Playfair Display | 400 |
-| Corpo, preços, botões | Geist | 400 / 500 / 600 |
-| Rótulos minúsculos em caixa alta | Geist Mono, espaçamento 0,08em | 500 |
+| Headings | Playfair Display | 400 |
+| Body, prices, buttons | Geist | 400 / 500 / 600 |
+| Tiny uppercase labels | Geist Mono, 0.08em tracking | 500 |
 
-| Nível | Celular | Desktop | Altura de linha |
+| Level | Phone | Desktop | Line height |
 |---|---|---|---|
-| H1 | 28px | 40px | 1,2 |
-| H2 | 24px | 32px | 1,25 |
-| H3 | 20px | 24px | 1,3 |
-| Corpo | 16px | 16px | 1,5 |
-| Legenda | 13px | 14px | 1,4 |
-| Rótulo | 10px | 11px | 1,35 |
+| H1 | 28px | 40px | 1.2 |
+| H2 | 24px | 32px | 1.25 |
+| H3 | 20px | 24px | 1.3 |
+| Body | 16px | 16px | 1.5 |
+| Caption | 13px | 14px | 1.4 |
+| Label | 10px | 11px | 1.35 |
 
-Tamanhos em `rem`. Nenhum contêiner de texto tem altura fixa; texto sempre quebra linha, nunca é cortado. Linha de leitura: 30 a 40 caracteres no celular, 45 a 75 no desktop.
+Sizes in `rem`. No text container has a fixed height; text always wraps, never gets cut. Reading line: 30 to 40 characters on the phone, 45 to 75 on desktop.
 
-### Forma, espaço e toque
+### Shape, space and touch
 
-- **Controles** (botão, chip de tamanho, campo, selo, seletor de quantidade): pílula (`border-radius: 9999px`).
-- **Fotos, tiles e cartões:** canto reto. **Painel inferior:** 16px só nos cantos de cima.
-- **Sem sombras.** Separação por cor de superfície e divisor.
-- **Alvo de toque:** mínimo 48×48px, com 8px entre alvos. Botão principal com 48px de altura.
-- **Foco:** contorno de 2px em `primary`, afastado 2px.
+- **Controls** (button, size chip, field, badge, quantity picker): pill (`border-radius: 9999px`).
+- **Photos, tiles and cards:** square corners. **Bottom panel:** 16px on the top corners only.
+- **No shadows.** Separation by surface color and divider.
+- **Touch target:** at least 48×48px, with 8px between targets. Main button 48px tall.
+- **Focus:** 2px outline in `primary`, 2px offset.
 
-## 4. Onde cada cor de sinal pode aparecer
+## 4. Where each signal color may appear
 
-| Cor | Pode | Não pode |
+| Color | Allowed | Not allowed |
 |---|---|---|
-| `sale` | selo de desconto, preço promocional, timer da reserva de 15 min, aviso de últimas peças, bloco de campanha na home | botão, link, título, ícone de navegação |
-| `success` | frete grátis, prazo de entrega calculado, PIX confirmado, pedido confirmado | preço, botão |
-| `error` | validação de formulário, pagamento recusado, peça esgotada durante a compra | promoção |
+| `sale` | discount badge, sale price, 15-min reservation timer, low-stock notice, campaign block on the home page | button, link, heading, navigation icon |
+| `success` | free shipping, calculated delivery time, PIX confirmed, order confirmed | price, button |
+| `error` | form validation, declined payment, item sold out during checkout | promotion |
 
-Cor nunca é o único sinal: selo tem texto, erro tem ícone e mensagem, tamanho selecionado tem borda dupla, tamanho esgotado é riscado.
+Color is never the only signal: a badge has text, an error has an icon and a message, a selected size has a double border, a sold-out size is struck through.
 
-## 5. Componentes
+## 5. Components
 
-| Componente | Comportamento | Base |
+| Component | Behavior | Based on |
 |---|---|---|
-| Barra de anúncio | faixa `primary` no topo com cupom ou frete; some nas telas de compra | Hering |
-| Cabeçalho | busca à esquerda, logo ao centro, sacola à direita | Miu Miu |
-| Abas inferiores | Início, Buscar, Sacola, Conta; nas telas de produto, sacola e checkout dão lugar ao botão fixo | fluxograma do cliente |
-| Faixa de benefícios | três itens em rótulo monoespaçado, sem cor | conteúdo Hering, acabamento Hermès |
-| Card de produto | foto 3:4 sobre `surface`, selo, coração, botão de compra rápida, nome, preço; esgotado vai para o fim da grade com marcação | Miu Miu + Hering |
-| Página de produto | galeria de 4+ fotos (carrossel no celular, grade 2×2 no desktop), título em serifa, preço riscado + atual + selo, parcelas, cor em bolinhas, tamanho em chips, guia de medidas, CEP com prazo logo abaixo, "Adicionar à sacola" fixo na base | Hering + Miu Miu |
-| Painel de sacola | sobe de baixo ao adicionar a peça: timer, item, quanto falta para o frete grátis, subtotal, "Finalizar compra" e "Ver sacola" | Hering |
-| Página de sacola | cabeçalho reduzido, progresso em 3 passos, timer, cartões brancos, frete por CEP, total com parcelas, "Finalizar compra" | Hermès, com frete antecipado |
-| Campo de formulário | rótulo acima, 48px, borda `control`, erro com borda + ícone + texto, atributos `autocomplete` | manual de UX |
-| Aviso de cookies | "Rejeitar" e "Aceitar" com mesmo tamanho e cor; nada marcado por padrão | guia de LGPD |
+| Announcement bar | `primary` strip at the top with coupon or shipping; hidden on purchase screens | Hering |
+| Header | search on the left, logo in the center, bag on the right | Miu Miu |
+| Bottom tabs | Home, Search, Bag, Account; on the product, bag and checkout screens they give way to the fixed button | customer flowchart |
+| Benefits strip | three items in monospaced labels, no color | Hering content, Hermès finish |
+| Product card | 3:4 photo on `surface`, badge, heart, quick-buy button, name, price; sold out goes to the end of the grid with a mark | Miu Miu + Hering |
+| Product page | gallery of 4+ photos (carousel on the phone, 2×2 grid on desktop), serif title, struck-through price + current + badge, installments, color as dots, size as chips, size guide, CEP with delivery time right below, "Adicionar à sacola" fixed at the bottom | Hering + Miu Miu |
+| Bag panel | when adding the item, slides up from the bottom on the phone and opens from the right side on a computer: timer, item, amount left for free shipping, subtotal, "Finalizar compra" and "Ver sacola" | Hering |
+| Bag page | reduced header, 3-step progress, timer, white cards, shipping by CEP, total with installments, "Finalizar compra" | Hermès, with early shipping |
+| Form field | label above, 48px, `control` border, error with border + icon + text, `autocomplete` attributes | UX handbook |
+| Cookie notice | "Rejeitar" and "Aceitar" with the same size and color; nothing checked by default | LGPD guide |
 
-Logo: `public/logo.svg` (placeholder em traço fino).
+Logo: `public/logo.svg` (thin-stroke placeholder).
 
-## 6. Acessibilidade sempre ligada
+## 6. Accessibility, always on
 
-- Texto com contraste mínimo de 4,5:1; borda de controle e foco com 3:1.
-- Foco visível em tudo que é interativo, e nunca coberto pelas barras fixas (usar `scroll-padding`).
-- Endereço de cobrança igual ao de entrega por padrão; dados preservados após erro.
-- Compra sem conta e sem CAPTCHA de transcrição.
-- Respeitar `prefers-reduced-motion`.
-- Escopo básico, como nos requisitos: sem leitor de tela avançado nem Libras no lançamento.
+- Text with at least 4.5:1 contrast; control border and focus with 3:1.
+- Visible focus on everything interactive, never covered by the fixed bars (use `scroll-padding`).
+- Billing address same as delivery address by default; data kept after an error.
+- Checkout without account and without transcription CAPTCHA.
+- Respect `prefers-reduced-motion`.
+- Basic scope, as in the requirements: no advanced screen reader support and no Libras at launch.
 
-## 7. Implementação
+## 7. Implementation
 
-O projeto usa Tailwind 4: os tokens vivem em `app/globals.css`, não em `tailwind.config.ts`.
+The project uses Tailwind 4: tokens live in `app/globals.css`, not in `tailwind.config.ts`.
 
-**Idioma do código:** nomes e comentários em inglês simples, seguindo `docs/GLOSSARIO.md`; o texto que a cliente vê fica em português. A correspondência entre os nomes antigos dos tokens e os atuais está no glossário.
+**Language:** code and docs in plain English, following `docs/GLOSSARY.md`; the text the customer sees stays in Portuguese. The glossary maps the old token names to the current ones.
 
 ```css
 @theme {
@@ -138,27 +138,27 @@ O projeto usa Tailwind 4: os tokens vivem em `app/globals.css`, não em `tailwin
 }
 ```
 
-- Fontes por `next/font/google`: Geist e Geist Mono já estão em `app/layout.tsx`; entra só `Playfair_Display`.
-- Remover o bloco `prefers-color-scheme: dark` que veio no scaffold, senão a loja aparece meio escura em celulares com tema escuro.
-- Trocar `lang="en"` por `lang="pt-BR"`.
-- Um teste automático confere os pares de contraste da tabela de cor.
+- Fonts through `next/font/google`: Geist, Geist Mono and `Playfair_Display`, in `app/layout.tsx`.
+- No `prefers-color-scheme: dark` block, or the store looks half dark on phones with a dark theme.
+- The page declares `lang="pt-BR"`, because the store text is Portuguese.
+- An automated test checks the contrast pairs of the color table.
 
-### Abordagens consideradas
+### Approaches considered
 
-| Abordagem | Avaliação |
+| Approach | Assessment |
 |---|---|
-| Variáveis em `globals.css` via `@theme` | **Escolhida.** É o caminho nativo do Tailwind 4, sem arquivo nem dependência extra |
-| `tailwind.config.ts`, como no `DESIGN.md` antigo | Descartada: é o formato do Tailwind 3 |
-| Tokens em JSON (DTCG) compilados com Style Dictionary | Descartada: serve para distribuir tokens a iOS, Android e Figma; aqui é uma loja web só |
+| Variables in `globals.css` via `@theme` | **Chosen.** It is the native Tailwind 4 way, with no extra file or dependency |
+| `tailwind.config.ts`, as in the old `DESIGN.md` | Dropped: it is the Tailwind 3 format |
+| JSON tokens (DTCG) compiled with Style Dictionary | Dropped: it serves to ship tokens to iOS, Android and Figma; this is a web-only store |
 
-## 8. Fora do lançamento
+## 8. Not in the launch
 
-- **Tema escuro:** nenhum requisito pede e nenhuma referência tem.
-- **Tema de alto contraste:** quando entrar, redefine os mesmos tokens para o nível AAA (7:1): fundo e cartão brancos, texto preto, borda de 2px no lugar dos preenchimentos `surface`, links e foco em azul `#0052A3`. O azul do `DESIGN.md` antigo pertence a este tema.
+- **Dark theme:** no requirement asks for it and no reference has it.
+- **High-contrast theme:** when it comes, it redefines the same tokens at AAA level (7:1): white background and card, black text, 2px border instead of `surface` fills, links and focus in blue `#0052A3`. The blue of the old `DESIGN.md` belongs to this theme.
 
-## 9. Em aberto
+## 9. Open
 
-- **Checkout (entrega e pagamento):** não há captura de referência real; só os fluxogramas.
-- **Fotos reais:** as escolhas foram feitas vendo silhuetas; rever fundo e `surface` quando houver foto de produto.
-- **Parte de baixo do painel de sacola** da referência não aparece na captura; o desenho da seção 5 é proposta.
-- **Escolhas de quem escreveu, não do dono:** `control` e `line` como cores separadas, verde `success` mais escuro que o do `DESIGN.md` antigo, contorno de foco em `primary`.
+- **Checkout (delivery and payment):** there is no real reference screenshot; only the flowcharts.
+- **Real photos:** the choices were made looking at silhouettes; review background and `surface` once there are product photos.
+- **Bottom part of the bag panel** in the reference does not show in the screenshot; the design in section 5 is a proposal.
+- **Choices made by the writer, not the owner:** `control` and `line` as separate colors, `success` green darker than in the old `DESIGN.md`, focus outline in `primary`.

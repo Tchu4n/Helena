@@ -8,7 +8,7 @@ export function CookieBanner() {
   return (
     <section
       aria-label="Aviso de cookies"
-      className="fixed inset-x-0 bottom-16 z-20 border-t border-line bg-card px-4 py-4 md:bottom-0"
+      className="fixed inset-x-0 bottom-(--bottom-bar) z-20 border-t border-line bg-card px-4 py-4"
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-3 md:flex-row md:items-center">
         <p className="text-sm md:flex-1">

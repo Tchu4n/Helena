@@ -1,9 +1,12 @@
 // Only the fields the screens use go to components; the full API response never does.
 import type { components } from "../../lib/api-types.ts";
+import { formatPrice } from "../../lib/format.ts";
 
 type ProductSummary = components["schemas"]["ProductSummary"];
 type Home = components["schemas"]["Home"];
 type ProductPage = components["schemas"]["ProductPage"];
+type Product = components["schemas"]["Product"];
+type InstallmentPlan = components["schemas"]["InstallmentPlan"];
 
 export type CardProduct = {
   slug: string;
@@ -55,4 +58,52 @@ export function toHomeView(home: Home): HomeView {
 
 export function toProductListView(page: ProductPage): ProductListView {
   return { items: page.items.map(toCardProduct), total: page.total, page: page.page, perPage: page.perPage };
+}
+
+export type SizeOption = { id: string; label: string; available: boolean; lowStock: boolean };
+
+export type ProductView = {
+  id: string;
+  slug: string;
+  name: string;
+  price: number;
+  originalPrice: number | null;
+  discountBadge: string | null;
+  installmentText: string | null;
+  color: { name: string; hex: string };
+  otherColors: { slug: string; name: string; hex: string }[];
+  photos: { url: string; alt: string }[];
+  sizes: SizeOption[];
+  soldOut: boolean;
+  fabric: string;
+  collection: string;
+  description: string;
+  sizeGuide: { columns: string[]; rows: string[][] } | null;
+};
+
+// PRO-02: the API already applies the rule (up to 6x, minimum R$ 50,00); 1 means no installments.
+export function installmentText(plan: InstallmentPlan): string | null {
+  if (plan.maxInstallments <= 1) return null;
+  return `até ${plan.maxInstallments}x de ${formatPrice(plan.installmentAmount)} sem juros`;
+}
+
+export function toProductView(p: Product): ProductView {
+  return {
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    price: p.price,
+    originalPrice: p.originalPrice ?? null,
+    discountBadge: p.discountBadge ?? null,
+    installmentText: installmentText(p.installmentPlan),
+    color: { name: p.color.name, hex: p.color.hex },
+    otherColors: p.otherColors.map((c) => ({ slug: c.slug, name: c.name, hex: c.hex })),
+    photos: p.photos.map((ph) => ({ url: ph.url, alt: ph.altText })),
+    sizes: p.sizes.map((s) => ({ id: s.id, label: s.label, available: s.available, lowStock: s.lowStock })),
+    soldOut: p.soldOut,
+    fabric: p.fabric,
+    collection: p.collection,
+    description: p.description,
+    sizeGuide: p.sizeGuide ? { columns: p.sizeGuide.columns, rows: p.sizeGuide.rows } : null,
+  };
 }

@@ -6,6 +6,11 @@ export { CategoryTiles } from "./components/CategoryTiles.tsx";
 export { HomeAnnouncement } from "./components/HomeAnnouncement.tsx";
 export { getHome } from "./queries/getHome.ts";
 export { listProducts } from "./queries/listProducts.ts";
+export { getProduct } from "./queries/getProduct.ts";
+export { ProductGallery } from "./components/ProductGallery.tsx";
+export { ProductColors, ProductDetails, ProductHeading } from "./components/ProductInfo.tsx";
+export { SizeGuide } from "./components/SizeGuide.tsx";
+export { ProductPurchase } from "./components/ProductPurchase.tsx";
 export {
   activeChips,
   canonicalRedirect,
@@ -17,4 +22,4 @@ export {
   SORT_SLUGS,
   type CatalogFilters,
 } from "./filters.ts";
-export type { CardProduct, HomeView } from "./views.ts";
+export type { CardProduct, HomeView, ProductView, SizeOption } from "./views.ts";

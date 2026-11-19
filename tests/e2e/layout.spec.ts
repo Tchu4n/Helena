@@ -38,3 +38,18 @@ test("GER-07 focus visible", async ({ page }) => {
   const outline = await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle);
   expect(outline).not.toBe("none");
 });
+
+test("footer not covered by tabs", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const link = await page.getByRole("contentinfo").getByRole("link").last().boundingBox();
+  const tabs = await page.getByRole("navigation", { name: "Abas" }).boundingBox();
+  expect(link!.y + link!.height).toBeLessThanOrEqual(tabs!.y);
+});
+
+test("GER-03 cookie notice does not cover the product's fixed purchase bar", async ({ page }) => {
+  await page.goto("/produto/jaqueta-sarja-verde");
+  const notice = (await page.getByRole("region", { name: "Aviso de cookies" }).boundingBox())!;
+  const bar = (await page.getByRole("button", { name: "Adicionar à sacola" }).locator("..").boundingBox())!;
+  expect(notice.y + notice.height).toBeLessThanOrEqual(bar.y + 1);
+});

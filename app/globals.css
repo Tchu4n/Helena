@@ -33,10 +33,25 @@ body {
   outline-offset: 2px;
 }
 
+/* GER-03, GER-07: height of the bar fixed at the bottom on phones, so the cookie notice sits above it:
+   the tab bar (4rem), or the purchase bar on buying screens (48px button + 2×16px padding + 1px border). */
+:root {
+  --bottom-bar: 4rem;
+}
+:root:has([data-purchase-bar]) {
+  --bottom-bar: 81px;
+}
+@media (width >= 48rem) {
+  :root,
+  :root:has([data-purchase-bar]) {
+    --bottom-bar: 0px;
+  }
+}
+
 /* GER-07: keep focused elements clear of the fixed tab bar (4rem tall on phones). */
 @media (width < 48rem) {
   html {
-    scroll-padding-bottom: 5rem;
+    scroll-padding-bottom: 6rem;
   }
 }
 

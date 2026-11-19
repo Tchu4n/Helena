@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/src/components/ui";
-import { formatPrice } from "@/src/lib/format";
 import type { CardProduct } from "../views.ts";
+import { Price } from "./Price.tsx";
 
 // Photo 3:4 on `surface`, badge, name and price (DESIGN.md, section 5). Square corners.
 // `eager` is for the first cards on screen, which hold the largest image (GER-08).
@@ -27,18 +27,7 @@ export function ProductCard({ product, size, eager = false }: { product: CardPro
         </div>
       </div>
       <p className="text-sm leading-[1.4] text-pretty">{product.name}</p>
-      <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-        {onSale ? (
-          <>
-            <span className="sr-only">Preço anterior</span>
-            <s className="text-muted">{formatPrice(product.originalPrice!)}</s>
-            <span className="sr-only">Preço atual</span>
-            <span className="font-medium text-sale">{formatPrice(product.price)}</span>
-          </>
-        ) : (
-          <span className="font-medium">{formatPrice(product.price)}</span>
-        )}
-      </p>
+      <Price price={product.price} originalPrice={product.originalPrice} className="text-sm" />
     </Link>
   );
 }

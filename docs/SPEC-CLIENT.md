@@ -1,605 +1,634 @@
-# SPEC-CLIENT — telas do cliente
+# SPEC-CLIENT — customer screens
 
-Especificação de comportamento das 8 telas do cliente da loja Helena, em cenários Dado/Quando/Então. É a fonte da verdade do comportamento: mudou o comportamento, muda primeiro este arquivo, depois o teste, depois o código.
+Behavior spec of the 8 customer screens of the Helena store, as Given/When/Then scenarios. It is the source of truth for behavior: if behavior changes, this file changes first, then the test, then the code.
 
-- **Origem:** `Levantamento de Requisitos Helena Ecommerce` (estórias E1 a E19), fluxogramas de telas do cliente, guia de LGPD, manual de UX/UI, `CLAUDE.md` e `docs/DESIGN.md`.
-- **O que não está aqui:** aparência (está em `docs/DESIGN.md`), formato das chamadas à API (virá no contrato OpenAPI), telas do painel administrativo.
-- **Como ler:** cada cenário tem um código (`SAC-04`) que vira nome de teste. Entre parênteses, a estória de origem. Valores em reais são exemplos que os testes usam literalmente.
-- **Estado:** aprovada pelo dono em 14/11/2026. A seção 12 registra as decisões tomadas e o que ainda depende do contrato da API.
+- **Sources:** `Levantamento de Requisitos Helena Ecommerce` (stories E1 to E19), customer screen flowcharts, LGPD guide, UX/UI handbook, `CLAUDE.md` and `docs/DESIGN.md`.
+- **Not here:** look and feel (in `docs/DESIGN.md`), API call format (in the OpenAPI contract), admin panel screens.
+- **How to read:** each scenario has a code (`SAC-04`) that becomes a test name. In parentheses, the source story. Amounts in reais are examples the tests use literally. Text in quotes is what the customer sees, in Portuguese, exactly as on screen.
+- **Status:** approved by the owner on 2026-11-14. Section 12 records the decisions made and what still depends on the API contract.
 
-## 1. Telas e rotas
+## 1. Screens and routes
 
-| # | Tela | Rota proposta | Prefixo |
+| # | Screen | Route | Prefix |
 |---|---|---|---|
-| 1 | Vitrine (página inicial) | `/` | `VIT` |
-| 2 | Catálogo e filtros | `/catalogo` | `CAT` |
-| 3 | Produto | `/produto/[slug]` | `PRO` |
-| 4 | Sacola (painel e página) | `/sacola` | `SAC` |
-| 5 | Checkout (dados, entrega, pagamento) | `/checkout` | `CHK` |
-| 6 | Confirmação e rastreio | `/pedido/[numero]` | `PED` |
-| 7 | Devolução | `/devolucao` | `DEV` |
-| 8 | Minha conta | `/conta` | `CTA` |
-| — | Comportamento comum a todas | — | `GER` |
+| 1 | Home (vitrine) | `/` | `VIT` |
+| 2 | Catalog and filters | `/catalogo` | `CAT` |
+| 3 | Product | `/produto/[slug]` | `PRO` |
+| 4 | Bag (panel and page) | `/sacola` | `SAC` |
+| 5 | Checkout (details, delivery, payment) | `/checkout` | `CHK` |
+| 6 | Confirmation and tracking | `/pedido/[numero]` | `PED` |
+| 7 | Returns | `/devolucao` | `DEV` |
+| 8 | My account | `/conta` | `CTA` |
+| — | Behavior shared by all | — | `GER` |
 
-## 2. Regras e valores usados nos cenários
+Routes are in Portuguese because the customer sees them in the browser. The prefixes are kept as they are because the tests already use them.
 
-| Regra | Valor |
+## 2. Rules and values used in the scenarios
+
+| Rule | Value |
 |---|---|
-| Reserva da peça | 15 minutos a partir do início do pagamento |
-| Parcelamento | até 6x sem juros, parcela mínima de R$ 50,00 |
-| Frete grátis | R$ 300,00 ou mais em peças, já com o desconto do cupom; qualquer CEP do Brasil; só na modalidade mais barata |
-| Benefício | cupom e frete grátis podem se acumular |
-| Cupom | um por compra; código de até 20 caracteres, ativo, desconto de 0 a 70% sobre o valor das peças |
-| Últimas peças | aviso quando o tamanho tem 15 unidades ou menos no estoque de vitrine |
-| CEP | 8 dígitos numéricos |
-| CPF | 11 dígitos numéricos |
-| Devolução | até 7 dias corridos após a entrega, uma solicitação por pedido |
-| Modalidades de frete | Motoboy (mesmo dia, só região metropolitana), PAC, Sedex |
-| Categorias | Camisetas, Calças, Jaquetas, Acessórios |
+| Item reservation | 15 minutes from the start of payment |
+| Installments | up to 6 interest-free, minimum installment R$ 50,00 |
+| Free shipping | R$ 300,00 or more in items, after the coupon discount; any CEP in Brazil; only on the cheapest option |
+| Benefit | coupon and free shipping can stack |
+| Coupon | one per purchase; code up to 20 characters, active, discount from 0 to 70% on the items amount |
+| Low stock | notice when the size has 15 units or fewer in sale stock |
+| CEP | 8 numeric digits |
+| CPF | 11 numeric digits |
+| Returns | up to 7 calendar days after delivery, one request per order |
+| Shipping options | Courier (same day, metro area only), PAC, Sedex |
+| Categories | Camisetas, Calças, Jaquetas, Acessórios |
 
-**Número máximo de parcelas** = o menor entre 6 e a parte inteira de (total ÷ 50), nunca menos que 1.
+**Maximum number of installments** = the smaller of 6 and the whole part of (total ÷ 50), never less than 1.
 
-| Total | Parcelas oferecidas |
+| Total | Installments offered |
 |---|---|
 | R$ 49,90 | 1x |
 | R$ 99,99 | 1x |
-| R$ 100,00 | até 2x de R$ 50,00 |
-| R$ 149,99 | até 2x |
-| R$ 150,00 | até 3x |
-| R$ 299,99 | até 5x |
-| R$ 300,00 | até 6x de R$ 50,00 |
-| R$ 1.000,00 | até 6x |
+| R$ 100,00 | up to 2x of R$ 50,00 |
+| R$ 149,99 | up to 2x |
+| R$ 150,00 | up to 3x |
+| R$ 299,99 | up to 5x |
+| R$ 300,00 | up to 6x of R$ 50,00 |
+| R$ 1.000,00 | up to 6x |
 
-**Benefício**, com frete de R$ 20,00 na modalidade mais barata:
+**Benefit**, with R$ 20,00 shipping on the cheapest option:
 
-| Produtos | Cupom | Desconto | Frete | Total |
+| Items | Coupon | Discount | Shipping | Total |
 |---|---|---|---|---|
-| R$ 320,00 | — | — | grátis | R$ 320,00 |
+| R$ 320,00 | — | — | free | R$ 320,00 |
 | R$ 320,00 | MARIA10 (10%) | R$ 32,00 | R$ 20,00 | R$ 308,00 |
-| R$ 400,00 | MARIA10 (10%) | R$ 40,00 | grátis | R$ 360,00 |
+| R$ 400,00 | MARIA10 (10%) | R$ 40,00 | free | R$ 360,00 |
 | R$ 250,00 | — | — | R$ 20,00 | R$ 270,00 |
 | R$ 250,00 | MARIA10 (10%) | R$ 25,00 | R$ 20,00 | R$ 245,00 |
 
-## 3. Comportamento comum (GER)
+## 3. Shared behavior (GER)
 
-**GER-01 — Abas inferiores no celular**
-- **Dado** que a cliente está na vitrine, no catálogo ou na conta, pelo celular
-- **Então** vê as abas Início, Buscar, Sacola e Conta fixas na base da tela
-- **E** a aba Sacola mostra a quantidade de peças quando a sacola não está vazia
+**GER-01 — Bottom tabs on the phone**
+- **Given** the customer is on the home, catalog or account screen, on the phone
+- **Then** she sees the tabs Início, Buscar, Sacola and Conta fixed at the bottom of the screen
+- **And** the Sacola tab shows the number of items when the bag is not empty
 
-**GER-02 — Telas de compra sem abas e sem barra de anúncio**
-- **Dado** que a cliente está na tela de produto, na sacola ou no checkout
-- **Então** as abas inferiores dão lugar ao botão principal da tela, fixo na base
-- **E** na sacola e no checkout a barra de anúncio do topo não aparece
+**GER-02 — Purchase screens without tabs and without announcement bar**
+- **Given** the customer is on the product, bag or checkout screen
+- **Then** the bottom tabs give way to the screen's main button, fixed at the bottom
+- **And** on the bag and checkout the top announcement bar does not show
 
-**GER-03 — Aviso de cookies na primeira visita** (LGPD)
-- **Dado** que a cliente ainda não escolheu suas preferências de cookies
-- **Quando** abre qualquer página
-- **Então** vê o aviso com "Rejeitar" e "Aceitar" do mesmo tamanho e cor, e "Gerenciar preferências"
-- **E** nenhum cookie que dependa de consentimento foi gravado ainda
+**GER-03 — Cookie notice on the first visit** (LGPD)
+- **Given** the customer has not chosen her cookie preferences yet
+- **When** she opens any page
+- **Then** she sees the notice with "Rejeitar" and "Aceitar" of the same size and color, and "Gerenciar preferências"
+- **And** no cookie that depends on consent has been stored yet
 
-**GER-04 — Rejeitar cookies não quebra a loja** (LGPD)
-- **Dado** que a cliente tocou em "Rejeitar"
-- **Quando** navega, adiciona peças à sacola e conclui uma compra
-- **Então** tudo funciona, e só os cookies necessários (sacola e sessão) são usados
+**GER-04 — Rejecting cookies doesn't break the store** (LGPD)
+- **Given** the customer tapped "Rejeitar"
+- **When** she browses, adds items to the bag and completes a purchase
+- **Then** everything works, and only the necessary cookies (bag and session) are used
 
-**GER-05 — Gerenciar preferências** (LGPD)
-- **Quando** a cliente toca em "Gerenciar preferências"
-- **Então** vê cada categoria de cookie descrita, todas as opcionais desmarcadas
-- **E** pode mudar a escolha depois, a qualquer momento, por um link no rodapé, sem precisar entrar na conta
+**GER-05 — Manage preferences** (LGPD)
+- **When** the customer taps "Gerenciar preferências"
+- **Then** she sees each cookie category described, all optional ones unchecked
+- **And** she can change the choice later, at any time, through a link in the footer, without signing in
 
-**GER-06 — Falha da API** (RFC 9457)
-- **Dado** que uma chamada à API falhou ou demorou demais
-- **Então** a tela mostra uma mensagem em português com ícone, sem código técnico, e a ação "Tentar de novo"
-- **E** nada que a cliente digitou é perdido
+**GER-06 — API failure** (RFC 9457)
+- **Given** an API call failed or took too long
+- **Then** the screen shows a message in Portuguese with an icon, no technical code, and the action "Tentar de novo"
+- **And** nothing the customer typed is lost
 
-**GER-07 — Toque, foco e sinal** (E17)
-- **Então** todo controle tem pelo menos 48×48px, com 8px de distância do vizinho
-- **E** o foco do teclado é sempre visível e nunca fica coberto pelas barras fixas
-- **E** nenhuma informação depende só de cor: selo tem texto, erro tem ícone e mensagem
+**GER-07 — Touch, focus and signal** (E17)
+- **Then** every control is at least 48×48px, 8px away from its neighbor
+- **And** keyboard focus is always visible and never covered by the fixed bars
+- **And** no information depends on color alone: a badge has text, an error has an icon and a message
 
-**GER-08 — Desempenho em rede móvel** (E16)
-- **Dado** uma conexão 4G lenta simulada, em celular intermediário
-- **Quando** a cliente abre a vitrine, o catálogo ou a tela de produto
-- **Então** o conteúdo principal da tela está visível em até 3 segundos
+**GER-08 — Performance on mobile network** (E16)
+- **Given** a simulated slow 4G connection, on a mid-range phone
+- **When** the customer opens the home, the catalog or the product screen
+- **Then** the main content of the screen is visible within 3 seconds
 
-**GER-09 — Preços**
-- **Então** todo valor aparece no formato `R$ 1.234,56`
+**GER-09 — Prices**
+- **Then** every amount shows in the format `R$ 1.234,56`
 
-## 4. Vitrine (VIT)
+## 4. Home (VIT)
 
-**VIT-01 — Conteúdo da página inicial**
-- **Quando** a cliente abre a loja
-- **Então** vê, nesta ordem: barra de anúncio, cabeçalho (busca, logo, sacola), bloco da coleção ou campanha em destaque, faixa de benefícios, as quatro categorias e a grade "Em destaque"
+**VIT-01 — Home page content**
+- **When** the customer opens the store
+- **Then** she sees, in this order: announcement bar, header (search, logo, bag), featured collection or campaign block, benefits strip, the four categories and the "Em destaque" grid
 
-**VIT-02 — Ir para uma categoria**
-- **Quando** a cliente toca em "Calças"
-- **Então** vai para o catálogo já filtrado por essa categoria
+**VIT-02 — Go to a category**
+- **When** the customer taps "Calças"
+- **Then** she goes to the catalog already filtered by that category
 
-**VIT-03 — Abrir um produto**
-- **Quando** a cliente toca em um card de produto
-- **Então** vai para a tela desse produto
+**VIT-03 — Open a product**
+- **When** the customer taps a product card
+- **Then** she goes to that product's screen
 
-**VIT-04 — Produto em promoção no card**
-- **Dado** um produto de R$ 199,00 por R$ 159,00
-- **Então** o card mostra o preço antigo riscado, o preço atual e o selo com o texto do desconto
+**VIT-04 — Product on sale in the card**
+- **Given** a product from R$ 199,00 for R$ 159,00
+- **Then** the card shows the old price struck through, the current price and the badge with the discount text
 
-**VIT-05 — Produto esgotado na grade** (E13)
-- **Dado** um produto sem nenhum tamanho no estoque de vitrine
-- **Então** ele aparece depois de todos os disponíveis, com a marcação "Esgotado" em texto
+**VIT-05 — Sold-out product in the grid** (E13)
+- **Given** a product with no size in sale stock
+- **Then** it shows after all available ones, marked "Esgotado" in text
 
-**VIT-06 — Chegada pelo Instagram**
-- **Dado** um link de anúncio que aponta para um produto ou uma categoria
-- **Quando** a cliente abre o link
-- **Então** cai direto nessa tela, sem passar pela página inicial nem por tela de cadastro
+**VIT-06 — Arriving from Instagram**
+- **Given** an ad link that points to a product or a category
+- **When** the customer opens the link
+- **Then** she lands right on that screen, without going through the home page or a sign-up screen
 
-## 5. Catálogo e filtros (CAT)
+## 5. Catalog and filters (CAT)
 
-**CAT-01 — Filtros disponíveis** (E13)
-- **Quando** a cliente toca em "Filtrar"
-- **Então** pode filtrar por categoria, tamanho, cor e faixa de preço (mínimo e máximo)
+**CAT-01 — Available filters** (E13)
+- **When** the customer taps "Filtrar"
+- **Then** she can filter by category, size, color and price range (minimum and maximum)
 
-**CAT-02 — A grade acompanha os filtros** (E13)
-- **Quando** a cliente aplica ou remove um filtro
-- **Então** a grade se atualiza sem recarregar a página inteira e mostra quantos produtos foram encontrados
-- **E** os filtros ativos aparecem como chips removíveis acima da grade
+**CAT-02 — The grid follows the filters** (E13)
+- **When** the customer applies or removes a filter
+- **Then** the grid updates without reloading the whole page and shows how many products were found
+- **And** the active filters show as removable chips above the grid
 
-**CAT-03 — Filtros ficam no endereço da página**
-- **Dado** o catálogo filtrado por "Jaquetas", tamanho M
-- **Quando** a cliente copia o endereço, volta com o botão do navegador ou recarrega
-- **Então** os mesmos filtros continuam aplicados
+**CAT-03 — Filters stay in the page address**
+- **Given** the catalog filtered by "Jaquetas", size M
+- **When** the customer copies the address, goes back with the browser button or reloads
+- **Then** the same filters stay applied
 
-**CAT-04 — Faixa de preço inválida** (E13)
-- **Quando** a cliente informa mínimo de R$ 200,00 e máximo de R$ 100,00
-- **Então** o filtro não é aplicado e aparece o erro "O preço mínimo não pode ser maior que o máximo"
+**CAT-04 — Invalid price range** (E13)
+- **When** the customer enters a minimum of R$ 200,00 and a maximum of R$ 100,00
+- **Then** the filter is not applied and the error "O preço mínimo não pode ser maior que o máximo" shows
 
-**CAT-05 — Filtro por tamanho e estoque** (E13)
-- **Dado** o filtro de tamanho M aplicado
-- **Então** os produtos com M disponível vêm primeiro
-- **E** os produtos sem M no estoque de vitrine vêm por último, marcados como "Esgotado no M"
+**CAT-05 — Filter by size and stock** (E13)
+- **Given** the size M filter applied
+- **Then** products with M available come first
+- **And** products without M in sale stock come last, marked "Esgotado no M"
 
-**CAT-06 — Nenhum resultado**
-- **Dado** uma combinação de filtros sem produtos
-- **Então** a tela diz que nada foi encontrado e oferece "Limpar filtros"
+**CAT-06 — No results**
+- **Given** a filter combination with no products
+- **Then** the screen says nothing was found and offers "Limpar filtros"
 
-**CAT-07 — Busca por texto**
-- **Quando** a cliente busca "jaqueta jeans" pela aba Buscar ou pelo cabeçalho
-- **Então** vê os produtos cujo nome ou categoria combinam com o texto, na mesma grade do catálogo, com os mesmos filtros disponíveis
+**CAT-07 — Text search**
+- **When** the customer searches "jaqueta jeans" from the Buscar tab or the header
+- **Then** she sees the products whose name or category match the text, in the same catalog grid, with the same filters available
 
-**CAT-08 — Compra rápida pelo card**
-- **Quando** a cliente toca no botão de compra rápida de um card
-- **Então** escolhe o tamanho ali mesmo (esgotados riscados) e a peça entra na sacola, como em `PRO-07`
+**CAT-08 — Quick buy from the card**
+- **When** the customer taps a card's quick-buy button
+- **Then** she picks the size right there (sold-out ones struck through) and the item goes into the bag, as in `PRO-07`
 
-**CAT-09 — Ordenar a grade**
-- **Quando** a cliente toca em "Ordenar"
-- **Então** pode escolher entre Novidades (padrão), Menor preço, Maior preço, Maior desconto e Mais vendidos
-- **E** a grade se reordena como em `CAT-02`, mantendo os filtros aplicados
-- **E** em qualquer ordem os produtos esgotados continuam por último (`VIT-05`, `CAT-05`)
-- **E** a ordem escolhida fica no endereço da página, como os filtros (`CAT-03`)
+**CAT-09 — Sort the grid**
+- **When** the customer taps "Ordenar"
+- **Then** she can choose between Novidades (default), Menor preço, Maior preço, Maior desconto and Mais vendidos
+- **And** the grid reorders as in `CAT-02`, keeping the applied filters
+- **And** in any order, sold-out products stay last (`VIT-05`, `CAT-05`)
+- **And** the chosen order stays in the page address, like the filters (`CAT-03`)
 
-## 6. Produto (PRO)
+## 6. Product (PRO)
 
-**PRO-01 — Conteúdo da tela**
-- **Quando** a cliente abre um produto
-- **Então** vê as fotos, nome, preço, parcelas, cor, tamanhos, guia de medidas, tecido, coleção, descrição, cálculo de frete por CEP e o botão "Adicionar à sacola" fixo na base
+**PRO-01 — Screen content**
+- **When** the customer opens a product
+- **Then** she sees the photos, name, price, installments, color, sizes, size guide, fabric, collection, description, shipping calculation by CEP and the "Adicionar à sacola" button fixed at the bottom
 
-**PRO-02 — Parcelas do produto** (E5)
-- **Dado** um produto de R$ 199,00
-- **Então** a tela mostra "até 3x de R$ 66,33 sem juros"
-- **Dado** um produto de R$ 79,00
-- **Então** a tela não mostra parcelamento
+**PRO-02 — Product installments** (E5)
+- **Given** a product of R$ 199,00
+- **Then** the screen shows "até 3x de R$ 66,33 sem juros"
+- **Given** a product of R$ 79,00
+- **Then** the screen shows no installments
 
-**PRO-03 — Tamanho esgotado** (E3, E13)
-- **Dado** que o tamanho P está sem estoque de vitrine
-- **Então** o chip P aparece riscado, não pode ser escolhido para compra e é anunciado como "esgotado"
+**PRO-03 — Sold-out size** (E3, E13)
+- **Given** size P has no sale stock
+- **Then** the P chip shows struck through, can't be chosen for purchase and is announced as "esgotado"
+- **When** the customer taps the P chip
+- **Then** the main button is disabled with the text "Esgotado" and the screen offers the `PRO-12` alert; tapping an available size turns the button back to "Adicionar à sacola"
 
-**PRO-04 — Tamanho selecionado**
-- **Quando** a cliente escolhe o tamanho M
-- **Então** o chip M fica com borda dupla e a tela diz, em texto, "Tamanho: M"
+**PRO-04 — Selected size**
+- **When** the customer picks size M
+- **Then** the M chip gets a double border and the screen says, in text, "Tamanho: M"
 
-**PRO-05 — Adicionar sem escolher tamanho**
-- **Dado** que nenhum tamanho foi escolhido
-- **Quando** a cliente toca em "Adicionar à sacola"
-- **Então** nada entra na sacola e a tela pede "Escolha um tamanho", levando o foco aos tamanhos
+**PRO-05 — Adding without picking a size**
+- **Given** no size was picked
+- **When** the customer taps "Adicionar à sacola"
+- **Then** nothing goes into the bag and the screen asks "Escolha um tamanho", moving focus to the sizes
 
-**PRO-06 — Guia de medidas**
-- **Quando** a cliente toca em "Guia de medidas"
-- **Então** vê a tabela de medidas da categoria sem sair da tela do produto
+**PRO-06 — Size guide**
+- **When** the customer taps "Guia de medidas"
+- **Then** she sees the category's size table without leaving the product screen
 
-**PRO-07 — Adicionar à sacola**
-- **Dado** o tamanho M escolhido e disponível
-- **Quando** a cliente toca em "Adicionar à sacola"
-- **Então** a peça entra na sacola, o contador da sacola aumenta e o painel de sacola sobe (`SAC-01`)
+**PRO-07 — Add to bag**
+- **Given** size M picked and available
+- **When** the customer taps "Adicionar à sacola"
+- **Then** the item goes into the bag, the bag counter goes up and the bag panel slides up (`SAC-01`)
+- **Until the panel exists**, the screen says "Peça adicionada à sacola" (decision of 2026-11-18; the panel replaces this message)
+- **And** a double tap on the button adds a single item
+- **And** if the item can't go into the bag, the items already there stay
 
-**PRO-08 — Frete na tela do produto** (E7)
-- **Quando** a cliente digita um CEP de 8 dígitos e toca em "Calcular"
-- **Então** vê as modalidades disponíveis para o CEP, cada uma com valor e prazo
-- **E** o CEP fica guardado para a sacola e o checkout
+**PRO-08 — Shipping on the product screen** (E7)
+- **When** the customer types an 8-digit CEP and taps "Calcular"
+- **Then** she sees the options available for the CEP, each with cost and delivery time
+- **And** the CEP is kept for the bag and checkout
+- **And** if our API fails, the `GER-06` message shows, the CEP stays in the field and "Adicionar à sacola" keeps working
 
-**PRO-09 — CEP inválido** (E7)
-- **Quando** a cliente informa um CEP com menos de 8 dígitos ou com letras
-- **Então** o cálculo não é feito e aparece o erro "Digite um CEP com 8 números"
+**PRO-09 — Invalid CEP** (E7)
+- **When** the customer enters a CEP with fewer than 8 digits or with letters
+- **Then** nothing is calculated and the error "Digite um CEP com 8 números" shows
+- **And** hyphen, dot and space are ignored: `01310-100` counts as `01310100`
 
-**PRO-10 — Motoboy só na região metropolitana** (E7)
-- **Dado** um CEP fora da região metropolitana
-- **Então** a opção Motoboy não aparece; só PAC e Sedex
+**PRO-10 — Courier only in the metro area** (E7)
+- **Given** a CEP outside the metro area
+- **Then** the Motoboy option doesn't show; only PAC and Sedex
 
-**PRO-11 — API de frete fora do ar** (E7)
-- **Dado** que a API de frete não respondeu
-- **Quando** a cliente calcula o frete
-- **Então** vê valor e prazo da taxa fixa da região do CEP, e segue comprando normalmente
+**PRO-11 — Shipping API down** (E7)
+- **Given** the shipping API did not answer
+- **When** the customer calculates shipping
+- **Then** she sees cost and delivery time of the fixed fee for the CEP's region, and keeps buying normally
 
-**PRO-12 — Avise-me quando voltar** (E9)
-- **Dado** que a cliente tocou em um tamanho esgotado
-- **Então** a tela oferece "Avise-me quando chegar", pedindo e-mail ou WhatsApp
-- **Quando** ela informa o contato e confirma
-- **Então** a tela confirma o registro e diz que o contato será usado só para esse aviso
+**PRO-12 — Notify me when it's back** (E9)
+- **Given** the customer tapped a sold-out size
+- **Then** the screen shows a card with the title "Tamanho P esgotado", the sentence "Garanta sua unidade assim que o estoque voltar." and the button "Avise-me quando estiver disponível" (owner's reference, 2026-11-19)
+- **When** she taps the button
+- **Then** the card asks for email or WhatsApp (email selected at first; it is the channel for the alert, not marketing consent)
+- **When** she enters the contact and confirms
+- **Then** the screen says "Pronto! Vamos avisar quando o tamanho P estiver disponível. Usaremos seu contato só para esse aviso."
+- **When** the contact is invalid
+- **Then** "Digite um e-mail válido" or "Digite o WhatsApp com DDD, só números" shows, and what she typed stays in the field
+- **And** a WhatsApp number with the country code, as the phone's autofill gives it (`+55 11 98765-4321`), is accepted as `11987654321`
 
-**PRO-13 — Últimas peças**
-- **Dado** que o tamanho escolhido tem 15 unidades ou menos no estoque de vitrine
-- **Então** a tela mostra o aviso "Últimas peças" em texto, sem informar a quantidade exata
-- **Dado** que o tamanho escolhido tem 16 unidades ou mais
-- **Então** o aviso não aparece
+**PRO-13 — Low stock**
+- **Given** the chosen size has 15 units or fewer in sale stock
+- **Then** the screen shows the notice "Últimas peças" in text, without telling the exact amount
+- **Given** the chosen size has 16 units or more
+- **Then** the notice doesn't show
 
-**PRO-14 — Produto todo esgotado**
-- **Dado** um produto sem nenhum tamanho disponível
-- **Então** o botão principal fica desabilitado com o texto "Esgotado" e a tela oferece o aviso de `PRO-12`
+**PRO-14 — Whole product sold out**
+- **Given** a product with no size available
+- **Then** the main button is disabled with the text "Esgotado" and the screen shows the `PRO-12` card with the title "Produto esgotado"
+- **When** she taps "Avise-me quando estiver disponível" without having picked a size
+- **Then** focus goes to the sizes and the card says "Escolha o tamanho para receber o aviso."; on tapping a size, the card already asks for the contact
 
-## 7. Sacola (SAC)
+## 7. Bag (SAC)
 
-**SAC-01 — Painel ao adicionar**
-- **Dado** que a cliente acabou de adicionar uma peça
-- **Então** um painel sobe da base com a peça adicionada, quanto falta para o frete grátis, o subtotal e os botões "Finalizar compra" e "Ver sacola"
-- **E** fechar o painel devolve a cliente à tela em que estava
+**SAC-01 — Panel on add**
+- **Given** the customer just added an item
+- **Then** a panel opens with the added item, the amount left for free shipping, the subtotal and the buttons "Finalizar compra" and "Ver sacola"
+- **And** closing the panel takes the customer back to the screen she was on
+- **And** the panel closes only when she taps to close it (the close button, outside the panel, or Esc on a keyboard); it never closes by itself
+- **And** on the phone it slides up from the bottom; on a computer it opens from the right side, full height
 
-**SAC-02 — Página da sacola**
-- **Quando** a cliente abre a sacola
-- **Então** vê o progresso em 3 passos (Sacola, Dados e entrega, Pagamento), cada peça com foto, nome, cor, tamanho, preço e quantidade, o cálculo de frete, o campo de cupom, o total com parcelas e "Finalizar compra"
+**SAC-02 — Bag page**
+- **When** the customer opens the bag
+- **Then** she sees the 3-step progress (Sacola, Dados e entrega, Pagamento), each item with photo, name, color, size, price and quantity, the shipping calculation, the coupon field, the total with installments and "Finalizar compra"
+- **And** the coupon field is always open, not hidden behind a link
 
-**SAC-03 — Sacola vazia**
-- **Dado** uma sacola sem peças
-- **Então** a tela diz que a sacola está vazia e oferece "Ver novidades"; não há botão de finalizar
+**SAC-03 — Empty bag**
+- **Given** a bag with no items
+- **Then** the screen says the bag is empty and offers "Ver novidades"; there is no checkout button
 
-**SAC-04 — Alterar quantidade** (E4)
-- **Quando** a cliente aumenta ou diminui a quantidade de uma peça
-- **Então** subtotal, frete, benefício e parcelas são recalculados
-- **E** a quantidade não passa do estoque de vitrine daquele tamanho; ao atingir o limite, a tela avisa "Só temos N unidades"
+**SAC-04 — Change quantity** (E4)
+- **When** the customer increases or decreases an item's quantity with the "−" and "+" buttons
+- **Then** subtotal, shipping, benefit and installments are recalculated
+- **And** the quantity doesn't go past the sale stock of that size; on reaching the limit, the "+" is disabled and the screen warns "Apenas N unidades restantes" ("Apenas 1 unidade restante" when it is one)
 
-**SAC-05 — Remover peça**
-- **Quando** a cliente remove uma peça
-- **Então** ela sai da lista, os valores são recalculados e a tela oferece "Desfazer" por alguns segundos
+**SAC-05 — Remove item**
+- **When** the customer removes an item
+- **Then** it leaves the list, the amounts are recalculated and the screen offers "Desfazer" for 10 seconds
+- **And** the message fades out before it leaves, to show it is about to go
 
-**SAC-06 — Sacola persiste**
-- **Dado** uma sacola com peças, sem conta
-- **Quando** a cliente fecha o navegador e volta no mesmo aparelho
-- **Então** as peças continuam na sacola
+**SAC-06 — Bag persists**
+- **Given** a bag with items, no account
+- **When** the customer closes the browser and comes back on the same device
+- **Then** the items are still in the bag
 
-**SAC-07 — Peça que esgotou enquanto estava na sacola** (E4)
-- **Dado** uma peça da sacola cujo tamanho zerou no estoque de vitrine
-- **Quando** a cliente abre a sacola
-- **Então** a peça aparece marcada como "Esgotada", fora do total
-- **E** "Finalizar compra" só é liberado depois que ela remove a peça ou troca o tamanho
+**SAC-07 — Item that sold out while in the bag** (E4)
+- **Given** a bag item whose size hit zero in sale stock
+- **When** the customer opens the bag
+- **Then** the item shows marked "Esgotada", left out of the total
+- **And** "Finalizar compra" stays enabled
+- **When** she taps "Finalizar compra" with that item still in the bag
+- **Then** she stays on the bag and an error names the piece: "A peça Camiseta listrada (Azul · P) esgotou. Remova da sacola para finalizar a compra."
+- **And** the screen scrolls to the item, which offers "Remover"
+- **And** once she removes it, "Finalizar compra" moves on to checkout
 
-**SAC-08 — Frete na sacola** (E7)
-- **Dado** que a cliente já informou o CEP na tela do produto
-- **Então** a sacola já mostra as modalidades com valor e prazo, e permite trocar o CEP
-- **E** valem as mesmas regras de `PRO-09`, `PRO-10` e `PRO-11`
+**SAC-08 — Shipping in the bag** (E7)
+- **Given** the customer already entered the CEP on the product screen
+- **Then** the bag already shows the options with cost and delivery time, and lets her change the CEP
+- **And** she chooses the option on the bag page, with the cheapest one chosen at first; the panel of `SAC-01` shows no option
+- **And** the same rules of `PRO-09`, `PRO-10` and `PRO-11` apply
 
-**SAC-09 — Quanto falta para o frete grátis** (E6)
-- **Dado** R$ 250,00 em peças, sem cupom
-- **Então** a tela mostra "Faltam R$ 50,00 para o frete grátis"
-- **Dado** R$ 320,00 em peças com o cupom MARIA10 aplicado (R$ 288,00)
-- **Então** a tela mostra "Faltam R$ 12,00 para o frete grátis"
+**SAC-09 — Amount left for free shipping** (E6)
+- **Given** R$ 250,00 in items, no coupon
+- **Then** the screen shows "Faltam R$ 50,00 para o frete grátis"
+- **Given** R$ 320,00 in items with the coupon MARIA10 applied (R$ 288,00)
+- **Then** the screen shows "Faltam R$ 12,00 para o frete grátis"
 
-**SAC-10 — Frete grátis aplicado** (E6)
-- **Dado** R$ 320,00 em peças, sem cupom, e qualquer CEP válido do Brasil
-- **Então** a modalidade mais barata aparece como "Grátis" e o total com ela é R$ 320,00
-- **E** as outras modalidades continuam com o valor normal
+**SAC-10 — Free shipping applied** (E6)
+- **Given** R$ 320,00 in items, no coupon, and any valid CEP in Brazil
+- **Then** the cheapest option shows as "Grátis" and the total with it is R$ 320,00
+- **And** the other options keep their normal cost
 
-**SAC-11 — Aplicar cupom válido** (E6)
-- **Dado** R$ 250,00 em peças e frete de R$ 20,00
-- **Quando** a cliente aplica o cupom MARIA10
-- **Então** vê a linha de desconto de R$ 25,00, o total de R$ 245,00 e o cupom com a opção "Remover"
+**SAC-11 — Apply a valid coupon** (E6)
+- **Given** R$ 250,00 in items and R$ 20,00 shipping
+- **When** the customer applies the coupon MARIA10
+- **Then** she sees the R$ 25,00 discount line, the R$ 245,00 total and the coupon with the "Remover" option
 
-**SAC-12 — Cupom inválido ou inativo** (E6)
-- **Quando** a cliente aplica um código que não existe ou está inativo
-- **Então** nenhum valor muda e aparece o erro "Cupom inválido ou expirado"
+**SAC-12 — Invalid or inactive coupon** (E6)
+- **When** the customer applies a code that doesn't exist or is inactive
+- **Then** no amount changes and the error "Cupom inválido ou expirado" shows
 
-**SAC-13 — Cupom e frete grátis juntos** (E6)
-- **Dado** R$ 400,00 em peças com frete grátis aplicado
-- **Quando** a cliente aplica o cupom MARIA10
-- **Então** o desconto é de R$ 40,00, o frete continua "Grátis" e o total é R$ 360,00
+**SAC-13 — Coupon and free shipping together** (E6)
+- **Given** R$ 400,00 in items with free shipping applied
+- **When** the customer applies the coupon MARIA10
+- **Then** the discount is R$ 40,00, shipping stays "Grátis" and the total is R$ 360,00
 
-**SAC-14 — Cupom derruba o valor abaixo do frete grátis** (E6)
-- **Dado** R$ 320,00 em peças com frete grátis aplicado
-- **Quando** a cliente aplica o cupom MARIA10
-- **Então** o frete volta a ser cobrado (R$ 20,00) e o total passa a R$ 308,00
-- **E** a tela explica: "Com o cupom, faltam R$ 12,00 para o frete grátis"
-- **Quando** a cliente remove o cupom
-- **Então** o frete volta a "Grátis" e o total a R$ 320,00
+**SAC-14 — Coupon drops the amount below free shipping** (E6)
+- **Given** R$ 320,00 in items with free shipping applied
+- **When** the customer applies the coupon MARIA10
+- **Then** shipping is charged again (R$ 20,00) and the total becomes R$ 308,00
+- **And** the screen explains: "Com o cupom, faltam R$ 12,00 para o frete grátis"
+- **When** the customer removes the coupon
+- **Then** shipping goes back to "Grátis" and the total to R$ 320,00
 
-**SAC-15 — Um cupom por compra** (E6)
-- **Dado** um cupom já aplicado
-- **Quando** a cliente aplica outro código válido
-- **Então** o novo cupom substitui o anterior
+**SAC-15 — One coupon per purchase** (E6)
+- **Given** a coupon already applied
+- **When** the customer applies another valid code
+- **Then** the new coupon replaces the previous one
 
-**SAC-16 — Parcelas acompanham o total** (E5)
-- **Então** a sacola mostra o número máximo de parcelas conforme a tabela da seção 2, recalculado a cada mudança do total
+**SAC-16 — Installments follow the total** (E5)
+- **Then** the bag shows the maximum number of installments according to the table in section 2, recalculated on every change of the total
 
-**SAC-17 — Reserva em andamento** (E4)
-- **Dado** que a cliente iniciou o pagamento e voltou para a sacola antes dos 15 minutos
-- **Então** a sacola e o painel mostram o tempo restante da reserva
-- **Dado** que nenhum pagamento foi iniciado
-- **Então** não há timer na sacola
+**SAC-17 — Reservation in progress** (E4) — built with checkout, since the reservation only starts at payment (decided on 2026-11-19)
+- **Given** the customer started payment and came back to the bag before the 15 minutes
+- **Then** the bag and the panel show the reservation time left
+- **Given** no payment was started
+- **Then** there is no timer in the bag
 
 ## 8. Checkout (CHK)
 
-Passo 2 (dados e entrega) e passo 3 (pagamento) do progresso da sacola.
+Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 
-### Dados e entrega
+### Details and delivery
 
-**CHK-01 — Compra sem conta** (E18)
-- **Quando** a cliente toca em "Finalizar compra"
-- **Então** vai direto para o formulário de dados, sem tela de login, sem pedir senha e sem CAPTCHA
+**CHK-01 — Buying without an account** (E18)
+- **When** the customer taps "Finalizar compra"
+- **Then** she goes straight to the details form, with no login screen, no password and no CAPTCHA
 
-**CHK-02 — Campos obrigatórios** (E1)
-- **Então** o formulário pede só: nome, CPF, e-mail, telefone e endereço de entrega
-- **E** cada campo tem rótulo visível acima e o atributo `autocomplete` correspondente
-- **E** o CEP informado antes já vem preenchido
+**CHK-02 — Required fields** (E1)
+- **Then** the form asks only for: name, CPF, email, phone and delivery address
+- **And** each field has a visible label above and the matching `autocomplete` attribute
+- **And** the CEP entered before comes already filled in
 
-**CHK-03 — Validação dos campos** (E1)
+**CHK-03 — Field validation** (E1)
 
-| Campo | Entrada | Resultado |
+| Field | Input | Result |
 |---|---|---|
-| CPF | `123.456.789-0` (10 dígitos) | erro "CPF deve ter 11 números" |
-| CPF | `1234567890a` | erro "CPF deve ter 11 números" |
-| E-mail | `maria.exemplo.com` | erro "Digite um e-mail válido" |
-| Telefone | `(11) 9abc-0000` | erro "Digite só números" |
-| CEP | `0131010` | erro "Digite um CEP com 8 números" |
-| Nome, endereço | vazio | erro "Campo obrigatório" |
+| CPF | `123.456.789-0` (10 digits) | error "CPF deve ter 11 números" |
+| CPF | `1234567890a` | error "CPF deve ter 11 números" |
+| Email | `maria.exemplo.com` | error "Digite um e-mail válido" |
+| Phone | `(11) 9abc-0000` | error "Digite só números" |
+| CEP | `0131010` | error "Digite um CEP com 8 números" |
+| Name, address | empty | error "Campo obrigatório" |
 
-- **E** pontos, traços e parênteses digitados pela cliente são aceitos e descartados antes de validar
-- **E** cada erro aparece junto do campo, com borda, ícone e texto, e o foco vai para o primeiro campo com erro
+- **And** dots, dashes and parentheses typed by the customer are accepted and dropped before validating
+- **And** each error shows next to the field, with border, icon and text, and focus goes to the first field with an error
 
-**CHK-04 — Dados preservados após erro**
-- **Dado** um formulário com um campo inválido
-- **Quando** a cliente tenta avançar
-- **Então** nenhum campo já preenchido é apagado
+**CHK-04 — Data kept after an error**
+- **Given** a form with an invalid field
+- **When** the customer tries to move on
+- **Then** no field already filled in is cleared
 
-**CHK-05 — Lead salvo antes do pagamento** (E1, E10)
-- **Dado** que a cliente preencheu todos os campos obrigatórios com valores válidos
-- **Quando** sai do último campo, mesmo sem avançar para o pagamento
-- **Então** os dados são salvos como lead
+**CHK-05 — Lead saved before payment** (E1, E10)
+- **Given** the customer filled in all required fields with valid values
+- **When** she leaves the last field, even without moving on to payment
+- **Then** the data is saved as a lead
 
-**CHK-06 — Aviso de lembrete** (LGPD)
-- **Então** junto dos campos de contato a tela avisa que e-mail e telefone podem ser usados para lembrar da compra não concluída, com link para a política de privacidade
+**CHK-06 — Reminder notice** (LGPD)
+- **Then** next to the contact fields the screen warns that email and phone may be used to remind about the unfinished purchase, with a link to the privacy policy
 
-**CHK-07 — Aceites de marketing** (LGPD)
-- **Então** há duas caixas separadas e desmarcadas: "Quero receber novidades por e-mail" e "Quero receber novidades por WhatsApp"
-- **E** a compra é concluída normalmente com as duas desmarcadas
-- **Quando** a cliente marca uma delas e conclui a etapa
-- **Então** o aceite é registrado só para aquele canal
+**CHK-07 — Marketing consents** (LGPD)
+- **Then** there are two separate unchecked boxes: "Quero receber novidades por e-mail" and "Quero receber novidades por WhatsApp"
+- **And** the purchase completes normally with both unchecked
+- **When** the customer checks one of them and completes the step
+- **Then** the consent is recorded only for that channel
 
-**CHK-08 — CPF ou e-mail já cadastrado** (E18)
-- **Dado** um CPF ou e-mail que já comprou na loja
-- **Quando** a cliente preenche o formulário
-- **Então** a compra segue sem erro de duplicidade e sem pedir login
-- **E** a tela não mostra nem preenche nenhum dado antigo associado a esse CPF ou e-mail
+**CHK-08 — CPF or email already on record** (E18)
+- **Given** a CPF or email that has bought from the store before
+- **When** the customer fills in the form
+- **Then** the purchase goes on with no duplicate error and no login request
+- **And** the screen neither shows nor fills in any old data tied to that CPF or email
 
-**CHK-09 — Escolher a entrega** (E7)
-- **Dado** o endereço preenchido
-- **Então** a cliente escolhe uma modalidade entre as disponíveis para o CEP, com valor e prazo, e o total é atualizado
-- **E** valem `PRO-10` (motoboy) e `PRO-11` (taxa fixa se a API cair)
+**CHK-09 — Choose delivery** (E7)
+- **Given** the address filled in
+- **Then** the customer picks one of the options available for the CEP, with cost and delivery time, and the total is updated
+- **And** `PRO-10` (courier) and `PRO-11` (fixed fee if the API goes down) apply
 
-**CHK-10 — Mudança de CEP recalcula o frete** (E7)
-- **Dado** uma sacola com frete calculado para um CEP
-- **Quando** a cliente informa no checkout um endereço com outro CEP
-- **Então** as modalidades, os valores e os prazos são recalculados, e a tela destaca a mudança do total antes do pagamento
+**CHK-10 — Changing the CEP recalculates shipping** (E7)
+- **Given** a bag with shipping calculated for a CEP
+- **When** the customer enters an address with another CEP at checkout
+- **Then** options, costs and delivery times are recalculated, and the screen highlights the change in the total before payment
 
-**CHK-11 — Resumo sempre visível**
-- **Então** em todo o checkout a cliente consegue ver peças, desconto, frete, prazo e total sem sair da etapa
+**CHK-11 — Summary always visible**
+- **Then** throughout checkout the customer can see items, discount, shipping, delivery time and total without leaving the step
 
-### Pagamento
+### Payment
 
-**CHK-12 — Início do pagamento cria a reserva** (E4)
-- **Dado** dados e entrega válidos
-- **Quando** a cliente avança para o pagamento
-- **Então** as peças ficam reservadas por 15 minutos e a tela mostra o tempo restante em contagem regressiva, com texto ("Sua reserva termina em 14:59")
+**CHK-12 — Starting payment creates the reservation** (E4)
+- **Given** valid details and delivery
+- **When** the customer moves on to payment
+- **Then** the items are reserved for 15 minutes and the screen shows the time left as a countdown, with text ("Sua reserva termina em 14:59")
 
-**CHK-13 — Estoque zerou antes de reservar** (E4)
-- **Dado** que uma peça da sacola zerou no estoque enquanto a cliente preenchia os dados
-- **Quando** ela avança para o pagamento
-- **Então** nenhuma cobrança é feita, a tela informa qual peça esgotou e leva de volta à sacola (`SAC-07`)
+**CHK-13 — Stock hit zero before reserving** (E4)
+- **Given** a bag item hit zero in stock while the customer was filling in her details
+- **When** she moves on to payment
+- **Then** nothing is charged, the screen says which item sold out and takes her back to the bag (`SAC-07`)
 
-**CHK-14 — Formas de pagamento** (E5)
-- **Então** a cliente escolhe entre PIX e cartão de crédito; nenhuma vem com dado sensível preenchido
+**CHK-14 — Payment methods** (E5)
+- **Then** the customer chooses between PIX and credit card; neither comes with sensitive data filled in
 
-**CHK-15 — Pagar com PIX** (E5)
-- **Quando** a cliente escolhe PIX e confirma
-- **Então** vê o QR code, o botão "Copiar código PIX", o valor e o tempo restante da reserva
+**CHK-15 — Pay with PIX** (E5)
+- **When** the customer picks PIX and confirms
+- **Then** she sees the QR code, the "Copiar código PIX" button, the amount and the reservation time left
 
-**CHK-16 — PIX confirmado na hora** (E5)
-- **Dado** a tela do PIX aberta
-- **Quando** o pagamento é confirmado
-- **Então** a cliente é levada à confirmação do pedido (`PED-01`) sem precisar recarregar a página
+**CHK-16 — PIX confirmed instantly** (E5)
+- **Given** the PIX screen open
+- **When** the payment is confirmed
+- **Then** the customer is taken to the order confirmation (`PED-01`) without reloading the page
 
-**CHK-17 — Reserva expirou** (E4)
-- **Dado** que os 15 minutos acabaram sem pagamento
-- **Então** a tela avisa que a reserva expirou e que as peças voltaram ao estoque, e o código PIX deixa de ser exibido
-- **E** oferece "Tentar de novo", que refaz a reserva se ainda houver estoque (senão, `CHK-13`)
+**CHK-17 — Reservation expired** (E4)
+- **Given** the 15 minutes ran out with no payment
+- **Then** the screen warns that the reservation expired and the items went back to stock, and the PIX code is no longer shown
+- **And** it offers "Tentar de novo", which redoes the reservation if there is still stock (otherwise, `CHK-13`)
 
-**CHK-18 — Pagar com cartão** (E5)
-- **Quando** a cliente escolhe cartão
-- **Então** informa os dados do cartão em campos do gateway de pagamento e escolhe o número de parcelas
-- **E** os dados do cartão não passam pelo servidor da loja
+**CHK-18 — Pay by card** (E5)
+- **When** the customer picks card
+- **Then** she enters the card details in the payment gateway's fields and picks the number of installments
+- **And** the card details don't go through the store's server
 
-**CHK-19 — Parcelas no cartão** (E5)
-- **Dado** um total de R$ 150,00
-- **Então** as opções são 1x de R$ 150,00, 2x de R$ 75,00 e 3x de R$ 50,00, e nenhuma outra
-- **E** todas aparecem como "sem juros"
+**CHK-19 — Card installments** (E5)
+- **Given** a total of R$ 150,00
+- **Then** the options are 1x of R$ 150,00, 2x of R$ 75,00 and 3x of R$ 50,00, and no other
+- **And** all show as "sem juros"
 
-**CHK-20 — Cartão aprovado** (E5)
-- **Quando** o pagamento é aprovado
-- **Então** a cliente é levada à confirmação do pedido (`PED-01`)
+**CHK-20 — Card approved** (E5)
+- **When** the payment is approved
+- **Then** the customer is taken to the order confirmation (`PED-01`)
 
-**CHK-21 — Cartão recusado** (E5)
-- **Quando** o pagamento é recusado
-- **Então** a tela mostra o erro com ícone e texto, sem culpar a cliente, e oferece tentar outro cartão ou pagar com PIX
-- **E** os dados pessoais e de entrega continuam preenchidos
-- **E** uma nova tentativa só segue se ainda houver estoque (senão, `CHK-13`)
+**CHK-21 — Card declined** (E5)
+- **When** the payment is declined
+- **Then** the screen shows the error with icon and text, without blaming the customer, and offers trying another card or paying with PIX
+- **And** personal and delivery details stay filled in
+- **And** a new attempt only goes on if there is still stock (otherwise, `CHK-13`)
 
-**CHK-22 — Toque duplo em pagar**
-- **Quando** a cliente toca duas vezes em "Pagar"
-- **Então** só uma cobrança é feita; o botão fica desabilitado e indica "Processando" após o primeiro toque
+**CHK-22 — Double tap on pay**
+- **When** the customer taps "Pagar" twice
+- **Then** only one charge is made; the button is disabled and shows "Processando" after the first tap
 
-**CHK-23 — Voltar sem perder**
-- **Quando** a cliente volta do pagamento para os dados, ou dos dados para a sacola
-- **Então** tudo que foi preenchido e escolhido continua lá
+**CHK-23 — Going back without losing anything**
+- **When** the customer goes back from payment to details, or from details to the bag
+- **Then** everything filled in and chosen is still there
 
-## 9. Confirmação e rastreio (PED)
+## 9. Confirmation and tracking (PED)
 
-**PED-01 — Pedido confirmado**
-- **Dado** um pagamento aprovado
-- **Então** a tela mostra "Pedido confirmado", o número do pedido, as peças, o total pago, a forma de pagamento, a modalidade e o prazo de entrega
-- **E** informa que a confirmação foi enviada ao e-mail informado, exibido parcialmente (`m***@exemplo.com`)
-- **E** oferece "Acompanhar pedido" e "Continuar comprando"
+**PED-01 — Order confirmed**
+- **Given** an approved payment
+- **Then** the screen shows "Pedido confirmado", the order number, the items, the total paid, the payment method, the delivery option and the delivery time
+- **And** it says the confirmation was sent to the given email, partly hidden (`m***@exemplo.com`)
+- **And** it offers "Acompanhar pedido" and "Continuar comprando"
 
-**PED-02 — Sacola esvaziada**
-- **Dado** um pedido confirmado
-- **Então** a sacola fica vazia e não há mais timer de reserva
+**PED-02 — Bag emptied**
+- **Given** a confirmed order
+- **Then** the bag is empty and there is no reservation timer anymore
 
-**PED-03 — Etapas do pedido** (E15)
-- **Quando** a cliente abre o acompanhamento
-- **Então** vê as etapas Pagamento confirmado, Em separação, Enviado e Entregue, com a etapa atual indicada por texto e a data de cada etapa concluída
+**PED-03 — Order steps** (E15)
+- **When** the customer opens tracking
+- **Then** she sees the steps Pagamento confirmado, Em separação, Enviado and Entregue, with the current step shown in text and the date of each completed step
 
-**PED-04 — Código de rastreio** (E15)
-- **Dado** um pedido enviado por PAC ou Sedex
-- **Então** a tela mostra o código de rastreio com a opção de copiar e o link de rastreamento
-- **Dado** um pedido enviado por motoboy
-- **Então** a tela mostra a previsão de entrega no dia, sem código dos Correios
+**PED-04 — Tracking code** (E15)
+- **Given** an order shipped by PAC or Sedex
+- **Then** the screen shows the tracking code with a copy option and the tracking link
+- **Given** an order shipped by courier
+- **Then** the screen shows the expected delivery that day, with no Correios code
 
-**PED-05 — Consultar pedido sem conta**
-- **Quando** a cliente informa o número do pedido e o e-mail usado na compra
-- **Então** vê o acompanhamento desse pedido
-- **E** a tela mostra peças, etapas, prazo e cidade/UF de entrega; não mostra CPF, telefone nem endereço completo
+**PED-05 — Look up an order without an account**
+- **When** the customer enters the order number and the email used for the purchase
+- **Then** she sees that order's tracking
+- **And** the screen shows items, steps, delivery time and delivery city/state; it doesn't show CPF, phone or the full address
 
-**PED-06 — Número ou e-mail não confere**
-- **Quando** o número e o e-mail não correspondem a um pedido
-- **Então** a tela responde "Não encontramos um pedido com esses dados", sem dizer qual dos dois está errado
+**PED-06 — Number or email doesn't match**
+- **When** the number and email don't match an order
+- **Then** the screen answers "Não encontramos um pedido com esses dados", without saying which of the two is wrong
 
-**PED-07 — Pedido em devolução** (E19)
-- **Dado** um pedido com devolução solicitada
-- **Então** o acompanhamento mostra o estado "Suporte em andamento"
+**PED-07 — Order under return** (E19)
+- **Given** an order with a return requested
+- **Then** tracking shows the state "Suporte em andamento"
 
-**PED-08 — Atalho para devolução** (E19)
-- **Dado** um pedido entregue há 7 dias ou menos, sem solicitação
-- **Então** o acompanhamento oferece "Solicitar devolução"
+**PED-08 — Shortcut to returns** (E19)
+- **Given** an order delivered 7 days ago or less, with no request
+- **Then** tracking offers "Solicitar devolução"
 
-## 10. Devolução (DEV)
+## 10. Returns (DEV)
 
-**DEV-01 — Abrir a solicitação** (E19)
-- **Dado** um pedido entregue há 7 dias corridos ou menos, sem solicitação anterior
-- **Quando** a cliente chega à devolução pelo acompanhamento, pela conta, ou informando número do pedido e e-mail
-- **Então** vê o pedido e o formulário com o motivo: Tamanho incorreto, Defeito, Arrependimento ou Outro
+**DEV-01 — Open the request** (E19)
+- **Given** an order delivered 7 calendar days ago or less, with no previous request
+- **When** the customer reaches returns from tracking, from the account, or by entering order number and email
+- **Then** she sees the order and the form with the reason: Tamanho incorreto, Defeito, Arrependimento or Outro
 
-**DEV-02 — Motivo obrigatório** (E19)
-- **Dado** que nenhum motivo foi escolhido
-- **Então** o botão "Enviar solicitação" fica desabilitado, com o texto de apoio "Escolha um motivo para continuar"
+**DEV-02 — Reason required** (E19)
+- **Given** no reason was picked
+- **Then** the "Enviar solicitação" button is disabled, with the helper text "Escolha um motivo para continuar"
 
-**DEV-03 — Solicitação enviada** (E19)
-- **Quando** a cliente escolhe um motivo e envia
-- **Então** a tela confirma o registro, diz que a equipe entrará em contato e que ela não precisa fazer mais nada por enquanto
-- **E** o pedido passa a aparecer como "Suporte em andamento"
+**DEV-03 — Request sent** (E19)
+- **When** the customer picks a reason and sends
+- **Then** the screen confirms it was recorded, says the team will get in touch and that she doesn't need to do anything else for now
+- **And** the order now shows as "Suporte em andamento"
 
-**DEV-04 — Prazo encerrado** (E19)
-- **Dado** um pedido entregue há 8 dias ou mais
-- **Então** o botão de solicitar está desabilitado e a tela explica "O prazo de 7 dias para devolução terminou em DD/MM"
+**DEV-04 — Deadline passed** (E19)
+- **Given** an order delivered 8 days ago or more
+- **Then** the request button is disabled and the screen explains "O prazo de 7 dias para devolução terminou em DD/MM"
 
-**DEV-05 — Uma solicitação por pedido** (E19)
-- **Dado** um pedido que já tem solicitação
-- **Então** a tela mostra o estado da solicitação existente (Solicitada, Em tratativa, Concluída ou Rejeitada) e não permite abrir outra
+**DEV-05 — One request per order** (E19)
+- **Given** an order that already has a request
+- **Then** the screen shows the state of the existing request (Solicitada, Em tratativa, Concluída or Rejeitada) and doesn't allow opening another
 
-**DEV-06 — Pedido ainda não entregue** (E19)
-- **Dado** um pedido que ainda não foi entregue
-- **Então** a devolução não está disponível e a tela indica o acompanhamento do pedido
+**DEV-06 — Order not delivered yet** (E19)
+- **Given** an order not delivered yet
+- **Then** returns are not available and the screen points to the order tracking
 
-**DEV-07 — Envio duplicado**
-- **Quando** a cliente toca duas vezes em "Enviar solicitação"
-- **Então** só uma solicitação é criada
+**DEV-07 — Duplicate send**
+- **When** the customer taps "Enviar solicitação" twice
+- **Then** only one request is created
 
-## 11. Minha conta (CTA)
+## 11. My account (CTA)
 
-**CTA-01 — Entrar sem senha** (E18)
-- **Dado** que a cliente não está identificada
-- **Quando** abre a aba Conta e informa seu e-mail
-- **Então** a tela diz "Se este e-mail tiver compras, enviamos um link de acesso", qualquer que seja o e-mail
-- **E** o link recebido abre a conta, vale uma única vez e expira
+**CTA-01 — Sign in without a password** (E18)
+- **Given** the customer is not identified
+- **When** she opens the Conta tab and enters her email
+- **Then** the screen says "Se este e-mail tiver compras, enviamos um link de acesso", whatever the email
+- **And** the link she gets opens the account, works only once and expires
 
-**CTA-02 — Seções da conta**
-- **Dado** a cliente identificada
-- **Então** vê Meus pedidos, Meus endereços, Dados pessoais e Privacidade
+**CTA-02 — Account sections**
+- **Given** the customer is identified
+- **Then** she sees Meus pedidos, Meus endereços, Dados pessoais and Privacidade
 
-**CTA-03 — Meus pedidos**
-- **Então** a cliente vê seus pedidos do mais recente ao mais antigo, com número, data, total e estado
-- **E** ao tocar em um pedido abre o acompanhamento (`PED-03`) com os dados completos
+**CTA-03 — My orders**
+- **Then** the customer sees her orders from newest to oldest, with number, date, total and state
+- **And** tapping an order opens tracking (`PED-03`) with the full details
 
-**CTA-04 — Sem pedidos**
-- **Dado** uma conta sem pedidos
-- **Então** a tela diz que ainda não há pedidos e oferece "Ver novidades"
+**CTA-04 — No orders**
+- **Given** an account with no orders
+- **Then** the screen says there are no orders yet and offers "Ver novidades"
 
-**CTA-05 — Meus endereços**
-- **Então** a cliente pode adicionar, editar e remover endereços, com as mesmas validações do checkout
-- **E** em uma nova compra identificada, o endereço salvo vem como sugestão
+**CTA-05 — My addresses**
+- **Then** the customer can add, edit and remove addresses, with the same validation as checkout
+- **And** in a new identified purchase, the saved address comes as a suggestion
 
-**CTA-06 — Dados pessoais** (E1)
-- **Então** a cliente vê nome, e-mail, telefone e CPF (parcialmente oculto) e pode corrigir nome, e-mail e telefone, com as validações de `CHK-03`
-- **E** o CPF não pode ser alterado pela tela
+**CTA-06 — Personal details** (E1)
+- **Then** the customer sees name, email, phone and CPF (partly hidden) and can fix name, email and phone, with the `CHK-03` validation
+- **And** the CPF can't be changed from the screen
 
-**CTA-07 — Senha opcional** (E18)
-- **Então** a cliente pode criar uma senha de no mínimo 8 caracteres para entrar sem o link
-- **E** nada na conta ou na compra depende de ter senha
+**CTA-07 — Optional password** (E18)
+- **Then** the customer can create a password of at least 8 characters to sign in without the link
+- **And** nothing in the account or the purchase depends on having a password
 
-**CTA-08 — Privacidade: consentimentos** (LGPD)
-- **Então** a cliente vê, por canal (e-mail e WhatsApp), se aceitou receber novidades e quando
-- **Quando** desmarca um canal
-- **Então** o aceite daquele canal é revogado na hora, sem afetar o outro nem as mensagens sobre pedidos
+**CTA-08 — Privacy: consents** (LGPD)
+- **Then** the customer sees, per channel (email and WhatsApp), whether she agreed to receive news and when
+- **When** she unchecks a channel
+- **Then** that channel's consent is revoked right away, without affecting the other one or the order messages
 
-**CTA-09 — Privacidade: meus dados** (LGPD)
-- **Então** a cliente pode pedir uma cópia dos seus dados ou a exclusão deles
-- **Quando** envia o pedido
-- **Então** a tela confirma o registro e informa que dados de notas fiscais são mantidos pelo prazo que a lei exige
+**CTA-09 — Privacy: my data** (LGPD)
+- **Then** the customer can ask for a copy of her data or for its deletion
+- **When** she sends the request
+- **Then** the screen confirms it was recorded and says invoice data is kept for the period the law requires
 
-**CTA-10 — Sair**
-- **Quando** a cliente toca em "Sair"
-- **Então** a sessão termina e as telas da conta voltam a pedir identificação
+**CTA-10 — Sign out**
+- **When** the customer taps "Sair"
+- **Then** the session ends and the account screens ask for identification again
 
-**CTA-11 — Conta de outra pessoa**
-- **Dado** a cliente identificada
-- **Quando** tenta abrir um pedido ou endereço que não é dela
-- **Então** recebe a mesma resposta de "não encontrado" de um item que não existe
+**CTA-11 — Someone else's account**
+- **Given** the customer is identified
+- **When** she tries to open an order or address that isn't hers
+- **Then** she gets the same "not found" answer as for an item that doesn't exist
 
-## 12. Decisões e pontos em aberto
+## 12. Decisions and open points
 
-Os requisitos não fechavam estes pontos. O dono decidiu em 14/11/2026; os cenários acima já seguem a coluna "Decisão".
+The requirements didn't settle these points. The owner decided on 2026-11-14; the scenarios above already follow the "Decision" column.
 
-| # | Ponto | Decisão |
+| # | Point | Decision |
 |---|---|---|
-| 1 | Quando começa a reserva (os fluxogramas mostravam o timer já na sacola) | Ao avançar para o pagamento; timer na sacola só com reserva em andamento (`SAC-17`, `CHK-12`) |
-| 2 | Cupom junto com frete grátis (a E6 dizia "nunca os dois") | Podem se acumular; um cupom por compra (`SAC-13`, `SAC-15`). **Substitui a regra da E6** |
-| 3 | Base do frete grátis e do cupom | Valor das peças, sem o frete; os R$ 300,00 contam depois do desconto (`SAC-14`) |
-| 4 | Qual modalidade fica grátis | A mais barata disponível para o CEP (`SAC-10`) |
-| 5 | Onde vale o frete grátis (a visão geral dizia "região/estados vizinhos") | Todos os CEPs do Brasil. **Substitui a restrição de região** |
-| 6 | Filtro por tamanho com produto esgotado | Aparece por último, marcado (`CAT-05`) |
-| 7 | "Últimas peças" | 15 unidades ou menos do tamanho no estoque de vitrine (`PRO-13`) |
-| 8 | Endereço (a E1 tinha um campo só) | CEP, rua, número, complemento (opcional), bairro, cidade e UF |
-| 9 | Lead incompleto | Salva só com todos os obrigatórios válidos (`CHK-05`) |
-| 10 | Acesso à conta e ao pedido | Sem senha: link por e-mail (`CTA-01`) e consulta por número + e-mail com dados reduzidos (`PED-05`) |
-| 11 | Etapas visíveis do pedido | Pagamento confirmado, Em separação, Enviado, Entregue (`PED-03`) |
-| 12 | Nova devolução após uma rejeitada | Não; uma solicitação por pedido (`DEV-05`) |
-| 13 | Devolução por peça e campo de comentário | Fora: pedido inteiro, só com motivo |
-| 14 | Cancelamento antes do envio | Fora do lançamento |
-| 15 | Medida de desempenho | Conteúdo principal visível (LCP) em até 3 s em 4G lento simulado (`GER-08`) |
+| 1 | When the reservation starts (the flowcharts showed the timer already in the bag) | On moving on to payment; timer in the bag only with a reservation in progress (`SAC-17`, `CHK-12`) |
+| 2 | Coupon together with free shipping (E6 said "never both") | They can stack; one coupon per purchase (`SAC-13`, `SAC-15`). **Replaces the E6 rule** |
+| 3 | Base for free shipping and coupon | Items amount, without shipping; the R$ 300,00 count after the discount (`SAC-14`) |
+| 4 | Which option becomes free | The cheapest one available for the CEP (`SAC-10`) |
+| 5 | Where free shipping applies (the overview said "region/neighboring states") | All CEPs in Brazil. **Replaces the region restriction** |
+| 6 | Size filter with a sold-out product | Shows last, marked (`CAT-05`) |
+| 7 | "Últimas peças" | 15 units or fewer of the size in sale stock (`PRO-13`) |
+| 8 | Address (E1 had a single field) | CEP, street, number, complement (optional), neighborhood, city and state |
+| 9 | Incomplete lead | Saved only with all required fields valid (`CHK-05`) |
+| 10 | Access to account and order | No password: email link (`CTA-01`) and lookup by number + email with reduced data (`PED-05`) |
+| 11 | Visible order steps | Pagamento confirmado, Em separação, Enviado, Entregue (`PED-03`) |
+| 12 | New return after a rejected one | No; one request per order (`DEV-05`) |
+| 13 | Return per item and comment field | Out: whole order, reason only |
+| 14 | Cancellation before shipping | Not in the launch |
+| 15 | Performance measure | Main content visible (LCP) within 3 s on simulated slow 4G (`GER-08`) |
+| 16 | Where the `PRO-08` CEP is kept (decided on 2026-11-18) | Inside the bag, in the API (`setCartCep`); no cookie of its own. Calculating shipping creates the bag if it doesn't exist |
+| 17 | Panel on add (decided on 2026-11-18) | Comes with the bag; until then the `PRO-07` message applies |
+| 18 | Status of a missing product page (decided on 2026-11-19, following the Next.js docs) | The page streams, so it answers `200` with the not-found screen and a `noindex` tag (a "soft 404"). A real `404` would mean looking up the product before the page starts, which slows down every product page |
+| 19 | Bag controls (decided on 2026-11-19) | Quantity with "−" and "+" buttons; delivery option chosen only on the bag page; panel closes only by her tap; coupon field always open; "Desfazer" for 10 seconds, fading out; `SAC-17` built with checkout. Same day: "Finalizar compra" is never disabled by a sold-out item; tapping it shows an error naming the piece (`SAC-07`), so she knows why she can't move on; the stock limit reads "Apenas N unidades restantes" (`SAC-04`); on a computer the panel of `SAC-01` opens from the right side, like Hering's |
 
-**Fechado no contrato (`contract/openapi.yaml`):** o prazo de cada modalidade, inclusive o horário limite do motoboy, vem como texto pronto da API; o catálogo é paginado (24 por página, máximo 48). A ordenação entra no lançamento por decisão do dono (`CAT-09`).
+**Settled in the contract (`contract/openapi.yaml`):** the delivery time of each option, including the courier cutoff time, comes as ready-made text from the API; the catalog is paginated (24 per page, 48 max). Sorting is in the launch by the owner's decision (`CAT-09`).
 
-**Fora do lançamento** (aparecem em fluxogramas ou referências, mas não nos requisitos): avaliações de produto, produtos relacionados, lista de favoritos (o coração do card em `DESIGN.md` fica sem cenário até haver regra de onde guardar), sugestões automáticas na busca, login social, carteiras digitais (Apple Pay, Google Pay), boleto.
+**Not in the launch** (they show in flowcharts or references, but not in the requirements): product reviews, related products, wishlist (the card's heart in `DESIGN.md` has no scenario until there is a rule for where to keep it), search suggestions, social login, digital wallets (Apple Pay, Google Pay), boleto.

@@ -1,11 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { BagIcon, SearchIcon } from "../ui/icons.tsx";
 
-const ICON_LINK = "inline-flex size-12 items-center justify-center";
+const ICON_LINK = "relative inline-flex size-12 items-center justify-center";
 
 // Search on the left, logo in the center, bag on the right (DESIGN.md, section 5).
-export function Header() {
+// bagCount is a slot that renders the link name with the cart count, so this frame does not depend on the cart domain.
+export function Header({ bagCount }: { bagCount?: ReactNode }) {
   return (
     <header className="grid grid-cols-[3rem_1fr_3rem] items-center border-b border-line bg-background px-2">
       <Link href="/buscar" className={ICON_LINK}>
@@ -17,7 +19,7 @@ export function Header() {
       </Link>
       <Link href="/sacola" className={ICON_LINK}>
         <BagIcon />
-        <span className="sr-only">Sacola</span>
+        {bagCount ?? <span className="sr-only">Sacola</span>}
       </Link>
     </header>
   );

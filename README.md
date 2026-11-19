@@ -1,88 +1,88 @@
 # Helena
 
-E-commerce de moda desenvolvido como **Projeto Integrador** da faculdade. O objetivo final é entregar uma loja virtual funcional de ponta a ponta, com front-end em **Next.js**, back-end em **Java** e banco de dados **SQL Server**.
+Fashion e-commerce built as the college **Capstone Project** (Projeto Integrador). The final goal is a working online store from end to end, with a **Next.js** front end, a **Java** back end and a **SQL Server** database.
 
-A Helena é uma loja fictícia de camisetas, calças, jaquetas e acessórios para o público de 18 a 30 anos, que descobre os produtos pelo Instagram e compra pelo celular. O projeto parte de um levantamento de requisitos com um cliente simulado: hoje o estoque e os pedidos são controlados em planilhas, e a loja precisa de um sistema simples, barato e rápido no celular.
+Helena is a fictional store selling t-shirts, pants, jackets and accessories to people aged 18 to 30, who find the products on Instagram and buy on their phones. The project starts from a requirements survey with a simulated client: today stock and orders are tracked in spreadsheets, and the store needs a system that is simple, cheap and fast on the phone.
 
-## O que a loja faz
+## What the store does
 
-- **Catálogo:** filtros por categoria, tamanho, cor e preço; ordenação; aviso de últimas peças e de tamanho esgotado.
-- **Compra sem cadastro:** checkout sem conta nem senha, pensado para o celular.
-- **Pagamento:** PIX com confirmação na hora ou cartão em até 6x sem juros.
-- **Estoque sem venda dupla:** a peça fica reservada por 15 minutos durante o pagamento, e a compra é bloqueada se o estoque zerar.
-- **Frete:** por CEP, com motoboy no mesmo dia, PAC ou Sedex. Se a API de frete cair, entra uma taxa fixa e o checkout continua.
-- **Cupom e frete grátis:** um cupom por compra e frete grátis a partir de R$ 300,00.
-- **Pós-venda:** acompanhamento do pedido e devolução solicitada pela própria cliente.
-- **Privacidade:** coleta mínima de dados e consentimentos separados, seguindo a LGPD.
-- **Painel administrativo** (próxima etapa): entrada de mercadoria em lote, estoque, etiquetas, leads e indicadores.
+- **Catalog:** filters by category, size, color and price; sorting; low-stock and sold-out size notices.
+- **Guest checkout:** no account and no password, designed for the phone.
+- **Payment:** PIX with instant confirmation, or card in up to 6 interest-free installments.
+- **No double selling:** the item is reserved for 15 minutes during payment, and the purchase is blocked if stock hits zero.
+- **Shipping:** by CEP, with same-day courier, PAC or Sedex. If the shipping API goes down, a fixed fee applies and checkout keeps going.
+- **Coupon and free shipping:** one coupon per purchase and free shipping from R$ 300.00.
+- **After sale:** order tracking and returns requested by the customer herself.
+- **Privacy:** minimal data collection and separate consents, following the LGPD.
+- **Admin panel** (next stage): batch stock intake, stock, labels, leads and metrics.
 
-## Arquitetura
+## Architecture
 
 ```
-Navegador ──> Front-end (Next.js) ──> API REST (Java) ──> SQL Server
-                 este repositório       outro repositório
+Browser ──> Front end (Next.js) ──> REST API (Java) ──> SQL Server
+              this repository        another repository
 ```
 
-- O front nunca acessa o banco: ele conversa só com a API, sempre do lado do servidor.
-- A API é definida primeiro, em um contrato OpenAPI (`contract/openapi.yaml`). Enquanto o back-end não existe, o front roda contra uma API simulada gerada a partir desse contrato.
-- Gateway de pagamento, frete e nota fiscal entram por integrações, que ficam simuladas até haver acesso de teste.
+- The front end never touches the database: it only talks to the API, always on the server side.
+- The API is defined first, in an OpenAPI contract (`contract/openapi.yaml`). While the back end does not exist, the front end runs against a mock API generated from that contract.
+- Payment gateway, shipping and invoices come in through integrations, mocked until there is test access.
 
-## Tecnologias
+## Tech
 
-| Camada | Tecnologia |
+| Layer | Tech |
 |---|---|
-| Front-end | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
-| Back-end | Java (em outro repositório) |
-| Banco de dados | SQL Server |
-| Contrato da API | OpenAPI 3.0.3, servidor simulado com Prism |
-| Testes | `node:test` |
+| Front end | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
+| Back end | Java (another repository) |
+| Database | SQL Server |
+| API contract | OpenAPI 3.0.3, mock server with Prism |
+| Tests | `node:test` |
 
-## Como rodar
+## How to run
 
-Requisito: Node.js 20.9 ou mais novo.
+Requires Node.js 20.9 or newer.
 
 ```bash
 npm install
-npm run dev        # loja em http://localhost:3000
-npm run mock       # API simulada em http://localhost:4010
+npm run dev        # store at http://localhost:3000
+npm run mock       # mock API at http://localhost:4010
 ```
 
-| Comando | O que faz |
+| Command | What it does |
 |---|---|
-| `npm test` | Roda os testes |
-| `npm run lint` | Confere o código |
-| `npm run build` | Gera a versão de produção |
+| `npm test` | Runs the tests |
+| `npm run lint` | Checks the code |
+| `npm run build` | Builds for production |
 
-## Como o projeto é desenvolvido
+## How the project is built
 
-O comportamento vem antes do código. Cada mudança segue esta ordem:
+Behavior comes before code. Every change follows this order:
 
-1. **Especificação:** cenários Dado/Quando/Então em `docs/SPEC-CLIENT.md`.
-2. **Teste:** escrito a partir da especificação.
-3. **Código:** só o necessário para o teste passar.
+1. **Spec:** Given/When/Then scenarios in `docs/SPEC-CLIENT.md`.
+2. **Test:** written from the spec.
+3. **Code:** only what the test needs to pass.
 
-O código (nomes e comentários) é escrito em inglês simples, para que qualquer dev, inclusive iniciante, consiga ler. O texto que a cliente vê e a documentação ficam em português, e o `docs/GLOSSARIO.md` liga cada termo do negócio ao nome usado no código.
+Code and docs are written in plain English, so any dev, beginners included, can read them. Only what the customer sees (screen text, store URLs) stays in Portuguese, and commit messages are written in Portuguese. `docs/GLOSSARY.md` maps each business term to the name used in the code.
 
-## Documentação
+## Docs
 
-| Arquivo | Conteúdo |
+| File | Content |
 |---|---|
-| `docs/SPEC-CLIENT.md` | As 8 telas do cliente, em 103 cenários |
-| `docs/DESIGN.md` | Cores, tipografia e componentes da interface |
-| `contract/openapi.yaml` | Contrato da API usada pelas telas do cliente |
-| `database/schema.sql` | Esquema do banco (rascunho) |
-| `docs/GLOSSARIO.md` | Termo do negócio → nome usado no código |
-| `CLAUDE.md` | Regras e restrições do projeto |
+| `docs/SPEC-CLIENT.md` | The 8 customer screens, in 103 scenarios |
+| `docs/DESIGN.md` | Colors, type and interface components |
+| `contract/openapi.yaml` | Contract of the API used by the customer screens |
+| `database/schema.sql` | Database schema (draft) |
+| `docs/GLOSSARY.md` | Business term → name used in the code |
+| `CLAUDE.md` | Project rules and constraints |
 
-## Andamento
+## Progress
 
-- [x] Levantamento de requisitos
+- [x] Requirements survey
 - [x] Design system
-- [x] Especificação das telas do cliente
-- [x] Contrato da API
-- [x] Rascunho do esquema do banco
-- [ ] Telas do cliente
-- [ ] Back-end em Java
-- [ ] Esquema executado no SQL Server
-- [ ] Integrações (pagamento, frete, nota fiscal)
-- [ ] Painel administrativo
+- [x] Customer screens spec
+- [x] API contract
+- [x] Database schema draft
+- [ ] Customer screens
+- [ ] Java back end
+- [ ] Schema run on SQL Server
+- [ ] Integrations (payment, shipping, invoice)
+- [ ] Admin panel

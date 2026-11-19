@@ -4,7 +4,7 @@
   Source: user stories E1 to E19 from the requirements document,
   docs/SPEC-CLIENT.md and contract/openapi.yaml. Covers the store and what the
   admin panel already has defined in the requirements. Business terms map to
-  these names in docs/GLOSSARIO.md.
+  these names in docs/GLOSSARY.md.
 
   Conventions:
   - Names in simple English, snake_case, singular tables. Words that SQL Server
