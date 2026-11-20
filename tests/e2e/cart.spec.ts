@@ -380,3 +380,59 @@ test("focus never under the purchase bar", async ({ context, page }) => {
   const box = (await last.boundingBox())!;
   expect(box.y + box.height).toBeLessThanOrEqual(bar.y);
 });
+
+const panel = (page: Page) => page.getByRole("dialog", { name: "Peça adicionada à sacola" });
+
+async function addJacketM(page: Page) {
+  await page.goto("/produto/jaqueta-sarja-verde");
+  await page.getByRole("group", { name: "Tamanho" }).getByText("M", { exact: true }).click();
+  await page.getByRole("button", { name: "Adicionar à sacola" }).click();
+  await expect(panel(page)).toBeVisible();
+}
+
+test("SAC-01 panel on add", async ({ page }) => {
+  await addJacketM(page);
+  await expect(panel(page)).toContainText("Jaqueta sarja");
+  await expect(panel(page)).toContainText("Verde · Tamanho M · 1 peça");
+  await expect(panel(page)).toContainText("R$ 199,00");
+  await expect(panel(page)).toContainText("Faltam R$ 101,00 para o frete grátis");
+  await expect(panel(page)).toContainText("Subtotal (1 peça)");
+  await expect(panel(page).getByRole("link", { name: "Finalizar compra" })).toHaveAttribute("href", "/checkout");
+  await expect(panel(page).getByRole("link", { name: "Ver sacola" })).toHaveAttribute("href", "/sacola");
+  await expect(panel(page).getByRole("radio")).toHaveCount(0);
+});
+
+test("SAC-01 closes only by her", async ({ page }) => {
+  await page.clock.install();
+  await addJacketM(page);
+  const url = page.url();
+  await page.clock.runFor(15_000);
+  await expect(panel(page)).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(panel(page)).toBeHidden();
+  expect(page.url()).toBe(url);
+  await expect(page.getByRole("button", { name: "Adicionar à sacola" })).toBeFocused();
+
+  await page.getByRole("button", { name: "Adicionar à sacola" }).click();
+  await expect(panel(page)).toBeVisible();
+  await page.mouse.click(10, 10); // the backdrop, above the phone sheet
+  await expect(panel(page)).toBeHidden();
+
+  await page.getByRole("button", { name: "Adicionar à sacola" }).click();
+  await panel(page).getByRole("button", { name: "Fechar" }).click();
+  await expect(panel(page)).toBeHidden();
+});
+
+test.describe("SAC-01 computer", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+  test("panel opens from the right, full height", async ({ page }) => {
+    await addJacketM(page);
+    // Measure after the slide in has ended.
+    await panel(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const box = (await panel(page).boundingBox())!;
+    expect(Math.round(box.x + box.width)).toBe(1280);
+    expect(Math.round(box.y)).toBe(0);
+    expect(Math.round(box.height)).toBe(800);
+  });
+});

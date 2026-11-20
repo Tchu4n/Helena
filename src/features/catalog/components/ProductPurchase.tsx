@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/src/components/ui/Button.tsx";
 import { AlertIcon } from "@/src/components/ui/icons.tsx";
-import type { AddToCartState } from "@/src/features/cart";
+import { CartPanel, type AddToCartState } from "@/src/features/cart/client";
 import type { SizeOption } from "../views.ts";
 import { RestockAlertCard } from "./RestockAlertCard.tsx";
 
@@ -20,15 +20,20 @@ const INITIAL: AddToCartState = {
   status: "idle",
   message: null,
   focusSizes: false,
+  panel: null,
+  addedAt: 0,
 };
 
 // PRO-03 to PRO-05, PRO-07, PRO-13, PRO-14. The add action comes from the cart domain through the page.
 export function ProductPurchase({ sizes, soldOut, addToCart }: Props) {
   const [state, formAction, pending] = useActionState(addToCart, INITIAL);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // SAC-01: the panel of the last add stays open until she closes it.
+  const [closedAt, setClosedAt] = useState(0);
   const submitting = useRef(false);
   const firstAvailable = useRef<HTMLInputElement>(null);
   const sizeGroup = useRef<HTMLFieldSetElement>(null);
+  const form = useRef<HTMLFormElement>(null);
 
   const selected = sizes.find((s) => s.id === selectedId) ?? null;
   const blocked = soldOut || (selected !== null && !selected.available);
@@ -47,6 +52,7 @@ export function ProductPurchase({ sizes, soldOut, addToCart }: Props) {
   return (
     <>
       <form
+        ref={form}
         action={formAction}
         // A double tap must add one piece only: the API adds quantities up.
         onSubmit={(event) => {
@@ -113,9 +119,6 @@ export function ProductPurchase({ sizes, soldOut, addToCart }: Props) {
             {state.message}
           </p>
         )}
-        <p role="status" className="text-sm">
-          {state.status === "added" ? state.message : ""}
-        </p>
 
         {/* GER-02: the main button replaces the tabs, fixed at the bottom on phones. */}
         <div data-purchase-bar className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-background p-4 md:static md:border-0 md:p-0">
@@ -134,6 +137,17 @@ export function ProductPurchase({ sizes, soldOut, addToCart }: Props) {
         <RestockAlertCard
           size={selected && !selected.available ? selected : null}
           focusSizes={() => sizeGroup.current?.querySelector("input")?.focus()}
+        />
+      )}
+      {state.panel && state.addedAt !== closedAt && (
+        <CartPanel
+          key={state.addedAt}
+          panel={state.panel}
+          onClose={() => {
+            setClosedAt(state.addedAt);
+            // SAC-01: back where she was. The browser can't return focus itself: the button was disabled while adding.
+            form.current?.querySelector<HTMLButtonElement>("button[type=submit]")?.focus();
+          }}
         />
       )}
     </>

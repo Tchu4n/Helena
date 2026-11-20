@@ -124,8 +124,9 @@ test("PRO-07 add to cart", async ({ page }) => {
   await page.goto(JACKET);
   await chooseSize(page, "M");
   await addButton(page).click();
-  await expect(page.getByRole("status")).toContainText("Peça adicionada à sacola");
+  await expect(page.getByRole("dialog", { name: "Peça adicionada à sacola" })).toBeVisible();
   await expect(headerBag(page)).toHaveAccessibleName("Sacola, 1 peça");
+  await page.getByRole("button", { name: "Fechar" }).click();
   await addButton(page).click();
   await expect(headerBag(page)).toHaveAccessibleName("Sacola, 2 peças");
   await page.reload();
@@ -187,6 +188,7 @@ test("PRO-07 failed add keeps the pieces already in the cart", async ({ page }) 
   await chooseSize(page, "M");
   await addButton(page).click();
   await expect(headerBag(page)).toHaveAccessibleName("Sacola, 1 peça");
+  await page.getByRole("button", { name: "Fechar" }).click();
   // A size the API does not know also answers 404, like an unknown cart.
   await page.locator('input[name="productSizeId"]:checked').evaluate((el: HTMLInputElement) => {
     el.value = "00000000-0000-4000-8000-0000000beef0";
@@ -204,6 +206,7 @@ test("PRO-07 cart lookup failing after a 404 keeps the cart", async ({ page, con
   await expect(headerBag(page)).toHaveAccessibleName("Sacola, 1 peça");
   const cartId = (await context.cookies()).find((c) => c.name === "helena_cart")!.value;
   await request.post(`${FAKE_API}/__fail?path=/v1/carts/${cartId}`);
+  await page.getByRole("button", { name: "Fechar" }).click();
   await page.locator('input[name="productSizeId"]:checked').evaluate((el: HTMLInputElement) => {
     el.value = "00000000-0000-4000-8000-0000000beef0";
   });

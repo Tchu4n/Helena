@@ -1,6 +1,13 @@
-import type { ShippingView } from "./views.ts";
+import type { CartPanelView, ShippingView } from "./views.ts";
 
-export type AddToCartState = { status: "idle" | "added" | "error"; message: string | null; focusSizes: boolean };
+// SAC-01: `panel` is what the panel shows after a successful add; `addedAt` opens a fresh panel on every add.
+export type AddToCartState = {
+  status: "idle" | "added" | "error";
+  message: string | null;
+  focusSizes: boolean;
+  panel: CartPanelView | null;
+  addedAt: number;
+};
 
 export type ShippingState = {
   // "invalid": the CEP typed is wrong (a field error). "failed": our API failed (GER-06).

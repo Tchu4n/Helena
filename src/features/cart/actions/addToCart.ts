@@ -6,6 +6,7 @@ import { apiGet, apiPost, type ApiResult } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
 import { createCart, readCartId } from "../cart-session.ts";
 import type { AddToCartState } from "../types.ts";
+import { toCartPanelView } from "../views.ts";
 
 const input = z.object({ productSizeId: z.uuid() });
 
@@ -25,9 +26,9 @@ export async function addToCart(_prev: AddToCartState, formData: FormData): Prom
   let cartId = await readCartId();
 
   const parsed = input.safeParse({ productSizeId: formData.get("productSizeId") });
-  if (!parsed.success) return { status: "error", message: "Escolha um tamanho", focusSizes: true };
+  if (!parsed.success) return { status: "error", message: "Escolha um tamanho", focusSizes: true, panel: null, addedAt: 0 };
 
-  const failed: AddToCartState = { status: "error", message: "Não foi possível concluir. Tente de novo", focusSizes: false };
+  const failed: AddToCartState = { status: "error", message: "Não foi possível concluir. Tente de novo", focusSizes: false, panel: null, addedAt: 0 };
   cartId ??= await createCart();
   if (!cartId) return failed;
   let result = await addItem(cartId, parsed.data.productSizeId);
@@ -38,8 +39,14 @@ export async function addToCart(_prev: AddToCartState, formData: FormData): Prom
     if (!cartId) return failed;
     result = await addItem(cartId, parsed.data.productSizeId);
   }
-  if (!result.ok) return { status: "error", message: result.problem.title, focusSizes: false };
+  if (!result.ok) return { status: "error", message: result.problem.title, focusSizes: false, panel: null, addedAt: 0 };
 
   refresh();
-  return { status: "added", message: "Peça adicionada à sacola", focusSizes: false };
+  return {
+    status: "added",
+    message: "Peça adicionada à sacola",
+    focusSizes: false,
+    panel: toCartPanelView(result.data, parsed.data.productSizeId),
+    addedAt: Date.now(),
+  };
 }
