@@ -61,7 +61,7 @@ Owner's decision on 2026-11-19, extending the one from 2026-11-15:
 | `contract/openapi.yaml` | OpenAPI 3.0.3 contract of the API for the customer screens (approved on 2026-11-14; names moved to English on 2026-11-15, by the owner's decision, before any consumer existed) |
 | `database/schema.sql` | SQL Server DDL (draft, not run yet; moves to the back-end repository once it exists) |
 | `docs/referencias/` | Owner's research material (requirements, guides, screenshots, flowcharts). Local only, outside Git. Read it, never commit it |
-| `docs/superpowers/plans/` | Implementation plans: base design system and shared layout + catalog (done), product page (done, minor review items pending) |
+| `docs/superpowers/plans/` | Implementation plans: base design system and shared layout + catalog (done), product page (done, minor review items pending), bag (waiting for review) |
 
 Still missing: running and approving the DDL on a SQL Server, sandbox credentials (payment, shipping, invoice). The mock server came up and answered according to the contract on 2026-11-15.
 

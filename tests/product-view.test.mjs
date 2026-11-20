@@ -1,7 +1,8 @@
 // PRO-01, PRO-02: the product screen gets only the fields it shows, with the installment text ready.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { installmentText, toProductView } from "../src/features/catalog/views.ts";
+import { installmentText } from "../src/lib/format.ts";
+import { toProductView } from "../src/features/catalog/views.ts";
 
 const product = {
   id: "9b2f6a10-0000-4000-8000-000000000101",

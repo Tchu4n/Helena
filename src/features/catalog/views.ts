@@ -1,12 +1,11 @@
 // Only the fields the screens use go to components; the full API response never does.
 import type { components } from "../../lib/api-types.ts";
-import { formatPrice } from "../../lib/format.ts";
+import { installmentText } from "../../lib/format.ts";
 
 type ProductSummary = components["schemas"]["ProductSummary"];
 type Home = components["schemas"]["Home"];
 type ProductPage = components["schemas"]["ProductPage"];
 type Product = components["schemas"]["Product"];
-type InstallmentPlan = components["schemas"]["InstallmentPlan"];
 
 export type CardProduct = {
   slug: string;
@@ -80,12 +79,6 @@ export type ProductView = {
   description: string;
   sizeGuide: { columns: string[]; rows: string[][] } | null;
 };
-
-// PRO-02: the API already applies the rule (up to 6x, minimum R$ 50,00); 1 means no installments.
-export function installmentText(plan: InstallmentPlan): string | null {
-  if (plan.maxInstallments <= 1) return null;
-  return `até ${plan.maxInstallments}x de ${formatPrice(plan.installmentAmount)} sem juros`;
-}
 
 export function toProductView(p: Product): ProductView {
   return {

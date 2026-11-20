@@ -2,6 +2,7 @@
 // Control routes (/__fail, /__reset) exist only here, so tests can simulate an API outage.
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { cartTotals } from "./fake-cart.mjs";
 
 const PORT = 4011;
 
@@ -143,7 +144,7 @@ const QUOTES = {
     city: "São Paulo",
     state: "SP",
     options: [
-      option("courier", 1500, "Chega hoje"),
+      option("courier", 2500, "Chega hoje"),
       option("pac", 2000, "Chega em até 5 dias úteis"),
       option("sedex", 3500, "Chega em até 2 dias úteis"),
     ],
@@ -169,44 +170,72 @@ const OUT_OF_STOCK = {
   status: 409,
   code: "out_of_stock",
 };
+const INVALID_COUPON = {
+  type: "https://helena.example/problems/invalid-coupon",
+  title: "Cupom inválido ou expirado",
+  status: 422,
+  code: "invalid_coupon",
+};
+const UNAVAILABLE_DELIVERY = {
+  type: "https://helena.example/problems/invalid-data",
+  title: "Esta entrega não está disponível para o seu CEP",
+  status: 422,
+  code: "invalid_data",
+};
+const INVALID_QUANTITY = {
+  type: "https://helena.example/problems/invalid-data",
+  title: "Dados inválidos",
+  status: 422,
+  code: "invalid_data",
+};
+const COUPONS = { MARIA10: 10, OUTRO15: 15 };
 const NOT_FOUND = { type: "about:blank", title: "Não encontrado", status: 404, code: "not_found" };
 
 const carts = new Map();
 const requests = [];
 
+// Test hooks: sizes marked sold out and quantity limits apply to every cart.
+const soldOutIds = new Set();
+const maxById = new Map();
+
+const quoteFor = (cart) => (cart.cep ? (QUOTES[cart.cep] ?? QUOTES["99999999"]) : null);
+
+function newItem(size, quantity, extra = {}) {
+  const product = size?.product;
+  return {
+    id: randomUUID(),
+    productSizeId: size?.id ?? extra.productSizeId,
+    slug: product?.slug ?? "produto-de-teste",
+    name: product?.name ?? "Produto de teste",
+    color: product?.color.name ?? "Azul",
+    size: size?.label ?? "M",
+    photo: product?.photo ?? photo("tshirt", "Produto de teste"),
+    unitPrice: product?.price ?? 10000,
+    quantity,
+    maxQuantity: 10,
+    soldOut: false,
+    ...extra,
+  };
+}
+
 function cartBody(cart) {
   const items = cart.items.map((i) => ({
-    id: i.id,
-    productSizeId: i.size.id,
-    slug: i.size.product.slug,
-    name: i.size.product.name,
-    color: i.size.product.color.name,
-    size: i.size.label,
-    photo: i.size.product.photo,
-    unitPrice: i.size.product.price,
-    quantity: i.quantity,
-    maxQuantity: 10,
-    subtotal: i.size.product.price * i.quantity,
-    soldOut: false,
+    ...i,
+    maxQuantity: maxById.get(i.productSizeId) ?? i.maxQuantity,
+    soldOut: i.soldOut || soldOutIds.has(i.productSizeId),
+    subtotal: i.unitPrice * i.quantity,
   }));
-  const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-  const maxInstallments = Math.max(1, Math.min(6, Math.floor(subtotal / 5000)));
+  const couponPercent = cart.coupon ? COUPONS[cart.coupon] : 0;
+  const totals = cartTotals({ lines: items, couponPercent, quote: quoteFor(cart), chosen: cart.chosen });
   return {
     id: cart.id,
     items,
-    pieceCount: items.reduce((sum, i) => sum + i.quantity, 0),
-    subtotal,
-    coupon: null,
-    discount: 0,
-    amountToFreeShipping: Math.max(0, 30000 - subtotal),
+    pieceCount: items.filter((i) => !i.soldOut).reduce((sum, i) => sum + i.quantity, 0),
+    coupon: cart.coupon ? { code: cart.coupon, percent: couponPercent } : null,
     cep: cart.cep,
-    deliveryOptions: [],
-    chosenDelivery: null,
-    shippingAmount: null,
-    total: subtotal,
-    installmentPlan: { maxInstallments, installmentAmount: Math.floor(subtotal / maxInstallments) },
+    chosenDelivery: cart.chosen,
     reservationExpiresAt: null,
-    canCheckout: items.length > 0,
+    ...totals,
   };
 }
 
@@ -240,7 +269,7 @@ async function route(req, url) {
     let raw = "";
     for await (const chunk of req) raw += chunk;
     if (raw) return [415, { type: "about:blank", title: "Invalid content type", status: 415, code: "invalid_data" }];
-    const cart = { id: randomUUID(), items: [], cep: null };
+    const cart = { id: randomUUID(), items: [], cep: null, chosen: null, coupon: null };
     carts.set(cart.id, cart);
     return [201, cartBody(cart)];
   }
@@ -250,16 +279,49 @@ async function route(req, url) {
     if (req.method === "GET" && parts.length === 3) return [200, cartBody(cart)];
     if (req.method === "PUT" && parts[3] === "cep") {
       cart.cep = (await readJson(req)).cep;
+      if (!quoteFor(cart)?.options.some((o) => o.type === cart.chosen)) cart.chosen = null;
+      return [200, cartBody(cart)];
+    }
+    if (req.method === "PUT" && parts[3] === "delivery") {
+      const { type } = await readJson(req);
+      if (!quoteFor(cart)?.options.some((o) => o.type === type)) return [422, UNAVAILABLE_DELIVERY];
+      cart.chosen = type;
+      return [200, cartBody(cart)];
+    }
+    if (parts[3] === "coupon") {
+      if (req.method === "DELETE") cart.coupon = null;
+      else if (req.method === "PUT") {
+        const code = String((await readJson(req)).code ?? "").toUpperCase();
+        if (!COUPONS[code]) return [422, INVALID_COUPON];
+        cart.coupon = code;
+      } else return null;
       return [200, cartBody(cart)];
     }
     if (req.method === "POST" && parts[3] === "items") {
       const { productSizeId, quantity } = await readJson(req);
       const size = ALL_SIZES.find((s) => s.id === productSizeId);
       if (!size) return [404, NOT_FOUND];
-      if (!size.available) return [409, OUT_OF_STOCK];
-      const item = cart.items.find((i) => i.size.id === productSizeId);
+      if (!size.available || soldOutIds.has(productSizeId)) return [409, OUT_OF_STOCK];
+      if (!Number.isInteger(quantity) || quantity < 1) return [422, INVALID_QUANTITY];
+      const item = cart.items.find((i) => i.productSizeId === productSizeId);
+      const max = maxById.get(productSizeId) ?? item?.maxQuantity ?? 10;
+      if ((item?.quantity ?? 0) + quantity > max) return [409, OUT_OF_STOCK];
       if (item) item.quantity += quantity;
-      else cart.items.push({ id: randomUUID(), size, quantity });
+      else cart.items.push(newItem(size, quantity));
+      return [200, cartBody(cart)];
+    }
+    if (parts[3] === "items" && parts.length === 5) {
+      const index = cart.items.findIndex((i) => i.id === parts[4]);
+      if (index < 0) return [404, NOT_FOUND];
+      if (req.method === "DELETE") cart.items.splice(index, 1);
+      else if (req.method === "PATCH") {
+        const { quantity } = await readJson(req);
+        if (!Number.isInteger(quantity) || quantity < 1) return [422, INVALID_QUANTITY];
+        const line = cart.items[index];
+        const max = maxById.get(line.productSizeId) ?? line.maxQuantity;
+        if (line.soldOut || soldOutIds.has(line.productSizeId) || quantity > max) return [409, OUT_OF_STOCK];
+        cart.items[index].quantity = quantity;
+      } else return null;
       return [200, cartBody(cart)];
     }
   }
@@ -312,7 +374,27 @@ createServer(async (req, res) => {
   if (req.method === "POST" && url.pathname === "/__reset") {
     failing.clear();
     carts.clear();
+    soldOutIds.clear();
+    maxById.clear();
     requests.length = 0;
+    return send(res, 200, { ok: true });
+  }
+  if (req.method === "POST" && url.pathname === "/__carts") {
+    const { lines = [], cep = null, chosen = null } = await readJson(req);
+    const cart = { id: randomUUID(), cep, chosen, coupon: null, items: [] };
+    for (const { productSizeId, ...extra } of lines) {
+      const size = ALL_SIZES.find((s) => s.id === productSizeId);
+      cart.items.push(newItem(size, extra.quantity ?? 1, { productSizeId, ...extra }));
+    }
+    carts.set(cart.id, cart);
+    return send(res, 200, { id: cart.id });
+  }
+  if (req.method === "POST" && url.pathname === "/__sold-out") {
+    soldOutIds.add(url.searchParams.get("productSizeId"));
+    return send(res, 200, { ok: true });
+  }
+  if (req.method === "POST" && url.pathname === "/__max") {
+    maxById.set(url.searchParams.get("productSizeId"), Number(url.searchParams.get("max")));
     return send(res, 200, { ok: true });
   }
   // Lets a test check which API paths the store called.

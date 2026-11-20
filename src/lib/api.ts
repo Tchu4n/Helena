@@ -37,6 +37,14 @@ export function apiPut<T>(path: string, body: unknown): Promise<ApiResult<T>> {
   return request<T>(new URL(path, env.apiUrl), { method: "PUT", body: JSON.stringify(body) });
 }
 
+export function apiPatch<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+  return request<T>(new URL(path, env.apiUrl), { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function apiDelete<T>(path: string): Promise<ApiResult<T>> {
+  return request<T>(new URL(path, env.apiUrl), { method: "DELETE" });
+}
+
 async function request<T>(url: URL, init: { method: string; body?: string }): Promise<ApiResult<T>> {
   try {
     const response = await fetch(url, {

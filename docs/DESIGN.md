@@ -93,8 +93,8 @@ Color is never the only signal: a badge has text, an error has an icon and a mes
 | Benefits strip | three items in monospaced labels, no color | Hering content, Hermès finish |
 | Product card | 3:4 photo on `surface`, badge, heart, quick-buy button, name, price; sold out goes to the end of the grid with a mark | Miu Miu + Hering |
 | Product page | gallery of 4+ photos (carousel on the phone, 2×2 grid on desktop), serif title, struck-through price + current + badge, installments, color as dots, size as chips, size guide, CEP with delivery time right below, "Adicionar à sacola" fixed at the bottom | Hering + Miu Miu |
-| Bag panel | when adding the item, slides up from the bottom on the phone and opens from the right side on a computer: timer, item, amount left for free shipping, subtotal, "Finalizar compra" and "Ver sacola" | Hering |
-| Bag page | reduced header, 3-step progress, timer, white cards, shipping by CEP, total with installments, "Finalizar compra" | Hermès, with early shipping |
+| Bag panel | when adding the item, slides up from the bottom on the phone and opens from the right side on a computer: item, amount left for free shipping, subtotal, "Finalizar compra" and "Ver sacola" | Hering |
+| Bag page | reduced header, 3-step progress, white cards, shipping by CEP, total with installments, "Finalizar compra"; the 15-min timer shows only with a reservation in progress, after payment started (`SAC-17`) | Hermès, with early shipping |
 | Form field | label above, 48px, `control` border, error with border + icon + text, `autocomplete` attributes | UX handbook |
 | Cookie notice | "Rejeitar" and "Aceitar" with the same size and color; nothing checked by default | LGPD guide |
 

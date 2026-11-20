@@ -29,11 +29,11 @@ const server = createServer(async (req, res) => {
   // /slow never answers
 });
 
-let apiGet, apiPost, apiPut;
+let apiGet, apiPost, apiPut, apiPatch, apiDelete;
 before(async () => {
   await new Promise((resolve) => server.listen(0, resolve));
   process.env.API_URL = `http://localhost:${server.address().port}`;
-  ({ apiGet, apiPost, apiPut } = await import("../src/lib/api.ts"));
+  ({ apiGet, apiPost, apiPut, apiPatch, apiDelete } = await import("../src/lib/api.ts"));
 });
 after(() => server.close());
 
@@ -96,6 +96,19 @@ test("apiPut sends PUT with JSON", async () => {
   await apiPut("/ok", { cep: "01310100" });
   assert.equal(lastRequest.method, "PUT");
   assert.deepEqual(JSON.parse(lastRequest.body), { cep: "01310100" });
+});
+
+test("SAC-04 apiPatch sends PATCH with JSON", async () => {
+  await apiPatch("/ok", { quantity: 2 });
+  assert.equal(lastRequest.method, "PATCH");
+  assert.deepEqual(JSON.parse(lastRequest.body), { quantity: 2 });
+});
+
+test("SAC-05 apiDelete sends DELETE without body", async () => {
+  const result = await apiDelete("/ok");
+  assert.equal(lastRequest.method, "DELETE");
+  assert.equal(lastRequest.body, "");
+  assert.deepEqual(result, { ok: true, data: { hello: "world" } });
 });
 
 test("apiPost without body sends no body (createCart has no request body)", async () => {

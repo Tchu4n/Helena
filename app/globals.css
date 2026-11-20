@@ -33,6 +33,15 @@ body {
   outline-offset: 2px;
 }
 
+/* GER-02: bag and checkout (pages with the purchase steps) hide the announcement, the search and the bag icon.
+   The header icons keep their place, so the logo stays centered. */
+body:has([data-purchase-steps]) aside[data-hide-on-purchase] {
+  display: none;
+}
+body:has([data-purchase-steps]) header [data-hide-on-purchase] {
+  visibility: hidden;
+}
+
 /* GER-03, GER-07: height of the bar fixed at the bottom on phones, so the cookie notice sits above it:
    the tab bar (4rem), or the purchase bar on buying screens (48px button + 2×16px padding + 1px border). */
 :root {

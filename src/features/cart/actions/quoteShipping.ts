@@ -1,9 +1,9 @@
 "use server";
 
 import { z } from "zod";
-import { apiPost, apiPut } from "@/src/lib/api";
+import { apiPost } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
-import { createCart, ensureCart } from "../cart-session.ts";
+import { saveCep } from "../cart-api.ts";
 import { normalizeCep } from "../cep.ts";
 import type { ShippingState } from "../types.ts";
 import { toShippingView } from "../views.ts";
@@ -26,17 +26,7 @@ export async function quoteShipping(_prev: ShippingState, formData: FormData): P
   });
   if (!result.ok) return { status: "failed", cep: typed, message: result.problem.title, shipping: null };
 
+  // PRO-08: kept in the cart for the bag page and checkout. A failure here never hides the quote.
   await saveCep(cep);
   return { status: "ok", cep: typed, message: null, shipping: toShippingView(result.data) };
-}
-
-// PRO-08: the CEP is kept in the cart for the cart page and checkout. A failure here never hides the quote.
-async function saveCep(cep: string) {
-  const cartId = await ensureCart();
-  if (!cartId) return;
-  const saved = await apiPut(`/v1/carts/${cartId}/cep`, { cep });
-  if (!saved.ok && saved.problem.status === 404) {
-    const newId = await createCart();
-    if (newId) await apiPut(`/v1/carts/${newId}/cep`, { cep });
-  }
 }

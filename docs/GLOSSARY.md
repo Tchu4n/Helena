@@ -85,6 +85,11 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | endereço: rua, número, complemento, bairro, cidade, UF | `address`: `street`, `number`, `complement`, `neighborhood`, `city`, `state` |
 | cliente, lead | `customer`, `lead` |
 | dados da cliente | `customerDetails` |
+| painel da sacola | `CartPanel` |
+| compra rápida | `QuickBuy` |
+| etapas da compra | `PurchaseSteps` |
+| desfazer remoção | `restoreItem` |
+| finalizar compra | `goToCheckout` |
 
 ## Order and payment
 
