@@ -18,23 +18,25 @@ const INTERNAL_ERROR: Problem = {
 export async function apiGet<T>(
   path: string,
   query: Record<string, string | number | undefined> = {},
+  headers?: ExtraHeaders,
 ): Promise<ApiResult<T>> {
   const url = new URL(path, env.apiUrl);
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined) url.searchParams.set(key, String(value));
   }
-  return request<T>(url, { method: "GET" });
+  return request<T>(url, { method: "GET", headers });
 }
 
-export function apiPost<T>(path: string, body?: unknown): Promise<ApiResult<T>> {
+export function apiPost<T>(path: string, body?: unknown, headers?: ExtraHeaders): Promise<ApiResult<T>> {
   return request<T>(new URL(path, env.apiUrl), {
     method: "POST",
     body: body === undefined ? undefined : JSON.stringify(body),
+    headers,
   });
 }
 
-export function apiPut<T>(path: string, body: unknown): Promise<ApiResult<T>> {
-  return request<T>(new URL(path, env.apiUrl), { method: "PUT", body: JSON.stringify(body) });
+export function apiPut<T>(path: string, body: unknown, headers?: ExtraHeaders): Promise<ApiResult<T>> {
+  return request<T>(new URL(path, env.apiUrl), { method: "PUT", body: JSON.stringify(body), headers });
 }
 
 export function apiPatch<T>(path: string, body: unknown): Promise<ApiResult<T>> {
@@ -45,15 +47,20 @@ export function apiDelete<T>(path: string): Promise<ApiResult<T>> {
   return request<T>(new URL(path, env.apiUrl), { method: "DELETE" });
 }
 
-async function request<T>(url: URL, init: { method: string; body?: string }): Promise<ApiResult<T>> {
+// Extra request headers: Idempotency-Key, X-Order-Access, X-Forwarded-For (checkout).
+type ExtraHeaders = Record<string, string>;
+
+async function request<T>(url: URL, init: { method: string; body?: string; headers?: ExtraHeaders }): Promise<ApiResult<T>> {
   try {
     const response = await fetch(url, {
       ...init,
       cache: "no-store",
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: init.body
-        ? { Accept: "application/json", "Content-Type": "application/json" }
-        : { Accept: "application/json" },
+      headers: {
+        ...init.headers,
+        Accept: "application/json",
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+      },
     });
     // 201 without a body (for example, a saved restock alert) still counts as success.
     if (response.status === 201 || response.status === 204) {

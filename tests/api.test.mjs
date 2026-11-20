@@ -9,7 +9,7 @@ const server = createServer(async (req, res) => {
   lastUrl = req.url;
   let raw = "";
   for await (const chunk of req) raw += chunk;
-  lastRequest = { method: req.method, type: req.headers["content-type"], body: raw };
+  lastRequest = { method: req.method, type: req.headers["content-type"], body: raw, headers: req.headers };
   if (req.url.startsWith("/created")) {
     res.writeHead(201);
     return res.end();
@@ -116,4 +116,15 @@ test("apiPost without body sends no body (createCart has no request body)", asyn
   assert.equal(lastRequest.method, "POST");
   assert.equal(lastRequest.body, "");
   assert.equal(lastRequest.type, undefined);
+});
+
+test("CHK-12 extra headers (Idempotency-Key, X-Order-Access) reach the API with the JSON type kept", async () => {
+  await apiPost("/ok", { a: 1 }, { "Idempotency-Key": "k-1", "X-Order-Access": "acc" });
+  assert.equal(lastRequest.headers["idempotency-key"], "k-1");
+  assert.equal(lastRequest.headers["x-order-access"], "acc");
+  assert.equal(lastRequest.type, "application/json");
+  await apiGet("/ok", {}, { "X-Order-Access": "acc-2" });
+  assert.equal(lastRequest.headers["x-order-access"], "acc-2");
+  await apiPut("/ok", { b: 2 }, { "X-Forwarded-For": "203.0.113.7" });
+  assert.equal(lastRequest.headers["x-forwarded-for"], "203.0.113.7");
 });

@@ -19,3 +19,4 @@ export { applyCoupon } from "./actions/applyCoupon.ts";
 export { removeCoupon } from "./actions/removeCoupon.ts";
 export { CheckoutBar } from "./components/CheckoutBar.tsx";
 export { goToCheckout } from "./actions/goToCheckout.ts";
+export { readCartId } from "./cart-session.ts";

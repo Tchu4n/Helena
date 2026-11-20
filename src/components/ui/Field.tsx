@@ -9,10 +9,26 @@ type FieldProps = {
   inputMode?: "text" | "numeric" | "email" | "tel" | "search";
   autoComplete?: string;
   maxLength?: number;
+  // Controlled use (checkout form): the value lives in the parent's state.
+  value?: string;
+  onChange?: (value: string) => void;
+  onBlur?: () => void;
 };
 
 // Label above, 48px tall, error shown with border + icon + text (DESIGN.md, section 5).
-export function Field({ label, name, type = "text", defaultValue, error, inputMode, autoComplete, maxLength }: FieldProps) {
+export function Field({
+  label,
+  name,
+  type = "text",
+  defaultValue,
+  error,
+  inputMode,
+  autoComplete,
+  maxLength,
+  value,
+  onChange,
+  onBlur,
+}: FieldProps) {
   const errorId = `${name}-error`;
   return (
     <div className="flex flex-col gap-1">
@@ -24,6 +40,9 @@ export function Field({ label, name, type = "text", defaultValue, error, inputMo
         name={name}
         type={type}
         defaultValue={defaultValue}
+        value={value}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        onBlur={onBlur}
         inputMode={inputMode}
         autoComplete={autoComplete}
         maxLength={maxLength}
