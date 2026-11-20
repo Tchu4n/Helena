@@ -22,11 +22,25 @@ export function QuickBuy({ product, addToCart }: Props) {
   const [openedAt, setOpenedAt] = useState<number | null>(null);
   const [closedAt, setClosedAt] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // CAT-08: an add whose picker she closed while it ran must not open a panel when it lands, even if she
+  // has opened the picker again meanwhile. Its answer is marked as already seen and closed when it comes.
+  const [skipNextAnswer, setSkipNextAnswer] = useState(false);
+  const [seenAt, setSeenAt] = useState(state.at);
+  if (state.at !== seenAt) {
+    setSeenAt(state.at);
+    if (skipNextAnswer) {
+      setSkipNextAnswer(false);
+      setClosedAt(state.at);
+      setOpenedAt((opened) => (opened === null ? null : state.at));
+    }
+  }
   const trigger = useRef<HTMLButtonElement>(null);
   const backToCard = () => trigger.current?.focus();
 
   const answer = openedAt !== null && state.at > openedAt ? state : null;
-  const showPanel = state.panel !== null && state.at > closedAt;
+  // Only for an add answered while the picker was open: closing it during the add means no panel afterwards,
+  // and an old answer never comes back with the next open.
+  const showPanel = answer?.status === "added" && state.panel !== null && state.at > closedAt;
   const showPicker = openedAt !== null && answer?.status !== "added";
 
   return (
@@ -52,6 +66,7 @@ export function QuickBuy({ product, addToCart }: Props) {
           selectedId={selectedId}
           onSelect={setSelectedId}
           onClose={() => {
+            if (pending) setSkipNextAnswer(true);
             setOpenedAt(null);
             backToCard();
           }}

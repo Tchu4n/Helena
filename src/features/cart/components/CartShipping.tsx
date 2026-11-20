@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useOptimistic, useState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "@/src/components/ui/Button.tsx";
 import { Field } from "@/src/components/ui/Field.tsx";
 import { AlertIcon } from "@/src/components/ui/icons.tsx";
@@ -31,15 +31,19 @@ export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShippin
     message: null,
     shipping: null,
   });
-  // The tapped option shows checked at once and goes back to the bag's own choice if the API refuses it.
-  // The form is never remounted nor disabled, so keyboard focus stays on the option (GER-07).
-  const [picked, setPicked] = useOptimistic(chosenDelivery);
-  const [deliveryMessage, setDeliveryMessage] = useState<string | null>(null);
-  const deliveryAction = async (formData: FormData) => {
-    setPicked(String(formData.get("type")) as CartView["chosenDelivery"]);
-    const result = await chooseDelivery({ message: null }, formData);
-    setDeliveryMessage(result.message);
-  };
+  // The server action itself is the form action (no client wrapper), as React expects for form actions.
+  // Radios are uncontrolled and the form is never remounted nor disabled, so keyboard focus stays on the
+  // option (GER-07). React resets the form after each action, back to the bag's own choice (defaultChecked):
+  // the new one when it worked, the old one when the API refused it.
+  const [deliveryState, deliveryAction] = useActionState(chooseDelivery, { message: null });
+  // A refusal belongs to the CEP it came from; a new CEP hides it.
+  const [seenCep, setSeenCep] = useState(cep);
+  const [staleState, setStaleState] = useState<typeof deliveryState | null>(null);
+  if (cep !== seenCep) {
+    setSeenCep(cep);
+    setStaleState(deliveryState);
+  }
+  const deliveryMessage = deliveryState !== staleState ? deliveryState.message : null;
 
   return (
     <section aria-label={TITLE} className="flex flex-col gap-3 bg-card p-4">
@@ -78,7 +82,7 @@ export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShippin
                   type="radio"
                   name="type"
                   value={option.type}
-                  checked={option.type === picked}
+                  defaultChecked={option.type === chosenDelivery}
                   onChange={(event) => event.currentTarget.form?.requestSubmit()}
                   className="size-5 accent-primary"
                 />
@@ -90,12 +94,6 @@ export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShippin
               </label>
             ))}
           </fieldset>
-          {/* Without JavaScript the change can't submit by itself. */}
-          <noscript>
-            <Button variant="secondary" type="submit" className="mt-3">
-              Escolher entrega
-            </Button>
-          </noscript>
         </form>
       )}
       {deliveryMessage && <Alert>{deliveryMessage}</Alert>}

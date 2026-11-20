@@ -16,7 +16,8 @@ const failed = (message: string, itemId: string | null = null): RemoveState => (
   at: Date.now(),
 });
 
-// SAC-05. What "Desfazer" puts back is read from the API, never from the form.
+// SAC-05. What "Desfazer" puts back is read from the API, never from the form (one exception: the
+// already-gone case below echoes the screen's own state back).
 export async function removeItem(prev: RemoveState, formData: FormData): Promise<RemoveState> {
   const cartId = await readCartId();
   const parsed = input.safeParse({ itemId: formData.get("itemId") });
@@ -25,7 +26,10 @@ export async function removeItem(prev: RemoveState, formData: FormData): Promise
   const cart = await apiGet<components["schemas"]["Cart"]>(`/v1/carts/${cartId}`);
   if (!cart.ok) return failed(cart.problem.title, parsed.data.itemId);
   const item = cart.data.items.find((i) => i.id === parsed.data.itemId);
-  // Already gone (a second tap, or removed in another tab): show the bag as it is and keep the last notice.
+  // Already gone (a second tap, or removed in another tab): show the bag as it is and leave the last notice as
+  // it was. The screen follows a notice by its `at`, so the same state back neither restarts nor revives it.
+  // `prev` comes from the browser: at worst "Desfazer" would add a piece she could add anyway, to her own
+  // cart, and the API checks the stock.
   if (!item) {
     refresh();
     return prev;

@@ -10,9 +10,12 @@ const input = z.object({ itemId: z.uuid(), quantity: z.coerce.number().int().min
 const FAILED = "Não foi possível concluir. Tente de novo";
 
 // SAC-04. The API keeps the limit (maxQuantity); a 409 means the stock dropped while the bag was open.
-export async function updateQuantity(_prev: ItemActionState, formData: FormData): Promise<ItemActionState> {
+export async function updateQuantity(prev: ItemActionState, formData: FormData): Promise<ItemActionState> {
   // Authorization: the cart is the one in the visitor's own httpOnly cookie; the item id only goes inside its path.
   const cartId = await readCartId();
+  // A −/+ at its limit sends no quantity (tapped before the script loaded): nothing changes, not even the
+  // message already on the card.
+  if (cartId && formData.get("quantity") === null) return prev;
   const parsed = input.safeParse({ itemId: formData.get("itemId"), quantity: formData.get("quantity") });
   if (!cartId || !parsed.success) return { itemId: null, message: FAILED };
 

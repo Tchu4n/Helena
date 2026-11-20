@@ -16,7 +16,7 @@ type Props = {
 };
 
 const IDLE: RemoveState = { status: "idle", itemId: null, removed: null, message: null, at: 0 };
-const LINK_BUTTON = "min-h-12 px-1 text-sm underline";
+const LINK_BUTTON = "min-h-12 px-1 text-sm underline aria-disabled:text-muted";
 // SAC-05: visible for 7 s, then fades for 3 s, 10 s in all.
 const FADE_AFTER_MS = 7_000;
 const GONE_AFTER_MS = 10_000;
@@ -31,6 +31,9 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
 
   const removed = removeState.status === "removed" ? removeState : null;
   const showNotice = removed !== null && dismissedAt !== removed.at;
+  // Effects follow the removal by its `at`, not by the state object: the same removal sent back by the
+  // server must not restart the 10 seconds nor move the focus again (SAC-05).
+  const removedAt = removed?.at ?? 0;
   // A double tap must remove once: the second tap lands before React knows the first is pending.
   const removingNow = useRef(false);
   useEffect(() => {
@@ -39,18 +42,29 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
   // The removed card unmounts with the focus: it goes to "Desfazer" (GER-07).
   const undoButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (removed) undoButton.current?.focus();
-  }, [removed]);
+    if (removedAt) undoButton.current?.focus();
+  }, [removedAt]);
+  // A card that leaves without a new removal (already gone in another tab) takes the focus with it:
+  // it goes to "Desfazer" if a notice is on screen, otherwise to the first "Remover" left.
+  const list = useRef<HTMLUListElement>(null);
+  const tappedItemId = useRef<string | null>(null);
+  useEffect(() => {
+    const id = tappedItemId.current;
+    if (!id || items.some((i) => i.id === id)) return;
+    tappedItemId.current = null;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    (undoButton.current ?? list.current?.querySelector<HTMLButtonElement>("[data-remove]"))?.focus();
+  }, [items]);
 
   useEffect(() => {
-    if (!removed) return;
-    const fade = setTimeout(() => setFadingAt(removed.at), FADE_AFTER_MS);
-    const gone = setTimeout(() => setDismissedAt(removed.at), GONE_AFTER_MS);
+    if (!removedAt) return;
+    const fade = setTimeout(() => setFadingAt(removedAt), FADE_AFTER_MS);
+    const gone = setTimeout(() => setDismissedAt(removedAt), GONE_AFTER_MS);
     return () => {
       clearTimeout(fade);
       clearTimeout(gone);
     };
-  }, [removed]);
+  }, [removedAt]);
 
   // A failed removal shows on its card; a failed undo has no card left, so it shows below the list.
   const removeError = removeState.status === "error" ? removeState : null;
@@ -58,7 +72,7 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
 
   return (
     <>
-      <ul className="flex flex-col gap-3">
+      <ul ref={list} className="flex flex-col gap-3">
         {items.map((item, index) => (
           <li key={item.id}>
             <CartItemCard
@@ -70,12 +84,17 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
               <form
                 action={removeAction}
                 onSubmit={(event) => {
-                  if (removingNow.current) event.preventDefault();
+                  if (removingNow.current) {
+                    event.preventDefault();
+                    return;
+                  }
                   removingNow.current = true;
+                  tappedItemId.current = item.id;
                 }}
               >
                 <input type="hidden" name="itemId" value={item.id} />
-                <button type="submit" data-remove className={LINK_BUTTON}>
+                {/* Busy while a removal runs; aria-disabled keeps the focus (the guard above blocks the tap). */}
+                <button type="submit" data-remove aria-disabled={removing} className={LINK_BUTTON}>
                   Remover
                 </button>
               </form>
@@ -181,7 +200,8 @@ function CartItemCard({
             >
               <button
                 type="submit"
-                name="quantity"
+                // At the limit the button sends no quantity, so a tap before the script loads changes nothing.
+                name={item.quantity > 1 ? "quantity" : undefined}
                 value={item.quantity - 1}
                 aria-label="Diminuir"
                 aria-disabled={pending || item.quantity <= 1}
@@ -192,7 +212,7 @@ function CartItemCard({
               <output className="min-w-5 text-center tabular-nums">{item.quantity}</output>
               <button
                 type="submit"
-                name="quantity"
+                name={item.canIncrease ? "quantity" : undefined}
                 value={item.quantity + 1}
                 aria-label="Aumentar"
                 aria-disabled={pending || !item.canIncrease}

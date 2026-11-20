@@ -171,6 +171,9 @@ Routes are in Portuguese because the customer sees them in the browser. The pref
 **CAT-08 — Quick buy from the card**
 - **When** the customer taps a card's quick-buy button
 - **Then** she picks the size right there (sold-out ones struck through) and the item goes into the bag, as in `PRO-07`
+- **And** after adding, the panel of `SAC-01` takes the place of the size choice
+- **When** she closes the size choice while the item is still going into the bag
+- **Then** the item still goes into the bag (the counter goes up), but no panel opens afterwards, not even when she opens the size choice again (added on 2026-11-20)
 
 **CAT-09 — Sort the grid**
 - **When** the customer taps "Ordenar"
@@ -309,6 +312,7 @@ Routes are in Portuguese because the customer sees them in the browser. The pref
 - **Then** the bag already shows the options with cost and delivery time, and lets her change the CEP
 - **And** she chooses the option on the bag page, with the cheapest one chosen at first; the panel of `SAC-01` shows no option
 - **And** the same rules of `PRO-09`, `PRO-10` and `PRO-11` apply
+- **And** if choosing an option fails, the error shows next to the options; once she changes the CEP, an error about the previous CEP no longer shows (added on 2026-11-20)
 
 **SAC-09 — Amount left for free shipping** (E6)
 - **Given** R$ 250,00 in items, no coupon

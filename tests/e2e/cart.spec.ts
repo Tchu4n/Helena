@@ -544,3 +544,31 @@ test.describe("SAC-01 computer, inside the panel", () => {
     await expect(panel(page)).toBeVisible();
   });
 });
+
+// Second review fixes (2026-11-20).
+test("SAC-05 a stale Remover (item gone elsewhere) shows the bag as it is, no error", async ({ context, page, request }) => {
+  const id = await openBag(context, page, [{ productSizeId: JACKET_M }, { productSizeId: CAP }, { productSizeId: STRIPED_P }]);
+  // The cap's removal notice is on screen when she taps the stale "Remover" of the jacket.
+  await page.getByRole("article", { name: "Boné de algodão" }).getByRole("button", { name: "Remover" }).click();
+  await expect(page.getByRole("button", { name: "Desfazer" })).toBeVisible();
+  const [jacketId] = await itemIds(request, id);
+  await request.delete(`${FAKE_API}/v1/carts/${id}/items/${jacketId}`);
+  await jacketCard(page).getByRole("button", { name: "Remover" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(jacketCard(page)).toHaveCount(0);
+  // GER-07: the focus doesn't vanish with the card; it goes to the notice still on screen.
+  await expect(page.getByRole("button", { name: "Desfazer" })).toBeFocused();
+  await expect(page.getByText("Não foi possível concluir")).toHaveCount(0);
+  // SAC-05: the cap's notice keeps its 10 seconds (fixed after the third review, 2026-11-20).
+  await expect(page.getByText("Boné de algodão removida")).toBeVisible();
+});
+
+test("SAC-08 a delivery error leaves when the CEP changes", async ({ context, page, request }) => {
+  const id = await openBag(context, page, [{ productSizeId: JACKET_M }], { cep: "01310100", chosen: "pac" });
+  await request.post(`${FAKE_API}/__fail?path=/v1/carts/${id}/delivery`);
+  await deliveryOptions(page).getByRole("radio", { name: /Sedex/ }).check();
+  await expect(shippingBox(page).getByRole("alert")).toBeVisible();
+  await changeCep(page, "69900-000");
+  await expect(deliveryOptions(page)).toContainText("Chega em até 12 dias úteis");
+  await expect(shippingBox(page).getByRole("alert")).toHaveCount(0);
+});

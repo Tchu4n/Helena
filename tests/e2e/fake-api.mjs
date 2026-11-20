@@ -336,6 +336,8 @@ async function route(req, url) {
 }
 
 const failing = new Set();
+// Paths ending with one of these answer 2 s late, so a test can act while the store waits (/__slow?suffix=).
+const slowSuffixes = new Set();
 
 function listProducts(query) {
   const search = query.get("search");
@@ -378,8 +380,13 @@ createServer(async (req, res) => {
     failing.add(url.searchParams.get("path"));
     return send(res, 200, { ok: true });
   }
+  if (req.method === "POST" && url.pathname === "/__slow") {
+    slowSuffixes.add(url.searchParams.get("suffix"));
+    return send(res, 200, { ok: true });
+  }
   if (req.method === "POST" && url.pathname === "/__reset") {
     failing.clear();
+    slowSuffixes.clear();
     carts.clear();
     soldOutIds.clear();
     maxById.clear();
@@ -407,6 +414,7 @@ createServer(async (req, res) => {
   // Lets a test check which API paths the store called.
   if (url.pathname === "/__requests") return send(res, 200, requests);
   requests.push(url.pathname);
+  if ([...slowSuffixes].some((suffix) => url.pathname.endsWith(suffix))) await new Promise((r) => setTimeout(r, 2000));
   if (failing.has(url.pathname)) return send(res, 500, INTERNAL_ERROR);
   if (req.method === "GET" && url.pathname === "/v1/home") return send(res, 200, HOME);
   if (req.method === "GET" && url.pathname === "/v1/products") return send(res, ...listProducts(url.searchParams));

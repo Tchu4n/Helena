@@ -94,3 +94,35 @@ test("CAT-08 low stock shows for the chosen size", async ({ page }) => {
   await sizePicker(page).getByText("P", { exact: true }).click();
   await expect(sizePicker(page)).not.toContainText("Últimas peças");
 });
+
+test("CAT-08 closing the picker during the add: no panel later, not even on the next open", async ({ page, request }) => {
+  await request.post(`${FAKE_API}/__slow?suffix=/items`);
+  await page.goto("/catalogo");
+  await quickBuy(page).click();
+  await sizePicker(page).getByText("M", { exact: true }).click();
+  await sizePicker(page).getByRole("button", { name: "Adicionar à sacola" }).click();
+  await page.keyboard.press("Escape");
+  await expect(sizePicker(page)).toHaveCount(0);
+  // The add lands while the picker is closed.
+  await expect(page.getByRole("banner").getByRole("link", { name: /^Sacola/ })).toHaveAccessibleName("Sacola, 1 peça");
+  await expect(bagPanel(page)).toHaveCount(0);
+
+  await quickBuy(page).click();
+  await expect(sizePicker(page)).toBeVisible();
+  await expect(bagPanel(page)).toHaveCount(0);
+});
+
+test("CAT-08 reopening the picker before the closed add lands: still no panel", async ({ page, request }) => {
+  await request.post(`${FAKE_API}/__slow?suffix=/items`);
+  await page.goto("/catalogo");
+  await quickBuy(page).click();
+  await sizePicker(page).getByText("M", { exact: true }).click();
+  await sizePicker(page).getByRole("button", { name: "Adicionar à sacola" }).click();
+  await page.keyboard.press("Escape");
+  await quickBuy(page).click();
+  await expect(sizePicker(page)).toBeVisible();
+  // The closed add lands now, with the new picker open.
+  await expect(page.getByRole("banner").getByRole("link", { name: /^Sacola/ })).toHaveAccessibleName("Sacola, 1 peça");
+  await expect(bagPanel(page)).toHaveCount(0);
+  await expect(sizePicker(page)).toBeVisible();
+});
