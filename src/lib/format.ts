@@ -10,3 +10,10 @@ export function installmentText(plan: { maxInstallments: number; installmentAmou
   if (plan.maxInstallments <= 1) return null;
   return `até ${plan.maxInstallments}x de ${formatPrice(plan.installmentAmount)} sem juros`;
 }
+
+// PRO-10, SAC-08, CHK-09: delivery names the customer sees (owner renamed "Motoboy" on 2026-11-20).
+const DELIVERY_LABELS = { courier: "Entrega Helena", pac: "PAC", sedex: "Sedex" } as const;
+
+export function deliveryLabel(type: keyof typeof DELIVERY_LABELS): string {
+  return DELIVERY_LABELS[type];
+}

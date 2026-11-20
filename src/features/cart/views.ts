@@ -1,15 +1,13 @@
 // Only the fields the screen uses go to components; the full API response never does.
 // Amounts come ready from the API: nothing here recalculates them.
 import type { components } from "../../lib/api-types.ts";
-import { formatPrice, installmentText } from "../../lib/format.ts";
+import { deliveryLabel, formatPrice, installmentText } from "../../lib/format.ts";
 
 type Cart = components["schemas"]["Cart"];
 type CartItem = components["schemas"]["CartItem"];
 type DeliveryOption = components["schemas"]["DeliveryOption"];
 type ShippingQuote = components["schemas"]["ShippingQuote"];
 type DeliveryType = components["schemas"]["DeliveryType"];
-
-const DELIVERY_LABELS: Record<DeliveryType, string> = { courier: "Entrega Helena", pac: "PAC", sedex: "Sedex" };
 
 export type ShippingView = {
   city: string;
@@ -22,7 +20,7 @@ export function toShippingView(quote: ShippingQuote): ShippingView {
     city: quote.city,
     state: quote.state,
     options: quote.options.map((o) => ({
-      label: DELIVERY_LABELS[o.type],
+      label: deliveryLabel(o.type),
       price: o.free ? "Grátis" : formatPrice(o.price),
       free: o.free,
       deliveryTime: o.deliveryTime,
@@ -105,7 +103,7 @@ function toItemView(item: CartItem): CartItemView {
 function toDeliveryOptionView(o: DeliveryOption): DeliveryOptionView {
   return {
     type: o.type,
-    label: DELIVERY_LABELS[o.type],
+    label: deliveryLabel(o.type),
     price: o.free ? "Grátis" : formatPrice(o.price),
     free: o.free,
     deliveryTime: o.deliveryTime,
@@ -127,7 +125,7 @@ export function toCartView(cart: Cart): CartView {
     deliveryOptions: options.map(toDeliveryOptionView),
     chosenDelivery: cart.chosenDelivery ?? null,
     shipping: cart.shippingAmount == null ? null : chosen?.free ? "Grátis" : formatPrice(cart.shippingAmount),
-    shippingLabel: chosen ? DELIVERY_LABELS[chosen.type] : null,
+    shippingLabel: chosen ? deliveryLabel(chosen.type) : null,
     total: formatPrice(cart.total),
     installments: installments ? `ou ${installments}` : "Pagamento à vista no PIX ou no cartão",
     // SAC-07: shown when she taps "Finalizar compra" with these pieces still in the bag.
