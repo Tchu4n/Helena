@@ -17,3 +17,5 @@ export { chooseDelivery } from "./actions/chooseDelivery.ts";
 export { CouponForm } from "./components/CouponForm.tsx";
 export { applyCoupon } from "./actions/applyCoupon.ts";
 export { removeCoupon } from "./actions/removeCoupon.ts";
+export { CheckoutBar } from "./components/CheckoutBar.tsx";
+export { goToCheckout } from "./actions/goToCheckout.ts";

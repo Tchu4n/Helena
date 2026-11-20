@@ -54,7 +54,7 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
             <CartItemCard item={item} updateQuantity={updateQuantity}>
               <form action={removeAction}>
                 <input type="hidden" name="itemId" value={item.id} />
-                <button type="submit" disabled={removing} className={LINK_BUTTON}>
+                <button type="submit" disabled={removing} data-remove className={LINK_BUTTON}>
                   Remover
                 </button>
               </form>

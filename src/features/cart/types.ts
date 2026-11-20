@@ -23,3 +23,6 @@ export type RemoveState = {
 
 // SAC-11 to SAC-15. "invalid": the API refused the code (a field error). "failed": our API failed (GER-06).
 export type CouponState = { status: "idle" | "ok" | "invalid" | "failed"; code: string; message: string | null };
+
+// SAC-07: one message per sold-out piece, or `error` when our API failed (GER-06).
+export type CheckoutState = { messages: { itemId: string; text: string }[]; error: string | null };

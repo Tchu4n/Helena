@@ -322,3 +322,61 @@ test("GER-06 coupon API down keeps the code", async ({ context, page, request })
   await expect(couponBox(page).getByLabel("Código do cupom")).toHaveValue("MARIA10");
   await expect(summary(page)).not.toContainText("Desconto");
 });
+
+const checkoutButton = (page: Page) => page.getByRole("button", { name: "Finalizar compra" });
+const SOLD_OUT_TEXT = "A peça Camiseta listrada (Azul · P) esgotou. Remova da sacola para finalizar a compra.";
+
+test("SAC-07 sold-out piece blocks checkout until removed", async ({ context, page }) => {
+  await openBag(context, page, [
+    { productSizeId: JACKET_M },
+    { productSizeId: STRIPED_P, soldOut: true },
+  ]);
+  const striped = page.getByRole("article", { name: "Camiseta listrada" });
+  await expect(striped).toContainText("Esgotada");
+  await expect(summary(page)).toContainText("R$ 199,00");
+  await expect(checkoutButton(page)).toBeEnabled();
+
+  await checkoutButton(page).click();
+  await expect(page.getByRole("alert").filter({ hasText: SOLD_OUT_TEXT })).toBeVisible();
+  await expect(page).toHaveURL(/\/sacola$/);
+  await expect(striped).toBeInViewport();
+  await expect(striped.getByRole("button", { name: "Remover" })).toBeFocused();
+
+  await striped.getByRole("button", { name: "Remover" }).click();
+  await expect(striped).toHaveCount(0);
+  await checkoutButton(page).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+});
+
+test("SAC-07 sold out after the page opened", async ({ context, page, request }) => {
+  await openBag(context, page, [{ productSizeId: JACKET_M }, { productSizeId: STRIPED_P }]);
+  await request.post(`${FAKE_API}/__sold-out?productSizeId=${STRIPED_P}`);
+  await checkoutButton(page).click();
+  await expect(page.getByRole("alert").filter({ hasText: SOLD_OUT_TEXT })).toBeVisible();
+  await expect(page).toHaveURL(/\/sacola$/);
+  await expect(page.getByRole("article", { name: "Camiseta listrada" })).toContainText("Esgotada");
+});
+
+test("SAC-16 installments follow the total", async ({ context, page }) => {
+  await openBag(context, page, [{ productSizeId: JACKET_M, unitPrice: 15000, quantity: 2 }]);
+  await expect(summary(page)).toContainText("ou até 6x de R$ 50,00 sem juros");
+  await minus(page).click();
+  await expect(summary(page)).toContainText("ou até 3x de R$ 50,00 sem juros");
+});
+
+test("focus never under the purchase bar", async ({ context, page }) => {
+  await openBag(context, page, [
+    { productSizeId: JACKET_M },
+    { productSizeId: CAP },
+    { productSizeId: STRIPED_P },
+  ]);
+  const bar = (await checkoutButton(page).locator("xpath=ancestor::*[@data-purchase-bar]").boundingBox())!;
+  const last = page.getByRole("article").last().getByRole("button", { name: "Remover" });
+  await page.getByRole("article").first().getByRole("button", { name: "Remover" }).focus();
+  for (let i = 0; i < 20 && !(await last.evaluate((el) => el === document.activeElement)); i++) {
+    await page.keyboard.press("Tab");
+  }
+  await expect(last).toBeFocused();
+  const box = (await last.boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(bar.y);
+});

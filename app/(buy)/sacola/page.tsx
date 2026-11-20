@@ -8,9 +8,11 @@ import {
   CartShipping,
   chooseDelivery,
   CartSummary,
+  CheckoutBar,
   CouponForm,
   EmptyCart,
   getCart,
+  goToCheckout,
   removeCoupon,
   removeItem,
   restoreItem,
@@ -41,6 +43,7 @@ async function CartContent() {
       />
       <CouponForm coupon={cart.coupon} applyCoupon={applyCoupon} removeCoupon={removeCoupon} />
       <CartSummary cart={cart} />
+      <CheckoutBar total={cart.total} goToCheckout={goToCheckout} />
     </div>
   );
 }
