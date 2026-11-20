@@ -20,7 +20,7 @@ These rules have no exceptions. If a task can only be done by breaking one, the 
 - NEVER a Portuguese name in the code (variable, function, component, folder, file, test, contract field, database table or column), nor a fancy English word. The name of each business term is in `docs/GLOSSARY.md`.
 - NEVER access SQL Server from the front end; only the API, on the server side.
 - NEVER hand-write the API types or change the contract in a non-additive way.
-- NEVER import from inside another domain; only through its `index.ts`.
+- NEVER import from inside another domain; only through its `index.ts` (or its `client.ts`, from a client component).
 - NEVER put business rules, validation or long styling in `app/`.
 - NEVER pass the whole API response to a client component.
 
@@ -61,7 +61,7 @@ Owner's decision on 2026-11-19, extending the one from 2026-11-15:
 | `contract/openapi.yaml` | OpenAPI 3.0.3 contract of the API for the customer screens (approved on 2026-11-14; names moved to English on 2026-11-15, by the owner's decision, before any consumer existed) |
 | `database/schema.sql` | SQL Server DDL (draft, not run yet; moves to the back-end repository once it exists) |
 | `docs/referencias/` | Owner's research material (requirements, guides, screenshots, flowcharts). Local only, outside Git. Read it, never commit it |
-| `docs/superpowers/plans/` | Implementation plans: base design system and shared layout + catalog (done), product page (done, minor review items pending), bag (waiting for review) |
+| `docs/superpowers/plans/` | Implementation plans: base design system and shared layout + catalog (done), product page (done, minor review items pending), bag (done; quick buy and measurement not committed yet, final review pending) |
 
 Still missing: running and approving the DDL on a SQL Server, sandbox credentials (payment, shipping, invoice). The mock server came up and answered according to the contract on 2026-11-15.
 
@@ -112,6 +112,7 @@ src/
 ```
 
 - Each domain exposes only what is public in `index.ts`. Importing from inside another domain is forbidden.
+- A domain whose `index.ts` exports server code (queries, actions, `server-only` modules) may also have a `client.ts` with only what runs in the browser (client components, types); client components of other domains import from it. Owner's decision of 2026-11-20 (cart domain).
 - Server component by default. `"use client"` only on the leaves that need events, state or a browser API.
 - A client component does not import a server component; it receives it through `children` or props.
 - Files in `queries/` and `lib/` that talk to the API start with `import "server-only"`.

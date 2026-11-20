@@ -15,8 +15,8 @@ type Props = {
   restoreItem: Action<RemoveState>;
 };
 
-const IDLE: RemoveState = { status: "idle", removed: null, message: null, at: 0 };
-const LINK_BUTTON = "min-h-12 px-1 text-sm underline disabled:text-muted";
+const IDLE: RemoveState = { status: "idle", itemId: null, removed: null, message: null, at: 0 };
+const LINK_BUTTON = "min-h-12 px-1 text-sm underline";
 // SAC-05: visible for 7 s, then fades for 3 s, 10 s in all.
 const FADE_AFTER_MS = 7_000;
 const GONE_AFTER_MS = 10_000;
@@ -31,6 +31,16 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
 
   const removed = removeState.status === "removed" ? removeState : null;
   const showNotice = removed !== null && dismissedAt !== removed.at;
+  // A double tap must remove once: the second tap lands before React knows the first is pending.
+  const removingNow = useRef(false);
+  useEffect(() => {
+    if (!removing) removingNow.current = false;
+  }, [removing]);
+  // The removed card unmounts with the focus: it goes to "Desfazer" (GER-07).
+  const undoButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (removed) undoButton.current?.focus();
+  }, [removed]);
 
   useEffect(() => {
     if (!removed) return;
@@ -42,19 +52,30 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
     };
   }, [removed]);
 
-  const error =
-    (removeState.status === "error" ? removeState.message : null) ??
-    (restoreState.status === "error" && restoreState.at > removeState.at ? restoreState.message : null);
+  // A failed removal shows on its card; a failed undo has no card left, so it shows below the list.
+  const removeError = removeState.status === "error" ? removeState : null;
+  const restoreError = restoreState.status === "error" && restoreState.at > removeState.at ? restoreState.message : null;
 
   return (
     <>
       <ul className="flex flex-col gap-3">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <li key={item.id}>
-            <CartItemCard item={item} updateQuantity={updateQuantity}>
-              <form action={removeAction}>
+            <CartItemCard
+              item={item}
+              eager={index === 0}
+              updateQuantity={updateQuantity}
+              removeError={removeError?.itemId === item.id ? removeError.message : null}
+            >
+              <form
+                action={removeAction}
+                onSubmit={(event) => {
+                  if (removingNow.current) event.preventDefault();
+                  removingNow.current = true;
+                }}
+              >
                 <input type="hidden" name="itemId" value={item.id} />
-                <button type="submit" disabled={removing} data-remove className={LINK_BUTTON}>
+                <button type="submit" data-remove className={LINK_BUTTON}>
                   Remover
                 </button>
               </form>
@@ -62,11 +83,8 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
           </li>
         ))}
       </ul>
-      {error && (
-        <p role="alert" className="flex items-center gap-2 text-sm text-error">
-          <AlertIcon className="size-4 shrink-0" />
-          {error}
-        </p>
+      {(restoreError || (removeError && !removeError.itemId)) && (
+        <ErrorLine>{restoreError ?? removeError?.message}</ErrorLine>
       )}
       {showNotice && (
         <div
@@ -79,7 +97,7 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
           <form action={restoreAction} onSubmit={() => setDismissedAt(removed.at)}>
             <input type="hidden" name="productSizeId" value={removed.removed?.productSizeId} />
             <input type="hidden" name="quantity" value={removed.removed?.quantity} />
-            <button type="submit" disabled={restoring} className="min-h-12 px-2 underline">
+            <button ref={undoButton} type="submit" disabled={restoring} className="min-h-12 px-2 underline">
               Desfazer
             </button>
           </form>
@@ -89,12 +107,26 @@ export function CartItemList({ items, updateQuantity, removeItem, restoreItem }:
   );
 }
 
+function ErrorLine({ children }: { children: React.ReactNode }) {
+  return (
+    <p role="alert" className="flex items-center gap-2 text-sm text-error">
+      <AlertIcon className="size-4 shrink-0" />
+      {children}
+    </p>
+  );
+}
+
 function CartItemCard({
   item,
+  eager,
   updateQuantity,
+  removeError,
   children,
 }: {
   item: CartItemView;
+  removeError: string | null;
+  // GER-08: the first photo is the largest content on screen; loading it lazily cost about 1.7 s on slow 4G.
+  eager: boolean;
   updateQuantity: Action<ItemActionState>;
   children: React.ReactNode;
 }) {
@@ -108,7 +140,15 @@ function CartItemCard({
   return (
     <article id={`cart-item-${item.id}`} aria-label={item.name} className="grid grid-cols-[5rem_1fr] gap-3.5 bg-card p-4">
       <div className={`relative aspect-[3/4] bg-surface ${item.soldOut ? "opacity-55" : ""}`}>
-        <Image src={item.photoUrl} alt={item.photoAlt} fill sizes="5rem" className="object-cover" />
+        <Image
+          src={item.photoUrl}
+          alt={item.photoAlt}
+          fill
+          sizes="5rem"
+          loading={eager ? "eager" : "lazy"}
+          fetchPriority={eager ? "high" : "auto"}
+          className="object-cover"
+        />
       </div>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className={item.soldOut ? "text-muted" : ""}>{item.name}</span>
@@ -123,7 +163,12 @@ function CartItemCard({
           <form
             action={formAction}
             onSubmit={(event) => {
-              if (submitting.current) event.preventDefault();
+              // aria-disabled, not disabled: a disabled button would drop the keyboard focus (GER-07).
+              const submitter = (event.nativeEvent as SubmitEvent).submitter;
+              if (submitting.current || submitter?.getAttribute("aria-disabled") === "true") {
+                event.preventDefault();
+                return;
+              }
               submitting.current = true;
             }}
             className="mt-1.5"
@@ -139,8 +184,8 @@ function CartItemCard({
                 name="quantity"
                 value={item.quantity - 1}
                 aria-label="Diminuir"
-                disabled={pending || item.quantity <= 1}
-                className="size-12 rounded-control text-xl disabled:text-line"
+                aria-disabled={pending || item.quantity <= 1}
+                className="size-12 rounded-control text-xl aria-disabled:text-line"
               >
                 −
               </button>
@@ -150,8 +195,8 @@ function CartItemCard({
                 name="quantity"
                 value={item.quantity + 1}
                 aria-label="Aumentar"
-                disabled={pending || !item.canIncrease}
-                className="size-12 rounded-control text-xl disabled:text-line"
+                aria-disabled={pending || !item.canIncrease}
+                className="size-12 rounded-control text-xl aria-disabled:text-line"
               >
                 +
               </button>
@@ -159,12 +204,8 @@ function CartItemCard({
           </form>
         )}
         {item.stockLimit && <p className="text-sm font-medium text-sale">{item.stockLimit}</p>}
-        {state.message && (
-          <p role="alert" className="flex items-center gap-2 text-sm text-error">
-            <AlertIcon className="size-4 shrink-0" />
-            {state.message}
-          </p>
-        )}
+        {state.message && <ErrorLine>{state.message}</ErrorLine>}
+        {removeError && <ErrorLine>{removeError}</ErrorLine>}
         <div>{children}</div>
       </div>
     </article>

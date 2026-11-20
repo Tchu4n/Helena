@@ -1,71 +1,59 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef } from "react";
+import { useActionState } from "react";
 import { Button } from "@/src/components/ui/Button.tsx";
-import { CloseIcon } from "@/src/components/ui/icons.tsx";
+import { AlertIcon } from "@/src/components/ui/icons.tsx";
+import { Sheet } from "@/src/components/ui/Sheet.tsx";
+import { goToCheckout } from "../actions/goToCheckout.ts";
+import type { CheckoutState } from "../types.ts";
 import type { CartPanelView } from "../views.ts";
 
 type Props = { panel: CartPanelView; onClose: () => void };
 
-// SAC-01: a native modal dialog, so Esc, focus trap, focus return and the backdrop come from the browser.
-// It closes only when she asks: "Fechar", a tap outside or Esc; never by itself.
-export function CartPanel({ panel, onClose }: Props) {
-  const dialog = useRef<HTMLDialogElement>(null);
+const IDLE: CheckoutState = { messages: [], error: null };
 
-  useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
+// SAC-01. "Finalizar compra" goes through the same check as the bag (SAC-07): a piece of the bag that sold out
+// keeps her here, with the message, instead of reaching checkout.
+export function CartPanel({ panel, onClose }: Props) {
+  const [checkout, checkoutAction, checkingOut] = useActionState(goToCheckout, IDLE);
+  const alerts = checkout.error ? [checkout.error] : checkout.messages.map((m) => m.text);
 
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="cart-panel-title"
-      onClose={onClose}
-      // A click on the dialog itself (not on its content) is a click on the backdrop.
-      onClick={(event) => {
-        if (event.target === event.currentTarget) event.currentTarget.close();
-      }}
-      className="fixed inset-x-0 top-auto bottom-0 m-0 mt-auto w-full max-w-none rounded-t-2xl bg-background p-0 text-primary transition-transform duration-300 backdrop:bg-primary/45 starting:open:translate-y-full motion-reduce:transition-none md:inset-y-0 md:right-0 md:left-auto md:h-full md:max-h-none md:w-[400px] md:rounded-none md:starting:open:translate-x-full md:starting:open:translate-y-0"
-    >
-      <div className="flex flex-col gap-4 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <h2 id="cart-panel-title" className="font-mono text-xs font-medium uppercase tracking-[0.08em]">
-            Peça adicionada à sacola
-          </h2>
-          <button
-            type="button"
-            aria-label="Fechar"
-            onClick={() => dialog.current?.close()}
-            className="-mr-3 flex size-12 items-center justify-center rounded-control"
-          >
-            <CloseIcon className="size-5" />
-          </button>
+    <Sheet title="Peça adicionada à sacola" onClose={onClose}>
+      <div className="grid grid-cols-[5rem_1fr] gap-3.5 bg-card p-4">
+        <div className="relative aspect-[3/4] bg-surface">
+          <Image src={panel.photoUrl} alt={panel.photoAlt} fill sizes="5rem" className="object-cover" />
         </div>
-        <div className="grid grid-cols-[5rem_1fr] gap-3.5 bg-card p-4">
-          <div className="relative aspect-[3/4] bg-surface">
-            <Image src={panel.photoUrl} alt={panel.photoAlt} fill sizes="5rem" className="object-cover" />
-          </div>
-          <div className="flex flex-col gap-1 text-[0.9375rem]">
-            <span>{panel.name}</span>
-            <span className="text-sm text-muted">{panel.details}</span>
-            <span className="tabular-nums">{panel.price}</span>
-          </div>
-        </div>
-        {panel.freeShipping && <p className="text-sm">{panel.freeShipping}</p>}
-        <p className="flex justify-between gap-3 text-[0.9375rem] font-medium">
-          <span>{panel.subtotalLabel}</span>
-          <span className="tabular-nums">{panel.subtotal}</span>
-        </p>
-        <div className="flex flex-col gap-2">
-          <Button variant="primary" href="/checkout">
-            Finalizar compra
-          </Button>
-          <Button variant="secondary" href="/sacola">
-            Ver sacola
-          </Button>
+        <div className="flex flex-col gap-1 text-[0.9375rem]">
+          <span>{panel.name}</span>
+          <span className="text-sm text-muted">{panel.details}</span>
+          <span className="tabular-nums">{panel.price}</span>
         </div>
       </div>
-    </dialog>
+      {panel.freeShipping && <p className="text-sm">{panel.freeShipping}</p>}
+      <p className="flex justify-between gap-3 text-[0.9375rem] font-medium">
+        <span>{panel.subtotalLabel}</span>
+        <span className="tabular-nums">{panel.subtotal}</span>
+      </p>
+      {alerts.length > 0 && (
+        <div role="alert" className="flex flex-col gap-1">
+          {alerts.map((text, index) => (
+            <p key={index} className="flex items-start gap-2 text-sm text-error">
+              <AlertIcon className="size-4 shrink-0" />
+              {text}
+            </p>
+          ))}
+        </div>
+      )}
+      <form action={checkoutAction} className="flex flex-col gap-2">
+        <Button variant="primary" type="submit" disabled={checkingOut}>
+          Finalizar compra
+        </Button>
+        <Button variant="secondary" href="/sacola">
+          Ver sacola
+        </Button>
+      </form>
+    </Sheet>
   );
 }

@@ -21,7 +21,7 @@ const INITIAL: AddToCartState = {
   message: null,
   focusSizes: false,
   panel: null,
-  addedAt: 0,
+  at: 0,
 };
 
 // PRO-03 to PRO-05, PRO-07, PRO-13, PRO-14. The add action comes from the cart domain through the page.
@@ -139,12 +139,12 @@ export function ProductPurchase({ sizes, soldOut, addToCart }: Props) {
           focusSizes={() => sizeGroup.current?.querySelector("input")?.focus()}
         />
       )}
-      {state.panel && state.addedAt !== closedAt && (
+      {state.panel && state.at !== closedAt && (
         <CartPanel
-          key={state.addedAt}
+          key={state.at}
           panel={state.panel}
           onClose={() => {
-            setClosedAt(state.addedAt);
+            setClosedAt(state.at);
             // SAC-01: back where she was. The browser can't return focus itself: the button was disabled while adding.
             form.current?.querySelector<HTMLButtonElement>("button[type=submit]")?.focus();
           }}

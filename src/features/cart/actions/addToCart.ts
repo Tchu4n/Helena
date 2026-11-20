@@ -26,9 +26,15 @@ export async function addToCart(_prev: AddToCartState, formData: FormData): Prom
   let cartId = await readCartId();
 
   const parsed = input.safeParse({ productSizeId: formData.get("productSizeId") });
-  if (!parsed.success) return { status: "error", message: "Escolha um tamanho", focusSizes: true, panel: null, addedAt: 0 };
+  if (!parsed.success) return { status: "error", message: "Escolha um tamanho", focusSizes: true, panel: null, at: Date.now() };
 
-  const failed: AddToCartState = { status: "error", message: "Não foi possível concluir. Tente de novo", focusSizes: false, panel: null, addedAt: 0 };
+  const failed: AddToCartState = {
+    status: "error",
+    message: "Não foi possível concluir. Tente de novo",
+    focusSizes: false,
+    panel: null,
+    at: Date.now(),
+  };
   cartId ??= await createCart();
   if (!cartId) return failed;
   let result = await addItem(cartId, parsed.data.productSizeId);
@@ -39,7 +45,7 @@ export async function addToCart(_prev: AddToCartState, formData: FormData): Prom
     if (!cartId) return failed;
     result = await addItem(cartId, parsed.data.productSizeId);
   }
-  if (!result.ok) return { status: "error", message: result.problem.title, focusSizes: false, panel: null, addedAt: 0 };
+  if (!result.ok) return { status: "error", message: result.problem.title, focusSizes: false, panel: null, at: Date.now() };
 
   refresh();
   return {
@@ -47,6 +53,6 @@ export async function addToCart(_prev: AddToCartState, formData: FormData): Prom
     message: "Peça adicionada à sacola",
     focusSizes: false,
     panel: toCartPanelView(result.data, parsed.data.productSizeId),
-    addedAt: Date.now(),
+    at: Date.now(),
   };
 }

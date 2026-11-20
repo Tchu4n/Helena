@@ -57,10 +57,10 @@ body:has([data-purchase-steps]) header [data-hide-on-purchase] {
   }
 }
 
-/* GER-07: keep focused elements clear of the fixed tab bar (4rem tall on phones). */
+/* GER-07: keep focused elements clear of the bar fixed at the bottom on phones (tab bar or purchase bar). */
 @media (width < 48rem) {
   html {
-    scroll-padding-bottom: 6rem;
+    scroll-padding-bottom: calc(var(--bottom-bar) + 2rem);
   }
 }
 

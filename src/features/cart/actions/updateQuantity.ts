@@ -19,8 +19,9 @@ export async function updateQuantity(_prev: ItemActionState, formData: FormData)
   const { itemId, quantity } = parsed.data;
   const result = await apiPatch(`/v1/carts/${cartId}/items/${itemId}`, { quantity });
   if (!result.ok) {
-    // The new limit must show, so the page is read again (review focus 1).
-    if (result.problem.status === 409) refresh();
+    // The new limit must show (409, review focus 1), or the item is gone, removed in another tab (404):
+    // the page is read again either way.
+    if (result.problem.status === 409 || result.problem.status === 404) refresh();
     return { itemId, message: result.problem.title };
   }
   refresh();

@@ -314,7 +314,7 @@ Routes are in Portuguese because the customer sees them in the browser. The pref
 - **Given** R$ 250,00 in items, no coupon
 - **Then** the screen shows "Faltam R$ 50,00 para o frete grátis"
 - **Given** R$ 320,00 in items with the coupon MARIA10 applied (R$ 288,00)
-- **Then** the screen shows "Faltam R$ 12,00 para o frete grátis"
+- **Then** the screen shows "Com o cupom, faltam R$ 12,00 para o frete grátis" (the same text as `SAC-14`; aligned on 2026-11-20)
 
 **SAC-10 — Free shipping applied** (E6)
 - **Given** R$ 320,00 in items, no coupon, and any valid CEP in Brazil

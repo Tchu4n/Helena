@@ -1,12 +1,13 @@
 import type { CartPanelView, ShippingView } from "./views.ts";
 
-// SAC-01: `panel` is what the panel shows after a successful add; `addedAt` opens a fresh panel on every add.
+// SAC-01: `panel` is what the panel shows after a successful add. `at` is when this answer came,
+// for every answer (an add or an error), so a screen can tell answers apart (a fresh panel per add).
 export type AddToCartState = {
   status: "idle" | "added" | "error";
   message: string | null;
   focusSizes: boolean;
   panel: CartPanelView | null;
-  addedAt: number;
+  at: number;
 };
 
 export type ShippingState = {
@@ -21,8 +22,10 @@ export type ShippingState = {
 export type ItemActionState = { itemId: string | null; message: string | null };
 
 // SAC-05: `at` tells one removal from the next, so each one gets its own 10-second notice.
+// `itemId` says which card an error belongs to (GER-06: the message shows next to its control).
 export type RemoveState = {
   status: "idle" | "removed" | "error";
+  itemId: string | null;
   removed: { productSizeId: string; quantity: number; name: string } | null;
   message: string | null;
   at: number;

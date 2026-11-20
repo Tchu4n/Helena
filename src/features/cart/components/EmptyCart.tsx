@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Button } from "@/src/components/ui/Button.tsx";
 import { BagIcon } from "@/src/components/ui/icons.tsx";
 
 // SAC-03: no checkout button here.
@@ -8,12 +8,9 @@ export function EmptyCart() {
       <BagIcon className="size-10" />
       <h1 className="font-serif text-2xl font-normal">Sua sacola está vazia</h1>
       <p className="text-muted">As peças que você escolher aparecem aqui.</p>
-      <Link
-        href="/catalogo"
-        className="inline-flex min-h-12 items-center rounded-control bg-primary px-6 font-medium text-background"
-      >
+      <Button variant="primary" href="/catalogo">
         Ver novidades
-      </Link>
+      </Button>
     </div>
   );
 }

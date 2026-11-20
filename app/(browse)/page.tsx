@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { ErrorMessage } from "@/src/components/ui";
+import { addToCart } from "@/src/features/cart";
 import { BenefitsStrip, Campaign, CategoryTiles, getHome, ProductGrid } from "@/src/features/catalog";
 
 // VIT-01 order: campaign, benefits, categories, "Em destaque" (bar and header come from the layout).
@@ -15,7 +16,7 @@ async function HomeContent() {
         <h2 id="featured-title" className="font-serif text-2xl font-normal md:text-[2rem]">
           Em destaque
         </h2>
-        <ProductGrid products={home.data.featured} />
+        <ProductGrid products={home.data.featured} addToCart={addToCart} />
       </section>
     </div>
   );

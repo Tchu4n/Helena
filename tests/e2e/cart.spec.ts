@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { skipCookieBanner } from "./consent";
 
 const FAKE_API = "http://localhost:4011";
@@ -397,7 +397,8 @@ test("SAC-01 panel on add", async ({ page }) => {
   await expect(panel(page)).toContainText("R$ 199,00");
   await expect(panel(page)).toContainText("Faltam R$ 101,00 para o frete grátis");
   await expect(panel(page)).toContainText("Subtotal (1 peça)");
-  await expect(panel(page).getByRole("link", { name: "Finalizar compra" })).toHaveAttribute("href", "/checkout");
+  // Owner's decision of 2026-11-20: a button through the SAC-07 check, no longer a plain link.
+  await expect(panel(page).getByRole("button", { name: "Finalizar compra" })).toBeEnabled();
   await expect(panel(page).getByRole("link", { name: "Ver sacola" })).toHaveAttribute("href", "/sacola");
   await expect(panel(page).getByRole("radio")).toHaveCount(0);
 });
@@ -434,5 +435,112 @@ test.describe("SAC-01 computer", () => {
     expect(Math.round(box.x + box.width)).toBe(1280);
     expect(Math.round(box.y)).toBe(0);
     expect(Math.round(box.height)).toBe(800);
+  });
+});
+
+// Final review fixes (2026-11-19).
+async function itemIds(request: APIRequestContext, cartId: string): Promise<string[]> {
+  const cart = await (await request.get(`${FAKE_API}/v1/carts/${cartId}`)).json();
+  return cart.items.map((i: { id: string }) => i.id);
+}
+
+test("SAC-05 double tap on Remover keeps the undo notice", async ({ context, page }) => {
+  await openBag(context, page, [{ productSizeId: JACKET_M }, { productSizeId: CAP }]);
+  await jacketCard(page).getByRole("button", { name: "Remover" }).dblclick();
+  await expect(page.getByRole("button", { name: "Desfazer" })).toBeVisible();
+  await expect(page.getByText("Não foi possível concluir")).toHaveCount(0);
+});
+
+test("SAC-05 focus goes to Desfazer after removing", async ({ context, page }) => {
+  await openBag(context, page, [{ productSizeId: JACKET_M }, { productSizeId: CAP }]);
+  await jacketCard(page).getByRole("button", { name: "Remover" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Desfazer" })).toBeFocused();
+});
+
+test("SAC-04 focus stays on + after the change", async ({ context, page }) => {
+  await openBag(context, page, [{ productSizeId: JACKET_M }]);
+  await plus(page).focus();
+  await page.keyboard.press("Enter");
+  await expect(quantity(page)).toHaveText("2");
+  await expect(plus(page)).toBeFocused();
+});
+
+test("SAC-08 choosing the delivery by keyboard keeps focus", async ({ context, page }) => {
+  await openBag(context, page, [{ productSizeId: JACKET_M }], { cep: "01310100", chosen: "pac" });
+  await deliveryOptions(page).getByRole("radio", { name: /PAC/ }).focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(summary(page)).toContainText("Frete (Sedex)");
+  await expect(deliveryOptions(page).getByRole("radio", { name: /Sedex/ })).toBeFocused();
+});
+
+test("GER-06 quantity API down shows the error on the item", async ({ context, page, request }) => {
+  const id = await openBag(context, page, [{ productSizeId: JACKET_M }]);
+  const [itemId] = await itemIds(request, id);
+  await request.post(`${FAKE_API}/__fail?path=/v1/carts/${id}/items/${itemId}`);
+  await plus(page).click();
+  await expect(jacketCard(page).getByRole("alert")).toContainText("Não foi possível concluir. Tente de novo");
+  await expect(quantity(page)).toHaveText("1");
+});
+
+test("GER-06 remove API down shows the error on the item", async ({ context, page, request }) => {
+  const id = await openBag(context, page, [{ productSizeId: JACKET_M }, { productSizeId: CAP }]);
+  const [itemId] = await itemIds(request, id);
+  await request.post(`${FAKE_API}/__fail?path=/v1/carts/${id}/items/${itemId}`);
+  await jacketCard(page).getByRole("button", { name: "Remover" }).click();
+  await expect(jacketCard(page).getByRole("alert")).toContainText("Não foi possível concluir. Tente de novo");
+});
+
+test("GER-06 delivery API down keeps the bag", async ({ context, page, request }) => {
+  const id = await openBag(context, page, [{ productSizeId: JACKET_M }], { cep: "01310100", chosen: "pac" });
+  await request.post(`${FAKE_API}/__fail?path=/v1/carts/${id}/delivery`);
+  await deliveryOptions(page).getByRole("radio", { name: /Sedex/ }).check();
+  await expect(shippingBox(page).getByRole("alert")).toContainText("Não foi possível concluir. Tente de novo");
+  await expect(deliveryOptions(page).getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await expect(summary(page)).toContainText("Frete (PAC)");
+});
+
+test("SAC-11 double tap on Aplicar applies once", async ({ context, page }) => {
+  await openBag(context, page, [{ productSizeId: JACKET_M }]);
+  await couponBox(page).getByLabel("Código do cupom").fill("MARIA10");
+  await couponBox(page).getByRole("button", { name: "Aplicar" }).dblclick();
+  await expect(couponBox(page)).toContainText("MARIA10 · 10% de desconto");
+  await expect(couponBox(page).getByRole("alert")).toHaveCount(0);
+});
+
+test("SAC-07 the alert leaves once the sold-out piece is removed", async ({ context, page }) => {
+  await openBag(context, page, [{ productSizeId: JACKET_M }, { productSizeId: STRIPED_P, soldOut: true }]);
+  await checkoutButton(page).click();
+  const alert = page.getByRole("alert").filter({ hasText: SOLD_OUT_TEXT });
+  await expect(alert).toBeVisible();
+  await page.getByRole("article", { name: "Camiseta listrada" }).getByRole("button", { name: "Remover" }).click();
+  await expect(alert).toHaveCount(0);
+});
+
+test("SAC-07 bag emptied elsewhere: Finalizar compra stays on the bag", async ({ context, page, request }) => {
+  const id = await openBag(context, page, [{ productSizeId: JACKET_M }]);
+  const [itemId] = await itemIds(request, id);
+  await request.delete(`${FAKE_API}/v1/carts/${id}/items/${itemId}`);
+  await checkoutButton(page).click();
+  await expect(page.getByText("Sua sacola está vazia")).toBeVisible();
+  await expect(page).toHaveURL(/\/sacola$/);
+});
+
+test("SAC-07 the panel's Finalizar compra also checks sold-out pieces", async ({ context, page }) => {
+  await openBag(context, page, [{ productSizeId: STRIPED_P, soldOut: true }]);
+  await addJacketM(page);
+  await panel(page).getByRole("button", { name: "Finalizar compra" }).click();
+  await expect(panel(page).getByRole("alert")).toContainText(SOLD_OUT_TEXT);
+  await expect(page).toHaveURL(/\/produto\/jaqueta-sarja-verde$/);
+});
+
+test.describe("SAC-01 computer, inside the panel", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+  test("a click on blank space inside the panel keeps it open", async ({ page }) => {
+    await addJacketM(page);
+    await panel(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const box = (await panel(page).boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height - 20);
+    await expect(panel(page)).toBeVisible();
   });
 });

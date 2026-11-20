@@ -14,6 +14,7 @@ export async function restoreItem(_prev: RemoveState, formData: FormData): Promi
   const parsed = input.safeParse({ productSizeId: formData.get("productSizeId"), quantity: formData.get("quantity") });
   const failed = (title: string): RemoveState => ({
     status: "error",
+    itemId: null,
     removed: null,
     message: `Não foi possível desfazer: ${title}`,
     at: Date.now(),
@@ -23,5 +24,5 @@ export async function restoreItem(_prev: RemoveState, formData: FormData): Promi
   const result = await apiPost(`/v1/carts/${cartId}/items`, parsed.data);
   if (!result.ok) return failed(result.problem.title);
   refresh();
-  return { status: "idle", removed: null, message: null, at: Date.now() };
+  return { status: "idle", itemId: null, removed: null, message: null, at: Date.now() };
 }

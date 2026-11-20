@@ -154,3 +154,9 @@ test("SAC-01 panel view", () => {
   assert.equal(toCartPanelView(cartWith(), jacket.productSizeId).subtotalLabel, "Subtotal (1 peça)");
   assert.equal(toCartPanelView(cartWith(), "00000000-0000-4000-8000-000000000000"), null);
 });
+
+test("SAC-02 the item view carries no field the bag screen doesn't use", () => {
+  const item = toCartView(cartWith()).items[0];
+  assert.equal("slug" in item, false);
+  assert.equal("productSizeId" in item, false);
+});

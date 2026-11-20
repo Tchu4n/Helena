@@ -42,3 +42,9 @@ test("toProductView keeps only screen fields", () => {
   assert.equal(view.installmentText, "até 3x de R$\u00a066,33 sem juros");
   assert.deepEqual(view.photos, [{ url: "/placeholders/jacket.svg", alt: "Jaqueta" }]);
 });
+
+test("CAT-08 card carries sizes", async () => {
+  const { toCardProduct } = await import("../src/features/catalog/views.ts");
+  const card = toCardProduct({ ...product, sizes: [{ ...product.sizes[0], extra: "x" }] });
+  assert.deepEqual(card.sizes, [{ id: "5a1e0000-0000-4000-8000-000000000002", label: "M", available: true, lowStock: true }]);
+});

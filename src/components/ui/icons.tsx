@@ -67,6 +67,10 @@ export function UserIcon(props: IconProps) {
   return <Icon {...props}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Icon>;
 }
 
+export function PlusIcon(props: IconProps) {
+  return <Icon {...props}><path d="M12 5v14" /><path d="M5 12h14" /></Icon>;
+}
+
 export function CloseIcon(props: IconProps) {
   return <Icon {...props}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Icon>;
 }

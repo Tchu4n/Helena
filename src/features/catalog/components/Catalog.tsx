@@ -5,6 +5,7 @@ import { listProducts } from "../queries/listProducts.ts";
 import { FilterChips } from "./FilterChips.tsx";
 import { FilterPanel } from "./FilterPanel.tsx";
 import { Pagination } from "./Pagination.tsx";
+import type { AddToCart } from "./ProductCard.tsx";
 import { ProductGrid } from "./ProductGrid.tsx";
 import { SortPanel } from "./SortPanel.tsx";
 
@@ -14,7 +15,15 @@ function title(filters: CatalogFilters): string {
 }
 
 // CAT-01 to CAT-07, CAT-09: filters, chips, count and grid. Errors keep the address (GER-06).
-export async function Catalog({ filters, priceError }: { filters: CatalogFilters; priceError: string | null }) {
+export async function Catalog({
+  filters,
+  priceError,
+  addToCart,
+}: {
+  filters: CatalogFilters;
+  priceError: string | null;
+  addToCart: AddToCart;
+}) {
   const result = await listProducts(filters);
   return (
     <div className="flex flex-col gap-4 px-4 py-6">
@@ -44,7 +53,7 @@ export async function Catalog({ filters, priceError }: { filters: CatalogFilters
           <p className="text-sm text-muted">
             {result.data.total === 1 ? "1 produto" : `${result.data.total} produtos`}
           </p>
-          <ProductGrid products={result.data.items} size={filters.size} eagerCount={2} />
+          <ProductGrid products={result.data.items} size={filters.size} eagerCount={2} addToCart={addToCart} />
           <Pagination filters={filters} total={result.data.total} perPage={result.data.perPage} />
         </section>
       )}

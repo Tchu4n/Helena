@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useOptimistic, useState } from "react";
 import { Button } from "@/src/components/ui/Button.tsx";
 import { Field } from "@/src/components/ui/Field.tsx";
 import { AlertIcon } from "@/src/components/ui/icons.tsx";
@@ -31,7 +31,15 @@ export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShippin
     message: null,
     shipping: null,
   });
-  const [deliveryState, deliveryAction, choosing] = useActionState(chooseDelivery, { message: null });
+  // The tapped option shows checked at once and goes back to the bag's own choice if the API refuses it.
+  // The form is never remounted nor disabled, so keyboard focus stays on the option (GER-07).
+  const [picked, setPicked] = useOptimistic(chosenDelivery);
+  const [deliveryMessage, setDeliveryMessage] = useState<string | null>(null);
+  const deliveryAction = async (formData: FormData) => {
+    setPicked(String(formData.get("type")) as CartView["chosenDelivery"]);
+    const result = await chooseDelivery({ message: null }, formData);
+    setDeliveryMessage(result.message);
+  };
 
   return (
     <section aria-label={TITLE} className="flex flex-col gap-3 bg-card p-4">
@@ -58,9 +66,8 @@ export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShippin
       {cepState.status === "failed" && <Alert>{cepState.message}</Alert>}
 
       {deliveryOptions.length > 0 && (
-        // Remounted when the CEP or the choice changes, so the checked radio follows the bag.
-        <form key={`${cep}-${chosenDelivery}`} action={deliveryAction}>
-          <fieldset disabled={choosing} className="flex flex-col border-t border-line">
+        <form action={deliveryAction}>
+          <fieldset className="flex flex-col border-t border-line">
             <legend className="sr-only">Modalidade de entrega</legend>
             {deliveryOptions.map((option) => (
               <label
@@ -71,7 +78,7 @@ export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShippin
                   type="radio"
                   name="type"
                   value={option.type}
-                  defaultChecked={option.type === chosenDelivery}
+                  checked={option.type === picked}
                   onChange={(event) => event.currentTarget.form?.requestSubmit()}
                   className="size-5 accent-primary"
                 />
@@ -91,7 +98,7 @@ export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShippin
           </noscript>
         </form>
       )}
-      {deliveryState.message && <Alert>{deliveryState.message}</Alert>}
+      {deliveryMessage && <Alert>{deliveryMessage}</Alert>}
       {freeShipping && <p className="text-sm">{freeShipping}</p>}
     </section>
   );

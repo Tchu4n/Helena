@@ -17,6 +17,8 @@ export type CardProduct = {
   discountBadge: string | null;
   soldOut: boolean;
   soldOutInSize: boolean;
+  // CAT-08: quick buy picks the size on the card.
+  sizes: SizeOption[];
 };
 
 export type HomeView = {
@@ -38,6 +40,7 @@ export function toCardProduct(p: ProductSummary): CardProduct {
     discountBadge: p.discountBadge ?? null,
     soldOut: p.soldOut,
     soldOutInSize: p.soldOutInSize ?? false,
+    sizes: p.sizes.map(toSizeOption),
   };
 }
 
@@ -60,6 +63,10 @@ export function toProductListView(page: ProductPage): ProductListView {
 }
 
 export type SizeOption = { id: string; label: string; available: boolean; lowStock: boolean };
+
+function toSizeOption(s: SizeOption): SizeOption {
+  return { id: s.id, label: s.label, available: s.available, lowStock: s.lowStock };
+}
 
 export type ProductView = {
   id: string;
@@ -92,7 +99,7 @@ export function toProductView(p: Product): ProductView {
     color: { name: p.color.name, hex: p.color.hex },
     otherColors: p.otherColors.map((c) => ({ slug: c.slug, name: c.name, hex: c.hex })),
     photos: p.photos.map((ph) => ({ url: ph.url, alt: ph.altText })),
-    sizes: p.sizes.map((s) => ({ id: s.id, label: s.label, available: s.available, lowStock: s.lowStock })),
+    sizes: p.sizes.map(toSizeOption),
     soldOut: p.soldOut,
     fabric: p.fabric,
     collection: p.collection,

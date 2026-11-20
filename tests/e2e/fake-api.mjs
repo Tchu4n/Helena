@@ -6,7 +6,14 @@ import { cartTotals } from "./fake-cart.mjs";
 
 const PORT = 4011;
 
-const size = (label, available) => ({ id: `${label}-id`, label, available, lowStock: false });
+// Catalog sizes get their own UUIDs (from 100 up), so quick buy (CAT-08) can add them to a bag.
+let catalogSize = 100;
+const size = (label, available, lowStock = false) => ({
+  id: `5a1e0000-0000-4000-8000-${String(catalogSize++).padStart(12, "0")}`,
+  label,
+  available,
+  lowStock,
+});
 const photo = (file, altText) => ({ url: `/placeholders/${file}.svg`, altText });
 
 const PRODUCTS = [
@@ -21,7 +28,7 @@ const PRODUCTS = [
     discountBadge: "-20%",
     soldOut: false,
     soldOutInSize: false,
-    sizes: [size("P", true), size("M", true), size("G", false)],
+    sizes: [size("P", true), size("M", true, true), size("G", false)],
   },
   {
     id: "9b2f6a10-0000-4000-8000-000000000002",
@@ -136,7 +143,7 @@ const PRODUCT_DETAILS = Object.fromEntries(
     }),
   ].map((p) => [p.slug, p]),
 );
-const ALL_SIZES = Object.values(PRODUCT_DETAILS).flatMap((p) => p.sizes.map((s) => ({ ...s, product: p })));
+const ALL_SIZES = [...Object.values(PRODUCT_DETAILS), ...PRODUCTS].flatMap((p) => p.sizes.map((s) => ({ ...s, product: p })));
 
 const option = (type, price, deliveryTime) => ({ type, price, free: false, deliveryTime });
 const QUOTES = {
@@ -207,7 +214,7 @@ function newItem(size, quantity, extra = {}) {
     productSizeId: size?.id ?? extra.productSizeId,
     slug: product?.slug ?? "produto-de-teste",
     name: product?.name ?? "Produto de teste",
-    color: product?.color.name ?? "Azul",
+    color: product?.color?.name ?? "Azul",
     size: size?.label ?? "M",
     photo: product?.photo ?? photo("tshirt", "Produto de teste"),
     unitPrice: product?.price ?? 10000,

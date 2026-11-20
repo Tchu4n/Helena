@@ -32,8 +32,6 @@ export function toShippingView(quote: ShippingQuote): ShippingView {
 
 export type CartItemView = {
   id: string;
-  productSizeId: string;
-  slug: string;
   name: string;
   details: string;
   photoUrl: string;
@@ -92,8 +90,6 @@ function toItemView(item: CartItem): CartItemView {
   const atLimit = !item.soldOut && item.quantity >= item.maxQuantity;
   return {
     id: item.id,
-    productSizeId: item.productSizeId,
-    slug: item.slug,
     name: item.name,
     details: `${item.color} · ${item.size}`,
     photoUrl: item.photo.url,

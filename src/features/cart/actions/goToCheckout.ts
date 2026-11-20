@@ -20,5 +20,7 @@ export async function goToCheckout(): Promise<CheckoutState> {
     refresh(); // the page may not know yet that the piece sold out
     return { messages: soldOutMessages, error: null };
   }
+  // The API's own answer (for example, a bag emptied in another tab): back to the bag, which shows why.
+  if (!result.data.canCheckout) redirect("/sacola");
   redirect("/checkout");
 }

@@ -43,7 +43,11 @@ async function CartContent() {
       />
       <CouponForm coupon={cart.coupon} applyCoupon={applyCoupon} removeCoupon={removeCoupon} />
       <CartSummary cart={cart} />
-      <CheckoutBar total={cart.total} goToCheckout={goToCheckout} />
+      <CheckoutBar
+        total={cart.total}
+        soldOutItemIds={cart.items.filter((i) => i.soldOut).map((i) => i.id)}
+        goToCheckout={goToCheckout}
+      />
     </div>
   );
 }

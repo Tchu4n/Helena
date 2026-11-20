@@ -36,3 +36,23 @@ for (const path of ["/", "/catalogo", "/produto/jaqueta-sarja-verde"]) {
     expect(lcp).toBeLessThan(3000);
   });
 }
+
+// /sacola needs a bag with pieces, or it measures the empty bag.
+test("GER-08 main content of /sacola under 3 s on slow 4G", async ({ context, page }) => {
+  test.setTimeout(60_000);
+  const response = await context.request.post("http://localhost:4011/__carts", {
+    data: {
+      lines: [
+        { productSizeId: "5a1e0000-0000-4000-8000-000000000002" },
+        { productSizeId: "5a1e0000-0000-4000-8000-000000000004" },
+      ],
+      cep: "01310100",
+      chosen: "pac",
+    },
+  });
+  const { id } = await response.json();
+  await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
+  const lcp = await largestContentfulPaint(page, "/sacola");
+  console.log(`LCP /sacola: ${Math.round(lcp)} ms`);
+  expect(lcp).toBeLessThan(3000);
+});
