@@ -281,7 +281,8 @@ export interface paths {
          * @description Requires customer details and a delivery option already saved in the
          *     cart. Returns `access`, which the front end keeps in an `httpOnly`
          *     cookie and sends in `X-Order-Access` on the following calls for this
-         *     order.
+         *     order. Calling it again for the same cart replaces that cart's order
+         *     still awaiting payment and releases its reservation.
          */
         post: operations["createOrder"];
         delete?: never;

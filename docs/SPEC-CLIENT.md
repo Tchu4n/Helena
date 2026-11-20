@@ -374,7 +374,7 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 **CHK-02 — Required fields** (E1)
 - **Then** the form asks only for: name, CPF, email, phone and delivery address
 - **And** each field has a visible label above and the matching `autocomplete` attribute
-- **And** the CEP entered before comes already filled in
+- **And** the CEP field starts empty; delivery options show once she types a valid CEP (owner's decision of 2026-11-20)
 
 **CHK-03 — Field validation** (E1)
 
@@ -385,6 +385,9 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 | Email | `maria.exemplo.com` | error "Digite um e-mail válido" |
 | Phone | `(11) 9abc-0000` | error "Digite só números" |
 | CEP | `0131010` | error "Digite um CEP com 8 números" |
+| CPF | `111.444.777-00` (wrong check digits) | error "CPF inválido" |
+| Phone | `(11) 9876-543` (fewer than 10 numbers) | error "Digite o celular com DDD" |
+| State | `S` | error "Digite a sigla do estado, como SP" |
 | Name, address | empty | error "Campo obrigatório" |
 
 - **And** dots, dashes and parentheses typed by the customer are accepted and dropped before validating
@@ -450,7 +453,7 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 **CHK-16 — PIX confirmed instantly** (E5)
 - **Given** the PIX screen open
 - **When** the payment is confirmed
-- **Then** the customer is taken to the order confirmation (`PED-01`) without reloading the page
+- **Then** the customer is taken, without reloading the page, to the home page, which shows "Pagamento concluído com sucesso" with the order number until she closes it (owner's decision of 2026-11-20)
 
 **CHK-17 — Reservation expired** (E4)
 - **Given** the 15 minutes ran out with no payment
@@ -469,7 +472,7 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 
 **CHK-20 — Card approved** (E5)
 - **When** the payment is approved
-- **Then** the customer is taken to the order confirmation (`PED-01`)
+- **Then** the customer is taken to the home page, which shows "Pagamento concluído com sucesso" with the order number until she closes it (owner's decision of 2026-11-20)
 
 **CHK-21 — Card declined** (E5)
 - **When** the payment is declined

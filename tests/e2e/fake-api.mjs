@@ -3,6 +3,7 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { cartTotals } from "./fake-cart.mjs";
+import { RESERVATION_MS, canReserve, isReserved, orderStatus } from "./fake-order.mjs";
 
 const PORT = 4011;
 
@@ -196,10 +197,38 @@ const INVALID_QUANTITY = {
   code: "invalid_data",
 };
 const COUPONS = { MARIA10: 10, OUTRO15: 15 };
+const INVALID_DATA = { type: "https://helena.example/problems/invalid-data", title: "Dados inválidos", status: 422, code: "invalid_data" };
+const INCOMPLETE_CART = {
+  type: "https://helena.example/problems/incomplete-cart",
+  title: "Preencha seus dados e escolha a entrega para continuar",
+  status: 422,
+  code: "incomplete_cart",
+};
+const NOT_AUTHENTICATED = {
+  type: "https://helena.example/problems/not-authenticated",
+  title: "Identifique-se para continuar",
+  status: 401,
+  code: "not_authenticated",
+};
+const ALREADY_PAID = {
+  type: "https://helena.example/problems/order-already-paid",
+  title: "Este pedido já foi pago",
+  status: 409,
+  code: "order_already_paid",
+};
+const soldOutProblem = (name) => ({ ...OUT_OF_STOCK, title: `A peça ${name} esgotou` });
+const DECLINED_MESSAGE = "O banco do cartão não aprovou esta compra. Tente outro cartão ou pague com PIX.";
+// Any small valid PNG stands in for the QR code the real API sends as a data URI (CHK-15).
+const QR_CODE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 const NOT_FOUND = { type: "about:blank", title: "Não encontrado", status: 404, code: "not_found" };
 
 const carts = new Map();
 const requests = [];
+// Orders by number, and the first answer given to each Idempotency-Key (CHK-22).
+const orders = new Map();
+const answered = new Map();
+let nextOrder = 100001;
 
 // Test hooks: sizes marked sold out and quantity limits apply to every cart.
 const soldOutIds = new Set();
@@ -241,9 +270,158 @@ function cartBody(cart) {
     coupon: cart.coupon ? { code: cart.coupon, percent: couponPercent } : null,
     cep: cart.cep,
     chosenDelivery: cart.chosen,
-    reservationExpiresAt: null,
+    reservationExpiresAt: reservedOrderEnd(cart.id),
     ...totals,
   };
+}
+
+function reservedOrderEnd(cartId) {
+  const now = Date.now();
+  const order = [...orders.values()].find((o) => o.cartId === cartId && isReserved(o, now));
+  return order ? new Date(order.reservationEndsAt).toISOString() : null;
+}
+
+// Order lines with the stock as it is now (test hooks may have changed it since the order was made).
+const liveLines = (order) =>
+  order.lines.map((l) => ({
+    ...l,
+    soldOut: l.soldOut || soldOutIds.has(l.productSizeId),
+    maxQuantity: maxById.get(l.productSizeId) ?? l.maxQuantity,
+  }));
+const othersThan = (order) => [...orders.values()].filter((o) => o !== order);
+
+function maskEmail(email) {
+  const [local, domain] = email.split("@");
+  return `${local[0]}***${local.length > 1 ? local.at(-1) : ""}@${domain}`;
+}
+
+function orderBody(order) {
+  const now = Date.now();
+  const status = orderStatus(order, now);
+  const paid = status === "payment_confirmed";
+  return {
+    number: order.number,
+    createdAt: order.createdAt,
+    status,
+    steps: ["payment_confirmed", "preparing", "shipped", "delivered"].map((step) => ({
+      step,
+      completedAt: paid && step === "payment_confirmed" ? order.paidAt : null,
+    })),
+    items: order.items,
+    ...order.totals,
+    reservationExpiresAt: isReserved(order, now) ? new Date(order.reservationEndsAt).toISOString() : null,
+    payment: order.payment,
+    delivery: order.delivery,
+    maskedEmail: maskEmail(order.email),
+    return: null,
+    returnAvailability: { allowed: false, deadline: null, reason: "order_not_delivered" },
+  };
+}
+
+const filled = (v) => typeof v === "string" && v.length > 0;
+function validCustomer(body) {
+  const a = body?.address;
+  const c = body?.consents;
+  return (
+    [body?.name, body?.cpf, body?.email, body?.phone].every(filled) &&
+    [a?.cep, a?.street, a?.number, a?.neighborhood, a?.city, a?.state].every(filled) &&
+    typeof c?.email === "boolean" &&
+    typeof c?.whatsapp === "boolean" &&
+    filled(c?.textVersion)
+  );
+}
+
+// Same Idempotency-Key on the same path: the first answer again, with nothing done twice.
+async function once(req, path, run) {
+  const key = req.headers["idempotency-key"];
+  const id = `${path} ${key}`;
+  if (key && answered.has(id)) return answered.get(id);
+  const answer = await run();
+  if (key) answered.set(id, answer);
+  return answer;
+}
+
+function createOrder(cartId) {
+  const cart = carts.get(cartId);
+  if (!cart) return [404, NOT_FOUND];
+  if (!cart.customer || !cart.chosen || cart.items.length === 0) return [422, INCOMPLETE_CART];
+  // Going to payment again replaces the cart's order still awaiting payment and frees its pieces.
+  for (const [number, o] of orders) if (o.cartId === cartId && o.status === "awaiting_payment") orders.delete(number);
+  const body = cartBody(cart);
+  const lines = body.items.map((i) => ({
+    productSizeId: i.productSizeId,
+    quantity: i.quantity,
+    maxQuantity: i.maxQuantity,
+    soldOut: i.soldOut,
+    name: i.name,
+  }));
+  const now = Date.now();
+  const check = canReserve(lines, [...orders.values()], now);
+  if (!check.ok) return [409, soldOutProblem(check.name)];
+  const chosen = body.deliveryOptions.find((o) => o.type === cart.chosen);
+  const order = {
+    number: `HL-${nextOrder++}`,
+    access: randomUUID(),
+    cartId,
+    createdAt: new Date(now).toISOString(),
+    status: "awaiting_payment",
+    reservationEndsAt: now + RESERVATION_MS,
+    paidAt: null,
+    lines,
+    items: body.items.map(({ name, color, size, photo, unitPrice, quantity }) => ({ name, color, size, photo, unitPrice, quantity })),
+    totals: {
+      subtotal: body.subtotal,
+      coupon: cart.coupon,
+      discount: body.discount,
+      shippingAmount: body.shippingAmount ?? 0,
+      total: body.total,
+      installmentPlan: body.installmentPlan,
+    },
+    delivery: {
+      type: cart.chosen,
+      deliveryTime: chosen?.deliveryTime ?? "",
+      city: cart.customer.address.city,
+      state: cart.customer.address.state,
+      trackingCode: null,
+      trackingLink: null,
+      deliveredAt: null,
+    },
+    email: cart.customer.email,
+    payment: null,
+  };
+  orders.set(order.number, order);
+  return [201, { access: order.access, order: orderBody(order) }];
+}
+
+function pay(order, { method, cardToken, installments }) {
+  const now = Date.now();
+  if (orderStatus(order, now) === "payment_confirmed") return [409, ALREADY_PAID];
+  if (method !== "pix" && method !== "card") return [422, INVALID_DATA];
+  const max = order.totals.installmentPlan.maxInstallments;
+  if (method === "card" && (!filled(cardToken) || !Number.isInteger(installments) || installments < 1 || installments > max)) {
+    return [422, INVALID_DATA];
+  }
+  // A new attempt after a decline or an expired reservation reserves again, if there is stock (CHK-17, CHK-21).
+  if (!isReserved(order, now)) {
+    const check = canReserve(liveLines(order), othersThan(order), now);
+    if (!check.ok) return [409, soldOutProblem(check.name)];
+    order.status = "awaiting_payment";
+    order.reservationEndsAt = now + RESERVATION_MS;
+  }
+  const base = { id: randomUUID(), method, installments: method === "card" ? installments : null, message: null, pix: null };
+  if (method === "pix") {
+    const expiresAt = new Date(order.reservationEndsAt).toISOString();
+    const pixCode = `00020126580014br.gov.bcb.pix0136${order.number}52040000530398654${order.totals.total}5802BR6304ABCD`;
+    order.payment = { ...base, status: "pending", pix: { pixCode, qrCode: QR_CODE, expiresAt } };
+  } else if (cardToken.endsWith("0002")) {
+    order.payment = { ...base, status: "declined", message: DECLINED_MESSAGE };
+    order.reservationEndsAt = null; // a decline releases the reservation right away
+  } else {
+    order.payment = { ...base, status: "approved" };
+    order.status = "payment_confirmed";
+    order.paidAt = new Date(now).toISOString();
+  }
+  return [201, order.payment];
 }
 
 async function readJson(req) {
@@ -276,9 +454,24 @@ async function route(req, url) {
     let raw = "";
     for await (const chunk of req) raw += chunk;
     if (raw) return [415, { type: "about:blank", title: "Invalid content type", status: 415, code: "invalid_data" }];
-    const cart = { id: randomUUID(), items: [], cep: null, chosen: null, coupon: null };
+    const cart = { id: randomUUID(), items: [], cep: null, chosen: null, coupon: null, customer: null };
     carts.set(cart.id, cart);
     return [201, cartBody(cart)];
+  }
+  if (req.method === "POST" && url.pathname === "/v1/orders") {
+    const { cartId } = await readJson(req);
+    return once(req, url.pathname, () => createOrder(cartId));
+  }
+  if (parts[1] === "orders" && parts.length >= 3) {
+    const order = orders.get(decodeURIComponent(parts[2]));
+    if (!order) return [404, NOT_FOUND];
+    if (req.headers["x-order-access"] !== order.access) return [401, NOT_AUTHENTICATED];
+    if (req.method === "GET" && parts.length === 3) return [200, orderBody(order)];
+    if (req.method === "POST" && parts[3] === "payments") {
+      const body = await readJson(req);
+      return once(req, url.pathname, () => pay(order, body));
+    }
+    return null;
   }
   if (parts[1] === "carts" && parts.length >= 3) {
     const cart = carts.get(parts[2]);
@@ -287,6 +480,12 @@ async function route(req, url) {
     if (req.method === "PUT" && parts[3] === "cep") {
       cart.cep = (await readJson(req)).cep;
       if (!quoteFor(cart)?.options.some((o) => o.type === cart.chosen)) cart.chosen = null;
+      return [200, cartBody(cart)];
+    }
+    if (req.method === "PUT" && parts[3] === "customer") {
+      const body = await readJson(req);
+      if (!validCustomer(body)) return [422, INVALID_DATA];
+      cart.customer = body;
       return [200, cartBody(cart)];
     }
     if (req.method === "PUT" && parts[3] === "delivery") {
@@ -390,12 +589,14 @@ createServer(async (req, res) => {
     carts.clear();
     soldOutIds.clear();
     maxById.clear();
+    orders.clear();
+    answered.clear();
     requests.length = 0;
     return send(res, 200, { ok: true });
   }
   if (req.method === "POST" && url.pathname === "/__carts") {
-    const { lines = [], cep = null, chosen = null } = await readJson(req);
-    const cart = { id: randomUUID(), cep, chosen, coupon: null, items: [] };
+    const { lines = [], cep = null, chosen = null, coupon = null } = await readJson(req);
+    const cart = { id: randomUUID(), cep, chosen, coupon, customer: null, items: [] };
     for (const { productSizeId, ...extra } of lines) {
       const size = ALL_SIZES.find((s) => s.id === productSizeId);
       cart.items.push(newItem(size, extra.quantity ?? 1, { productSizeId, ...extra }));
@@ -411,6 +612,22 @@ createServer(async (req, res) => {
     maxById.set(url.searchParams.get("productSizeId"), Number(url.searchParams.get("max")));
     return send(res, 200, { ok: true });
   }
+  // Checkout hooks: mark a PIX paid (CHK-16), end a reservation now (CHK-17), read the saved lead (CHK-05, CHK-07).
+  if (req.method === "POST" && url.pathname === "/__pay") {
+    const order = orders.get(url.searchParams.get("number"));
+    if (order?.payment?.method === "pix" && order.payment.status === "pending") {
+      order.payment = { ...order.payment, status: "approved", pix: null };
+      order.status = "payment_confirmed";
+      order.paidAt = new Date().toISOString();
+    }
+    return send(res, 200, { ok: Boolean(order) });
+  }
+  if (req.method === "POST" && url.pathname === "/__expire") {
+    const order = orders.get(url.searchParams.get("number"));
+    if (order) order.reservationEndsAt = Date.now();
+    return send(res, 200, { ok: Boolean(order) });
+  }
+  if (url.pathname === "/__customer") return send(res, 200, carts.get(url.searchParams.get("cartId"))?.customer ?? null);
   // Lets a test check which API paths the store called.
   if (url.pathname === "/__requests") return send(res, 200, requests);
   requests.push(url.pathname);
