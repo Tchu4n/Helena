@@ -89,7 +89,7 @@ test("SAC-10 free option and shipping line", () => {
   assert.deepEqual(
     view.deliveryOptions.map((o) => [o.type, o.label, o.price]),
     [
-      ["courier", "Motoboy", "R$ 25,00"],
+      ["courier", "Entrega Helena", "R$ 25,00"],
       ["pac", "PAC", "Grátis"],
     ],
   );

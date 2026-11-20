@@ -234,7 +234,7 @@ Routes are in Portuguese because the customer sees them in the browser. The pref
 
 **PRO-10 — Courier only in the metro area** (E7)
 - **Given** a CEP outside the metro area
-- **Then** the Motoboy option doesn't show; only PAC and Sedex
+- **Then** the "Entrega Helena" option (the store's own same-day courier) doesn't show; only PAC and Sedex
 
 **PRO-11 — Shipping API down** (E7)
 - **Given** the shipping API did not answer
@@ -632,6 +632,7 @@ The requirements didn't settle these points. The owner decided on 2026-11-14; th
 | 17 | Panel on add (decided on 2026-11-18) | Comes with the bag; until then the `PRO-07` message applies |
 | 18 | Status of a missing product page (decided on 2026-11-19, following the Next.js docs) | The page streams, so it answers `200` with the not-found screen and a `noindex` tag (a "soft 404"). A real `404` would mean looking up the product before the page starts, which slows down every product page |
 | 19 | Bag controls (decided on 2026-11-19) | Quantity with "−" and "+" buttons; delivery option chosen only on the bag page; panel closes only by her tap; coupon field always open; "Desfazer" for 10 seconds, fading out; `SAC-17` built with checkout. Same day: "Finalizar compra" is never disabled by a sold-out item; tapping it shows an error naming the piece (`SAC-07`), so she knows why she can't move on; the stock limit reads "Apenas N unidades restantes" (`SAC-04`); on a computer the panel of `SAC-01` opens from the right side, like Hering's; once free shipping is reached there is no line about it, the cheapest option just shows "Grátis" (`SAC-10`) |
+| 20 | Name of the same-day courier option (decided on 2026-11-20) | The customer sees "Entrega Helena", never "Motoboy", on every screen (product, bag, checkout, order). In the code it stays `courier` |
 
 **Settled in the contract (`contract/openapi.yaml`):** the delivery time of each option, including the courier cutoff time, comes as ready-made text from the API; the catalog is paginated (24 per page, 48 max). Sorting is in the launch by the owner's decision (`CAT-09`).
 

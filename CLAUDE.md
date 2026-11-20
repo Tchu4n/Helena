@@ -2,7 +2,7 @@
 
 # Helena — project guidelines
 
-Online fashion store (t-shirts, pants, jackets, accessories) for ages 18 to 30, who buy on the phone from Instagram. MVP on a tight budget. This repository is the Next.js front end; the back end will be Java + SQL Server, in its own repository, and does not exist yet. Work order: customer screens first, admin panel later.
+Online fashion store (t-shirts, pants, jackets, accessories) for ages 18 to 30, who buy on the phone from Instagram. MVP on a tight budget. This repository is the Next.js front end; the back end will be Java with Spring Boot + SQL Server, in its own repository, and does not exist yet. Work order: customer screens first, admin panel later.
 
 ## Constraints (above everything)
 
@@ -122,7 +122,7 @@ src/
 
 ## Front and back
 
-- The front end never accesses SQL Server. The `queries/` layer calls the Java API, on the server side.
+- The front end never accesses SQL Server. The `queries/` layer calls the Java (Spring Boot) API, on the server side.
 - Contract first: the OpenAPI 3.x is written and approved before the screens. While the back end doesn't exist, the front end runs against a mock server (Prism).
 - Every API error comes in RFC 9457 format (`application/problem+json`); the screen handles that format in one place.
 - Contract changes are additive. Client TypeScript types are generated from the contract (`npm run types`), not hand-written.

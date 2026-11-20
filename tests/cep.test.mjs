@@ -23,7 +23,7 @@ test("toShippingView labels options and shows free shipping", () => {
     ],
   });
   assert.deepEqual(view.options[0], { label: "PAC", price: "Grátis", free: true, deliveryTime: "Chega em até 5 dias úteis" });
-  assert.equal(view.options[1].label, "Motoboy");
+  assert.equal(view.options[1].label, "Entrega Helena");
   assert.equal(view.options[1].price, "R$ 15,00");
   assert.equal(view.city, "São Paulo");
 });

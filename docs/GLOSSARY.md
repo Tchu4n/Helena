@@ -78,7 +78,7 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | cupom, desconto | `coupon`, `discount` |
 | frete, cotação de frete, valor do frete | `shipping`, `shippingQuote`, `shippingAmount` |
 | entrega, modalidade de entrega | `delivery`, `deliveryOption` |
-| modalidades: motoboy, PAC, Sedex | `courier`, `pac`, `sedex` |
+| modalidades: Entrega Helena (motoboy da loja, mesmo dia), PAC, Sedex | `courier`, `pac`, `sedex` |
 | prazo de entrega | `deliveryTime` |
 | frete grátis, quanto falta para o frete grátis | `freeShipping`, `amountToFreeShipping` |
 | taxa fixa de contingência | `fallback` |

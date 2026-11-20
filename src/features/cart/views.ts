@@ -9,7 +9,7 @@ type DeliveryOption = components["schemas"]["DeliveryOption"];
 type ShippingQuote = components["schemas"]["ShippingQuote"];
 type DeliveryType = components["schemas"]["DeliveryType"];
 
-const DELIVERY_LABELS: Record<DeliveryType, string> = { courier: "Motoboy", pac: "PAC", sedex: "Sedex" };
+const DELIVERY_LABELS: Record<DeliveryType, string> = { courier: "Entrega Helena", pac: "PAC", sedex: "Sedex" };
 
 export type ShippingView = {
   city: string;

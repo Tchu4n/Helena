@@ -312,7 +312,7 @@ test("PRO-08 shipping", async ({ page }) => {
   await page.goto(JACKET);
   await quote(page, "01310-100");
   const options = shipping(page).getByRole("list", { name: "Modalidades de entrega" });
-  await expect(options).toContainText("Motoboy");
+  await expect(options).toContainText("Entrega Helena");
   await expect(options).toContainText("PAC");
   await expect(options).toContainText("Sedex");
   await expect(options).toContainText("R$ 20,00");
@@ -342,7 +342,7 @@ test("PRO-10 courier only in metro area", async ({ page }) => {
   const options = shipping(page).getByRole("list", { name: "Modalidades de entrega" });
   await expect(options).toContainText("PAC");
   await expect(options).toContainText("Sedex");
-  await expect(options).not.toContainText("Motoboy");
+  await expect(options).not.toContainText("Entrega Helena");
 });
 
 test("PRO-11 fixed rate", async ({ page }) => {
