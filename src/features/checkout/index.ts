@@ -5,3 +5,8 @@ export { summaryFromCart } from "./views.ts";
 export type { SummaryView } from "./views.ts";
 export { saveCheckoutCep } from "./actions/saveCheckoutCep.ts";
 export { goToPayment } from "./actions/goToPayment.ts";
+export { getPaymentOrder } from "./queries/getPaymentOrder.ts";
+export { payWithPix } from "./actions/payWithPix.ts";
+export { checkPayment } from "./actions/checkPayment.ts";
+export { PaymentPanel } from "./components/PaymentPanel.tsx";
+export { PaymentSuccess } from "./components/PaymentSuccess.tsx";

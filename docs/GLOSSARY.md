@@ -101,7 +101,11 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | salvar lead | `saveLead` |
 | cronômetro da reserva | `ReservationTimer` |
 | campos do cartão (gateway simulado), token do cartão | `SimulatedCardFields`, `cardToken` |
-| mensagem de pagamento concluído | `PaymentSuccess` |
+| mensagem de pagamento concluído | `PaymentSuccess` (checks the order), `SuccessNotice` (the box) |
+| gerar código PIX | `payWithPix` |
+| conferir pagamento (PIX) | `checkPayment` |
+| encerrar a compra (apagar sacola e cookie do pedido) | `finishPurchase`, `forgetCart` |
+| pedido em pagamento (leitura) | `getPaymentOrder` |
 | cookie do pedido | `helena_order` |
 
 ## Order and payment

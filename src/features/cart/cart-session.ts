@@ -31,3 +31,8 @@ export async function createCart(): Promise<string | null> {
 export async function ensureCart(): Promise<string | null> {
   return (await readCartId()) ?? (await createCart());
 }
+
+// After a paid order the bag starts empty. Only callable from a Server Action.
+export async function forgetCart(): Promise<void> {
+  (await cookies()).delete(CART_COOKIE);
+}
