@@ -218,3 +218,115 @@ test("an empty bag goes back to /sacola", async ({ context, page }) => {
   await openCheckout(context, page, []);
   await expect(page).toHaveURL(/\/sacola$/);
 });
+
+// ---- Task 4: delivery, CHK-10 note, "Ir para pagamento" ----
+
+const ordersPosted = async (request: import("@playwright/test").APIRequestContext) =>
+  ((await (await request.get(`${FAKE_API}/__requests`)).json()) as string[]).filter((p) => p === "/v1/orders").length;
+
+const PROTOTYPE_BAG: Line[] = [{ productSizeId: JACKET_M }, { productSizeId: "5a1e0000-0000-4000-8000-000000000004", unitPrice: 11900 }];
+const delivery = (page: Page) => page.getByRole("group", { name: "Entrega", exact: true });
+const bar = (page: Page) => page.locator("[data-purchase-bar]");
+
+test("before any CEP: the hint, and the summary keeps the bag's shipping and total", async ({ context, page }) => {
+  await openCheckout(context, page, undefined, { cep: "01310100", chosen: "pac" });
+  await expect(delivery(page).getByText("Digite o CEP para ver as opções de entrega.")).toBeVisible();
+  await expect(delivery(page).getByRole("radio")).toHaveCount(0);
+  await page.getByText(/^Resumo/).click();
+  await expect(page.getByText("Frete (PAC)")).toBeVisible();
+  await expect(bar(page)).toContainText("R$ 219,00");
+});
+
+test("CHK-09 a CEP shows the options with price and time, the cheapest chosen; Sedex changes the total", async ({ context, page }) => {
+  await openCheckout(context, page);
+  await page.getByLabel("CEP", { exact: true }).fill("01310-100");
+  const options = delivery(page).getByRole("radio");
+  await expect(options).toHaveCount(3);
+  await expect(delivery(page).getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await expect(delivery(page)).toContainText("Chega em até 5 dias úteis");
+  await expect(delivery(page)).toContainText("R$ 20,00");
+  await expect(bar(page)).toContainText("R$ 219,00");
+  await delivery(page).getByRole("radio", { name: /Sedex/ }).check();
+  await expect(bar(page)).toContainText("R$ 234,00");
+  await page.getByText(/^Resumo/).click();
+  await expect(page.getByText("Frete (Sedex)")).toBeVisible();
+});
+
+test("CHK-09 with PRO-11: the fixed-fee answer still lets her go to payment", async ({ context, page }) => {
+  await openCheckout(context, page);
+  await fillValid(page, ["CEP"]);
+  await page.getByLabel("CEP", { exact: true }).fill("99999-999");
+  await expect(delivery(page).getByRole("radio")).toHaveCount(1);
+  await expect(delivery(page)).toContainText("R$ 30,00");
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+});
+
+test("CHK-10 a new CEP shows the change in the total; the bag's own CEP shows no note", async ({ context, page }) => {
+  // The prototype's bag: jacket R$ 199,00 + a R$ 119,00 piece, MARIA10, PAC R$ 20,00.
+  await openCheckout(context, page, PROTOTYPE_BAG, { cep: "01310100", chosen: "pac", coupon: "MARIA10" });
+  await expect(bar(page)).toContainText("R$\u00a0306,20");
+  await page.getByLabel("CEP", { exact: true }).fill("01310-100");
+  await expect(delivery(page).getByRole("radio")).toHaveCount(3);
+  await expect(page.getByText("O frete mudou com o novo CEP")).toHaveCount(0);
+  await page.getByLabel("CEP", { exact: true }).fill("69900-000");
+  await expect(delivery(page).getByRole("radio")).toHaveCount(2);
+  const note = page.getByText("O frete mudou com o novo CEP");
+  await expect(note).toBeVisible();
+  await expect(page.getByText("Total: R$\u00a0306,20 → R$\u00a0331,20")).toBeVisible();
+});
+
+test("CHK-11 the summary opens to items, discount, shipping, delivery time and total", async ({ context, page }) => {
+  await openCheckout(context, page, undefined, { cep: "01310100", chosen: "pac", coupon: "MARIA10" });
+  await page.getByText(/^Resumo/).click();
+  const summary = page.locator("details");
+  await expect(summary.getByText("Jaqueta sarja")).toBeVisible();
+  await expect(summary.getByText("Desconto (MARIA10)")).toBeVisible();
+  await expect(summary.getByText("Frete (PAC)")).toBeVisible();
+  await expect(summary.getByText("Chega em até 5 dias úteis")).toBeVisible();
+  await expect(summary.getByText("Total", { exact: true })).toBeVisible();
+});
+
+test("CHK-12 a valid form goes to /checkout/pagamento with one order", async ({ context, page, request }) => {
+  await openCheckout(context, page);
+  await fillValid(page);
+  await expect(delivery(page).getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+  expect(await ordersPosted(request)).toBe(1);
+});
+
+test("Review focus 4: a double tap on Ir para pagamento makes one order", async ({ context, page, request }) => {
+  await openCheckout(context, page);
+  await fillValid(page);
+  await expect(delivery(page).getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await request.post(`${FAKE_API}/__slow?suffix=/v1/orders`);
+  await page.getByRole("button", { name: "Ir para pagamento" }).dblclick();
+  await expect(page.getByRole("button", { name: "Processando" })).toBeDisabled();
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+  expect(await ordersPosted(request)).toBe(1);
+});
+
+test("CHK-13 a piece sold out before reserving: back to the bag, which names it", async ({ context, page, request }) => {
+  await openCheckout(context, page);
+  await fillValid(page);
+  await expect(delivery(page).getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await request.post(`${FAKE_API}/__sold-out?productSizeId=${JACKET_M}`);
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/sacola$/);
+  await expect(page.getByText("Esgotada", { exact: true })).toBeVisible();
+  await expect(page.getByText("Esgotou depois que entrou na sacola. Fica fora do total.")).toBeVisible();
+});
+
+// The 422 answer (incomplete cart) can't happen after the action saved the details and a delivery is chosen;
+// it goes through the same branch as this 500: problem.title above the bar.
+test("a failed /v1/orders shows the message above the bar and keeps the fields", async ({ context, page, request }) => {
+  await openCheckout(context, page);
+  await fillValid(page);
+  await expect(delivery(page).getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await request.post(`${FAKE_API}/__fail?path=/v1/orders`);
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("Não foi possível concluir. Tente de novo");
+  await expect(page).toHaveURL(/\/checkout$/);
+  for (const [label, value] of VALID) await expect(page.getByLabel(label, { exact: true })).toHaveValue(value);
+});

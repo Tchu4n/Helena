@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PurchaseSteps } from "@/src/components/layout";
 import { ErrorMessage } from "@/src/components/ui";
-import { getCart } from "@/src/features/cart";
-import { DetailsForm, OrderSummary, saveLead, summaryFromCart } from "@/src/features/checkout";
+import { chooseDelivery, getCart } from "@/src/features/cart";
+import { DetailsForm, goToPayment, OrderSummary, saveCheckoutCep, saveLead, summaryFromCart } from "@/src/features/checkout";
 
 export const metadata: Metadata = { title: "Dados e entrega · Helena" };
 
@@ -17,7 +17,16 @@ async function CheckoutContent() {
     <div className="flex flex-col gap-3 px-4 pt-2 pb-6">
       <h1 className="sr-only">Dados e entrega</h1>
       <OrderSummary summary={summaryFromCart(cart)} />
-      <DetailsForm total={cart.total} saveLead={saveLead} />
+      <DetailsForm
+        total={cart.total}
+        cep={cart.cep}
+        deliveryOptions={cart.deliveryOptions}
+        chosenDelivery={cart.chosenDelivery}
+        saveLead={saveLead}
+        saveCheckoutCep={saveCheckoutCep}
+        chooseDelivery={chooseDelivery}
+        goToPayment={goToPayment}
+      />
     </div>
   );
 }
