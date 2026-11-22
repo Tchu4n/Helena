@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { clearOrderAccess } from "@/src/lib/order-cookie";
 import { z } from "zod";
 import { apiPut } from "@/src/lib/api";
 import { readCartId } from "../cart-session.ts";
@@ -15,6 +16,7 @@ export async function chooseDelivery(_prev: { message: string | null }, formData
 
   const result = await apiPut(`/v1/carts/${cartId}/delivery`, parsed.data);
   if (!result.ok) return { message: result.problem.title };
+  await clearOrderAccess(); // any bag change ends the payment in progress (SAC-17)
   refresh();
   return { message: null };
 }

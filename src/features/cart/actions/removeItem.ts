@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { clearOrderAccess } from "@/src/lib/order-cookie";
 import { z } from "zod";
 import { apiDelete, apiGet } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
@@ -37,6 +38,7 @@ export async function removeItem(prev: RemoveState, formData: FormData): Promise
 
   const result = await apiDelete(`/v1/carts/${cartId}/items/${item.id}`);
   if (!result.ok) return failed(result.problem.title, item.id);
+  await clearOrderAccess(); // any bag change ends the payment in progress (SAC-17)
   refresh();
   return {
     status: "removed",

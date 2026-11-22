@@ -100,6 +100,8 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | ir para pagamento | `goToPayment` |
 | salvar lead | `saveLead` |
 | cronômetro da reserva | `ReservationTimer` |
+| forma de pagamento (escolha), reserva encerrada | `PaymentMethods`, `expired` |
+| fim da reserva (sacola e pagamento) | `reservationExpiresAt` |
 | campos do cartão (gateway simulado), token do cartão | `SimulatedCardFields`, `cardToken` |
 | mensagem de pagamento concluído | `PaymentSuccess` (checks the order), `SuccessNotice` (the box) |
 | gerar código PIX | `payWithPix` |

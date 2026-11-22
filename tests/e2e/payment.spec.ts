@@ -114,3 +114,55 @@ test("no order cookie: the payment page goes back to /checkout", async ({ contex
   await page.goto("/checkout/pagamento");
   await expect(page).toHaveURL(/\/checkout$/);
 });
+
+test("CHK-17 reservation over: warning, no PIX, and Tentar de novo reserves again", async ({ context, page, request }) => {
+  const number = await startPayment(context, page, request);
+  await generatePix(page);
+  await request.post(`${FAKE_API}/__expire?number=${number}`);
+  const alert = page.getByRole("main").getByRole("alert");
+  await expect(alert).toContainText("Reserva encerrada", { timeout: 6000 });
+  await expect(alert).toContainText("Os 15 minutos acabaram e as peças voltaram para o estoque. O código PIX não vale mais.");
+  await expect(page.getByText(/^00020126/)).toHaveCount(0);
+  await expect(page.getByRole("timer")).toHaveCount(0);
+  await page.getByRole("button", { name: "Tentar de novo" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "PIX" })).not.toBeChecked();
+  await generatePix(page);
+  await expect(page.getByText(/^00020126/)).toBeVisible();
+  await expect(page.getByRole("timer")).toHaveText(/Sua reserva termina em 1[45]:\d\d/);
+});
+
+test("CHK-17 reservation over and the piece sold out: Tentar de novo goes to the bag", async ({ context, page, request }) => {
+  const number = await startPayment(context, page, request);
+  await generatePix(page);
+  await request.post(`${FAKE_API}/__expire?number=${number}`);
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Reserva encerrada", { timeout: 6000 });
+  await request.post(`${FAKE_API}/__sold-out?productSizeId=${JACKET_M}`);
+  await page.getByRole("button", { name: "Tentar de novo" }).click();
+  await page.getByRole("radio", { name: "PIX" }).check();
+  await page.getByRole("button", { name: "Gerar código PIX" }).click();
+  await expect(page).toHaveURL(/\/sacola$/);
+  await expect(page.getByText("Esgotada").first()).toBeVisible();
+});
+
+test("SAC-17 the bag shows the reservation time only while a payment is in progress", async ({ context, page, request }) => {
+  const response = await context.request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId: JACKET_M }] } });
+  const { id } = await response.json();
+  await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
+  await page.goto("/sacola");
+  await expect(page.getByRole("heading", { name: /Sua sacola/ })).toBeVisible();
+  await expect(page.getByRole("timer")).toHaveCount(0);
+  await startPayment(context, page, request);
+  await page.goto("/sacola");
+  await expect(page.getByRole("timer")).toHaveText(/Sua reserva termina em 1[45]:\d\d/);
+});
+
+test("Review focus 5: changing the bag ends the payment in progress", async ({ context, page, request }) => {
+  await startPayment(context, page, request);
+  await page.goto("/sacola");
+  await expect(page.getByRole("timer")).toBeVisible();
+  await page.getByRole("button", { name: /Aumentar/ }).first().click();
+  await expect(page.getByRole("timer")).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/checkout$/);
+});

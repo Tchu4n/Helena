@@ -9,4 +9,5 @@ export { getPaymentOrder } from "./queries/getPaymentOrder.ts";
 export { payWithPix } from "./actions/payWithPix.ts";
 export { checkPayment } from "./actions/checkPayment.ts";
 export { PaymentPanel } from "./components/PaymentPanel.tsx";
+export { ReservationTimer } from "./components/ReservationTimer.tsx";
 export { PaymentSuccess } from "./components/PaymentSuccess.tsx";

@@ -160,3 +160,10 @@ test("SAC-02 the item view carries no field the bag screen doesn't use", () => {
   assert.equal("slug" in item, false);
   assert.equal("productSizeId" in item, false);
 });
+
+test("SAC-17 the reservation time only shows when she has an order being paid", () => {
+  const cart = cartWith({ reservationExpiresAt: "2026-11-21T12:15:00.000Z" });
+  assert.equal(toCartView(cart, false).reservationExpiresAt, null);
+  assert.equal(toCartView(cart).reservationExpiresAt, null);
+  assert.equal(toCartView(cart, true).reservationExpiresAt, "2026-11-21T12:15:00.000Z");
+});

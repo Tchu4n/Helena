@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { clearOrderAccess } from "@/src/lib/order-cookie";
 import { z } from "zod";
 import { apiPost } from "@/src/lib/api";
 import { readCartId } from "../cart-session.ts";
@@ -23,6 +24,7 @@ export async function restoreItem(_prev: RemoveState, formData: FormData): Promi
 
   const result = await apiPost(`/v1/carts/${cartId}/items`, parsed.data);
   if (!result.ok) return failed(result.problem.title);
+  await clearOrderAccess(); // any bag change ends the payment in progress (SAC-17)
   refresh();
   return { status: "idle", itemId: null, removed: null, message: null, at: Date.now() };
 }

@@ -19,6 +19,7 @@ async function PaymentContent() {
       <PaymentPanel
         total={order.total}
         reservationExpiresAt={order.reservationExpiresAt}
+        expired={order.status === "reservation_expired"}
         pix={order.pix}
         summary={<OrderSummary summary={order.summary} />}
         payWithPix={payWithPix}

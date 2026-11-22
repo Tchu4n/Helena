@@ -58,6 +58,7 @@ export type CartView = {
   total: string;
   installments: string;
   soldOutMessages: { itemId: string; text: string }[];
+  reservationExpiresAt: string | null;
 };
 
 export type CartPanelView = {
@@ -110,7 +111,8 @@ function toDeliveryOptionView(o: DeliveryOption): DeliveryOptionView {
   };
 }
 
-export function toCartView(cart: Cart): CartView {
+// SAC-17: the reservation time only while she has an order being paid (its cookie); a bag change ends it.
+export function toCartView(cart: Cart, hasOrder = false): CartView {
   const options = cart.deliveryOptions ?? [];
   const chosen = options.find((o) => o.type === cart.chosenDelivery);
   const installments = installmentText(cart.installmentPlan);
@@ -135,6 +137,7 @@ export function toCartView(cart: Cart): CartView {
         itemId: i.id,
         text: `A peça ${i.name} (${i.color} · ${i.size}) esgotou. Remova da sacola para finalizar a compra.`,
       })),
+    reservationExpiresAt: hasOrder ? (cart.reservationExpiresAt ?? null) : null,
   };
 }
 

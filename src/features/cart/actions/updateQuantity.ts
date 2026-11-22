@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { clearOrderAccess } from "@/src/lib/order-cookie";
 import { z } from "zod";
 import { apiPatch } from "@/src/lib/api";
 import { readCartId } from "../cart-session.ts";
@@ -27,6 +28,7 @@ export async function updateQuantity(prev: ItemActionState, formData: FormData):
     if (result.problem.status === 409 || result.problem.status === 404) refresh();
     return { itemId, message: result.problem.title };
   }
+  await clearOrderAccess(); // any bag change ends the payment in progress (SAC-17)
   refresh();
   return { itemId, message: null };
 }

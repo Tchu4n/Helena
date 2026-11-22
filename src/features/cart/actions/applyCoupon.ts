@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { clearOrderAccess } from "@/src/lib/order-cookie";
 import { z } from "zod";
 import { apiPut } from "@/src/lib/api";
 import { readCartId } from "../cart-session.ts";
@@ -22,6 +23,7 @@ export async function applyCoupon(_prev: CouponState, formData: FormData): Promi
   if (!result.ok) {
     return { status: result.problem.status === 422 ? "invalid" : "failed", code: typed, message: result.problem.title };
   }
+  await clearOrderAccess(); // any bag change ends the payment in progress (SAC-17)
   refresh();
   return { status: "ok", code: "", message: null };
 }

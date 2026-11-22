@@ -1,6 +1,7 @@
 import "server-only";
 import { apiPut, type ApiResult } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
+import { clearOrderAccess } from "@/src/lib/order-cookie";
 import { createCart, ensureCart } from "./cart-session.ts";
 
 type Cart = components["schemas"]["Cart"];
@@ -16,6 +17,7 @@ export async function saveCep(cep: string): Promise<ApiResult<Cart> | null> {
     if (!cartId) return result;
     result = await apiPut<Cart>(`/v1/carts/${cartId}/cep`, { cep });
   }
+  if (result.ok) await clearOrderAccess(); // a new CEP changes the total: the payment in progress ends (SAC-17)
   if (!result.ok || result.data.chosenDelivery || !result.data.deliveryOptions?.length) return result;
 
   const cheapest = result.data.deliveryOptions.reduce((a, b) => (b.price < a.price ? b : a));

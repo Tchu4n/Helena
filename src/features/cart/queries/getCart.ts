@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { apiGet } from "@/src/lib/api";
+import { readOrderAccess } from "@/src/lib/order-cookie";
 import type { components } from "@/src/lib/api-types";
 import { readCartId } from "../cart-session.ts";
 import { toCartView, type CartView } from "../views.ts";
@@ -24,6 +25,6 @@ export const getCartSummary = cache(async (): Promise<{ pieceCount: number; cep:
 export async function getCart(): Promise<{ ok: true; cart: CartView | null } | { ok: false; title: string }> {
   const result = await fetchCart();
   if (!result) return { ok: true, cart: null };
-  if (result.ok) return { ok: true, cart: toCartView(result.data) };
+  if (result.ok) return { ok: true, cart: toCartView(result.data, (await readOrderAccess()) !== null) };
   return result.problem.status === 404 ? { ok: true, cart: null } : { ok: false, title: result.problem.title };
 }

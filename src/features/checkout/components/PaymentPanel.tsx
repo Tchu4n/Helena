@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect, useRef, useState, type ReactNode } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/src/components/ui/Button.tsx";
 import { AlertIcon } from "@/src/components/ui/icons.tsx";
 import type { PayState } from "../types.ts";
@@ -12,6 +12,7 @@ type Method = "pix" | "card";
 type Props = {
   total: string;
   reservationExpiresAt: string | null;
+  expired: boolean; // the reservation had already ended when the page loaded
   pix: { pixCode: string; qrCode: string } | null; // a PIX still waiting, when she reloads the page
   summary: ReactNode;
   payWithPix: (prev: PayState, formData: FormData) => Promise<PayState>;
@@ -21,15 +22,83 @@ type Props = {
 const heading = "font-mono text-xs font-medium uppercase tracking-[0.08em]";
 const POLL_MS = 3000;
 
+// CHK-17: when the reservation ends (timer at zero or the API says so) the PIX goes away; "Tentar de novo"
+// starts a new attempt, and the next payment reserves the pieces again.
+export function PaymentPanel({ total, reservationExpiresAt, expired: expiredAtLoad, pix, summary, payWithPix, checkPayment }: Props) {
+  const [expired, setExpired] = useState(expiredAtLoad);
+  const [endedAt, setEndedAt] = useState<string | null>(null); // the reservation end that already passed
+  const [attempt, setAttempt] = useState(0);
+  const end = useCallback(() => {
+    setExpired(true);
+    setEndedAt(reservationExpiresAt);
+  }, [reservationExpiresAt]);
+  const timer = !expired && reservationExpiresAt && reservationExpiresAt !== endedAt ? reservationExpiresAt : null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {timer && (
+        <div className="bg-card px-4 py-3">
+          <ReservationTimer expiresAt={timer} onEnd={end} />
+        </div>
+      )}
+      {summary}
+      {expired ? (
+        <section aria-label="Reserva" className="flex flex-col gap-3 bg-card p-4">
+          <div role="alert" className="flex flex-col gap-1">
+            <p className="flex items-center gap-2 font-medium text-error">
+              <AlertIcon className="size-4 shrink-0" />
+              Reserva encerrada
+            </p>
+            <p className="text-sm">Os 15 minutos acabaram e as peças voltaram para o estoque. O código PIX não vale mais.</p>
+          </div>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setExpired(false);
+              setAttempt((n) => n + 1);
+            }}
+            className="w-full"
+          >
+            Tentar de novo
+          </Button>
+        </section>
+      ) : (
+        // A new key per attempt: the old PIX and the action's answer don't come back.
+        <PaymentMethods
+          key={attempt}
+          retry={attempt > 0}
+          total={total}
+          savedPix={attempt === 0 ? pix : null}
+          payWithPix={payWithPix}
+          checkPayment={checkPayment}
+          onExpired={end}
+        />
+      )}
+    </div>
+  );
+}
+
+type MethodsProps = Pick<Props, "total" | "payWithPix" | "checkPayment"> & {
+  retry: boolean;
+  savedPix: Props["pix"];
+  onExpired: () => void;
+};
+
 // CHK-14 to CHK-16: the method, then the PIX code; the screen asks for the payment until it is confirmed.
-export function PaymentPanel({ total, reservationExpiresAt, pix: savedPix, summary, payWithPix, checkPayment }: Props) {
+function PaymentMethods({ total, retry, savedPix, payWithPix, checkPayment, onExpired }: MethodsProps) {
   const router = useRouter();
   const [method, setMethod] = useState<Method | null>(savedPix ? "pix" : null);
   const [state, dispatch, pending] = useActionState(payWithPix, { status: "idle", pix: null, message: null });
   const attemptKey = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
   const codeRef = useRef<HTMLParagraphElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const pix = state.pix ?? savedPix;
+
+  // After "Tentar de novo" the button is gone: focus goes to the choice of method.
+  useEffect(() => {
+    if (retry) headingRef.current?.focus();
+  }, [retry]);
 
   // One Idempotency-Key per attempt: a double tap makes one payment; a new one after each answer.
   useEffect(() => {
@@ -43,10 +112,13 @@ export function PaymentPanel({ total, reservationExpiresAt, pix: savedPix, summa
       if (answer.status === "paid" && answer.number) {
         clearInterval(id);
         router.push(`/?pedido=${answer.number}`);
+      } else if (answer.status === "expired") {
+        clearInterval(id);
+        onExpired();
       }
     }, POLL_MS);
     return () => clearInterval(id);
-  }, [method, pix, checkPayment, router]);
+  }, [method, pix, checkPayment, router, onExpired]);
 
   function generatePix() {
     attemptKey.current ??= crypto.randomUUID();
@@ -69,16 +141,9 @@ export function PaymentPanel({ total, reservationExpiresAt, pix: savedPix, summa
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {reservationExpiresAt && (
-        <div className="bg-card px-4 py-3">
-          <ReservationTimer expiresAt={reservationExpiresAt} />
-        </div>
-      )}
-      {summary}
-
+    <>
       <fieldset aria-labelledby="payment-method" className="flex flex-col gap-3 bg-card p-4">
-        <h2 id="payment-method" className={heading}>
+        <h2 id="payment-method" ref={headingRef} tabIndex={-1} className={heading}>
           Forma de pagamento
         </h2>
         <div className="grid grid-cols-2 gap-2">
@@ -137,6 +202,6 @@ export function PaymentPanel({ total, reservationExpiresAt, pix: savedPix, summa
           )}
         </section>
       )}
-    </div>
+    </>
   );
 }

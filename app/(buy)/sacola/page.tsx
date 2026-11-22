@@ -19,6 +19,7 @@ import {
   saveCartCep,
   updateQuantity,
 } from "@/src/features/cart";
+import { ReservationTimer } from "@/src/features/checkout";
 
 export const metadata: Metadata = { title: "Sacola · Helena" };
 
@@ -29,6 +30,11 @@ async function CartContent() {
   if (!cart || cart.items.length === 0) return <EmptyCart />;
   return (
     <div className="flex flex-col gap-3 px-4 pt-2 pb-6">
+      {cart.reservationExpiresAt && (
+        <div className="bg-card px-4 py-3">
+          <ReservationTimer expiresAt={cart.reservationExpiresAt} />
+        </div>
+      )}
       <h1 className="my-1 font-mono text-xs font-medium uppercase tracking-[0.08em]">
         Sua sacola · {cart.pieceCount} {cart.pieceCount === 1 ? "peça" : "peças"}
       </h1>

@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { clearOrderAccess } from "@/src/lib/order-cookie";
 import { z } from "zod";
 import { apiGet, apiPost, type ApiResult } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
@@ -47,6 +48,7 @@ export async function addToCart(_prev: AddToCartState, formData: FormData): Prom
   }
   if (!result.ok) return { status: "error", message: result.problem.title, focusSizes: false, panel: null, at: Date.now() };
 
+  await clearOrderAccess(); // any bag change ends the payment in progress (SAC-17)
   refresh();
   return {
     status: "added",
