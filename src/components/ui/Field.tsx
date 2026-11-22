@@ -1,8 +1,8 @@
 import { AlertIcon } from "./icons.tsx";
 
-type FieldProps = {
+// `name` sends the value with its form; `id` alone leaves it out (the simulated card fields).
+type FieldProps = ({ name: string; id?: string } | { name?: undefined; id: string }) & {
   label: string;
-  name: string;
   type?: "text" | "email" | "tel" | "search";
   defaultValue?: string;
   error?: string | null;
@@ -19,6 +19,7 @@ type FieldProps = {
 export function Field({
   label,
   name,
+  id = name!,
   type = "text",
   defaultValue,
   error,
@@ -29,14 +30,14 @@ export function Field({
   onChange,
   onBlur,
 }: FieldProps) {
-  const errorId = `${name}-error`;
+  const errorId = `${id}-error`;
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={name} className="text-sm font-medium">
+      <label htmlFor={id} className="text-sm font-medium">
         {label}
       </label>
       <input
-        id={name}
+        id={id}
         name={name}
         type={type}
         defaultValue={defaultValue}

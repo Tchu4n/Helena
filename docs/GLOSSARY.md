@@ -102,7 +102,9 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | cronômetro da reserva | `ReservationTimer` |
 | forma de pagamento (escolha), reserva encerrada | `PaymentMethods`, `expired` |
 | fim da reserva (sacola e pagamento) | `reservationExpiresAt` |
-| campos do cartão (gateway simulado), token do cartão | `SimulatedCardFields`, `cardToken` |
+| campos do cartão (gateway simulado), token do cartão | `SimulatedCardFields` (its handle: `CardGateway`), `cardToken` (field and the function that makes the fake token) |
+| conferir os campos do cartão | `checkCard` |
+| pagar com cartão | `payWithCard` |
 | mensagem de pagamento concluído | `PaymentSuccess` (checks the order), `SuccessNotice` (the box) |
 | gerar código PIX | `payWithPix` |
 | conferir pagamento (PIX) | `checkPayment` |

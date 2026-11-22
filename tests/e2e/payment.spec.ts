@@ -26,12 +26,17 @@ test.beforeEach(async ({ context, request }) => {
 const paths = async (request: APIRequestContext) => (await (await request.get(`${FAKE_API}/__requests`)).json()) as string[];
 
 // Builds a bag, fills /checkout, taps "Ir para pagamento" and answers the order number.
-async function startPayment(context: BrowserContext, page: Page, request: APIRequestContext): Promise<string> {
-  const response = await context.request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId: JACKET_M }] } });
+async function startPayment(
+  context: BrowserContext,
+  page: Page,
+  request: APIRequestContext,
+  { productSizeId = JACKET_M, cep = "01310-100" } = {},
+): Promise<string> {
+  const response = await context.request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId }] } });
   const { id } = await response.json();
   await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
   await page.goto("/checkout");
-  for (const [label, value] of VALID) await page.getByLabel(label, { exact: true }).fill(value);
+  for (const [label, value] of VALID) await page.getByLabel(label, { exact: true }).fill(label === "CEP" ? cep : value);
   await expect(page.getByRole("radio", { name: /PAC/ })).toBeChecked();
   await page.getByRole("button", { name: "Ir para pagamento" }).click();
   await expect(page).toHaveURL(/\/checkout\/pagamento$/);
@@ -165,4 +170,105 @@ test("Review focus 5: changing the bag ends the payment in progress", async ({ c
   await expect(page.getByRole("timer")).toHaveCount(0);
   await page.goBack();
   await expect(page).toHaveURL(/\/checkout$/);
+});
+
+// Card (CHK-18 to CHK-22). The simulated gateway's fields: 4111 1111 1111 0000 is approved, a card ending in 0002 is declined.
+const CAP = "5a1e0000-0000-4000-8000-000000000004"; // Boné de algodão, R$ 79,00
+
+async function fillCard(page: Page, number: string, { cvv = "123" } = {}) {
+  await page.getByRole("radio", { name: "Cartão de crédito" }).check();
+  const gateway = page.getByRole("group", { name: "Campos do gateway · simulado" });
+  await gateway.getByLabel("Número do cartão").fill(number);
+  await gateway.getByLabel("Nome impresso no cartão").fill("MARIA SOUZA");
+  await gateway.getByLabel("Validade").fill("08/29");
+  await gateway.getByLabel("CVV").fill(cvv);
+}
+
+const payments = async (request: APIRequestContext) => (await paths(request)).filter((p) => p.endsWith("/payments"));
+
+test("CHK-18 the card data never leaves the browser; only a token reaches the API", async ({ context, page, request }) => {
+  await startPayment(context, page, request);
+  const sent: string[] = [];
+  page.on("request", (r) => sent.push(`${r.url()}\n${r.postData() ?? ""}`));
+  await fillCard(page, "4111 1111 1111 0000");
+  await page.getByRole("button", { name: "Pagar R$ 219,00" }).click();
+  await expect(page).toHaveURL(/\/\?pedido=HL-\d+$/);
+  for (const text of sent) {
+    expect(text).not.toContain("4111111111110000");
+    expect(text).not.toContain("4111 1111");
+    expect(text).not.toContain("411111");
+    expect(text).not.toContain("MARIA SOUZA");
+    expect(text).not.toContain("08/29");
+    // The CVV on its own: hex ids (action ids, UUIDs) may hold "123" inside them.
+    expect(text).not.toMatch(/(^|[^0-9a-z])123([^0-9a-z]|$)/im);
+  }
+  expect(await payments(request)).toHaveLength(1);
+  const bodies = await (await request.get(`${FAKE_API}/__payment-bodies`)).json();
+  expect(bodies).toEqual([{ method: "card", cardToken: "tok_test_0000", installments: 1 }]);
+});
+
+test("CHK-19 an order of R$ 150,00 offers 1x, 2x and 3x sem juros, and no other", async ({ context, page, request }) => {
+  await startPayment(context, page, request, { productSizeId: CAP, cep: "88010-000" });
+  await page.getByRole("radio", { name: "Cartão de crédito" }).check();
+  const options = page.getByLabel("Parcelas").locator("option");
+  await expect(options).toHaveText(["1x de R$ 150,00 sem juros", "2x de R$ 75,00 sem juros", "3x de R$ 50,00 sem juros"]);
+});
+
+test("CHK-20 an approved card goes to the home page with the success message", async ({ context, page, request }) => {
+  const number = await startPayment(context, page, request);
+  await fillCard(page, "4111 1111 1111 0000");
+  await page.getByLabel("Parcelas").selectOption({ label: "2x de R$ 109,50 sem juros" });
+  await page.getByRole("button", { name: "Pagar R$ 219,00" }).click();
+  await expect(page).toHaveURL(new RegExp(`/\\?pedido=${number}$`));
+  await expect(page.getByText("Pagamento concluído com sucesso")).toBeVisible();
+  const bodies = await (await request.get(`${FAKE_API}/__payment-bodies`)).json();
+  expect(bodies[0].installments).toBe(2);
+});
+
+test("CHK-21 a declined card: the error, Pagar com PIX, and the details still filled in", async ({ context, page, request }) => {
+  await startPayment(context, page, request);
+  await fillCard(page, "4111 1111 1111 0002");
+  await page.getByRole("button", { name: "Pagar R$ 219,00" }).click();
+  const alert = page.getByRole("main").getByRole("alert");
+  await expect(alert).toContainText("Pagamento não aprovado");
+  await expect(alert).toContainText("O banco do cartão não aprovou esta compra. Tente outro cartão ou pague com PIX.");
+  await expect(page.getByRole("timer")).toHaveCount(0);
+  await page.getByRole("button", { name: "Pagar com PIX" }).click();
+  await expect(page.getByRole("radio", { name: "PIX" })).toBeChecked();
+  await page.getByRole("button", { name: "Gerar código PIX" }).click();
+  await expect(page.getByText(/^00020126/)).toBeVisible();
+  await expect(page.getByRole("timer")).toHaveText(/Sua reserva termina em 1[45]:\d\d/);
+  // CHK-23: back to the details, everything she typed is still there.
+  await page.goto("/checkout");
+  for (const [label, value] of VALID) await expect(page.getByLabel(label, { exact: true })).toHaveValue(value);
+});
+
+test("CHK-21 a declined card and the piece sold out: paying again goes to the bag", async ({ context, page, request }) => {
+  await startPayment(context, page, request);
+  await fillCard(page, "4111 1111 1111 0002");
+  await page.getByRole("button", { name: "Pagar R$ 219,00" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Pagamento não aprovado");
+  await request.post(`${FAKE_API}/__sold-out?productSizeId=${JACKET_M}`);
+  await page.getByRole("group", { name: "Campos do gateway · simulado" }).getByLabel("Número do cartão").fill("4111 1111 1111 0000");
+  await page.getByRole("button", { name: "Pagar R$ 219,00" }).click();
+  await expect(page).toHaveURL(/\/sacola$/);
+});
+
+test("CHK-22 a double tap on Pagar makes one charge and shows Processando", async ({ context, page, request }) => {
+  await startPayment(context, page, request);
+  await request.post(`${FAKE_API}/__slow?suffix=/payments`);
+  await fillCard(page, "4111 1111 1111 0000");
+  await page.getByRole("button", { name: "Pagar R$ 219,00" }).dblclick();
+  await expect(page.getByRole("button", { name: "Processando" })).toBeDisabled();
+  await expect(page).toHaveURL(/\/\?pedido=HL-\d+$/, { timeout: 6000 });
+  expect(await payments(request)).toHaveLength(1);
+});
+
+test("card field checks: an empty CVV shows Confira o CVV, focuses it and sends nothing", async ({ context, page, request }) => {
+  await startPayment(context, page, request);
+  await fillCard(page, "4111 1111 1111 0000", { cvv: "" });
+  await page.getByRole("button", { name: "Pagar R$ 219,00" }).click();
+  await expect(page.getByText("Confira o CVV")).toBeVisible();
+  await expect(page.getByLabel("CVV")).toBeFocused();
+  expect(await payments(request)).toHaveLength(0);
 });

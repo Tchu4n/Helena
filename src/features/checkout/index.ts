@@ -7,6 +7,7 @@ export { saveCheckoutCep } from "./actions/saveCheckoutCep.ts";
 export { goToPayment } from "./actions/goToPayment.ts";
 export { getPaymentOrder } from "./queries/getPaymentOrder.ts";
 export { payWithPix } from "./actions/payWithPix.ts";
+export { payWithCard } from "./actions/payWithCard.ts";
 export { checkPayment } from "./actions/checkPayment.ts";
 export { PaymentPanel } from "./components/PaymentPanel.tsx";
 export { ReservationTimer } from "./components/ReservationTimer.tsx";

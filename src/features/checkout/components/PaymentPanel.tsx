@@ -5,6 +5,8 @@ import { startTransition, useActionState, useCallback, useEffect, useRef, useSta
 import { Button } from "@/src/components/ui/Button.tsx";
 import { AlertIcon } from "@/src/components/ui/icons.tsx";
 import type { PayState } from "../types.ts";
+import type { InstallmentOption } from "../views.ts";
+import { SimulatedCardFields, type CardGateway } from "./gateway/SimulatedCardFields.tsx";
 import { ReservationTimer } from "./ReservationTimer.tsx";
 
 type Method = "pix" | "card";
@@ -14,8 +16,10 @@ type Props = {
   reservationExpiresAt: string | null;
   expired: boolean; // the reservation had already ended when the page loaded
   pix: { pixCode: string; qrCode: string } | null; // a PIX still waiting, when she reloads the page
+  installmentOptions: InstallmentOption[];
   summary: ReactNode;
   payWithPix: (prev: PayState, formData: FormData) => Promise<PayState>;
+  payWithCard: (prev: PayState, formData: FormData) => Promise<PayState>;
   checkPayment: () => Promise<{ status: "waiting" | "paid" | "expired"; number: string | null }>;
 };
 
@@ -24,7 +28,17 @@ const POLL_MS = 3000;
 
 // CHK-17: when the reservation ends (timer at zero or the API says so) the PIX goes away; "Tentar de novo"
 // starts a new attempt, and the next payment reserves the pieces again.
-export function PaymentPanel({ total, reservationExpiresAt, expired: expiredAtLoad, pix, summary, payWithPix, checkPayment }: Props) {
+export function PaymentPanel({
+  total,
+  reservationExpiresAt,
+  expired: expiredAtLoad,
+  pix,
+  installmentOptions,
+  summary,
+  payWithPix,
+  payWithCard,
+  checkPayment,
+}: Props) {
   const [expired, setExpired] = useState(expiredAtLoad);
   const [endedAt, setEndedAt] = useState<string | null>(null); // the reservation end that already passed
   const [attempt, setAttempt] = useState(0);
@@ -69,7 +83,9 @@ export function PaymentPanel({ total, reservationExpiresAt, expired: expiredAtLo
           retry={attempt > 0}
           total={total}
           savedPix={attempt === 0 ? pix : null}
+          installmentOptions={installmentOptions}
           payWithPix={payWithPix}
+          payWithCard={payWithCard}
           checkPayment={checkPayment}
           onExpired={end}
         />
@@ -78,14 +94,14 @@ export function PaymentPanel({ total, reservationExpiresAt, expired: expiredAtLo
   );
 }
 
-type MethodsProps = Pick<Props, "total" | "payWithPix" | "checkPayment"> & {
+type MethodsProps = Pick<Props, "total" | "installmentOptions" | "payWithPix" | "payWithCard" | "checkPayment"> & {
   retry: boolean;
   savedPix: Props["pix"];
   onExpired: () => void;
 };
 
-// CHK-14 to CHK-16: the method, then the PIX code; the screen asks for the payment until it is confirmed.
-function PaymentMethods({ total, retry, savedPix, payWithPix, checkPayment, onExpired }: MethodsProps) {
+// CHK-14 to CHK-22: the method, then the PIX code (asked for until confirmed) or the card.
+function PaymentMethods({ total, retry, savedPix, installmentOptions, payWithPix, payWithCard, checkPayment, onExpired }: MethodsProps) {
   const router = useRouter();
   const [method, setMethod] = useState<Method | null>(savedPix ? "pix" : null);
   const [state, dispatch, pending] = useActionState(payWithPix, { status: "idle", pix: null, message: null });
@@ -202,6 +218,82 @@ function PaymentMethods({ total, retry, savedPix, payWithPix, checkPayment, onEx
           )}
         </section>
       )}
+
+      {method === "card" && (
+        <CardPayment total={total} installmentOptions={installmentOptions} payWithCard={payWithCard} onPix={() => setMethod("pix")} />
+      )}
     </>
+  );
+}
+
+type CardProps = Pick<Props, "total" | "installmentOptions" | "payWithCard"> & { onPix: () => void };
+
+// CHK-18 to CHK-22: the gateway makes a token in the browser; only the token and the installments are sent.
+function CardPayment({ total, installmentOptions, payWithCard, onPix }: CardProps) {
+  const gateway = useRef<CardGateway>(null);
+  const [installments, setInstallments] = useState(installmentOptions[0]?.value ?? 1);
+  const [state, dispatch, pending] = useActionState(payWithCard, { status: "idle", pix: null, message: null });
+  const attemptKey = useRef<string | null>(null);
+
+  // One Idempotency-Key per attempt: a double tap makes one charge; a new one after each answer (CHK-22).
+  useEffect(() => {
+    attemptKey.current = null;
+  }, [state]);
+
+  function pay() {
+    const card = gateway.current?.createToken();
+    if (!card) return;
+    attemptKey.current ??= crypto.randomUUID();
+    const data = new FormData();
+    data.set("cardToken", card.token);
+    data.set("installments", String(installments));
+    data.set("idempotencyKey", attemptKey.current);
+    startTransition(() => dispatch(data));
+  }
+
+  return (
+    <section aria-label="Cartão de crédito" className="flex flex-col gap-3 bg-card p-4">
+      <SimulatedCardFields ref={gateway} />
+      <div className="flex flex-col gap-1">
+        <label htmlFor="card-installments" className="text-sm font-medium">
+          Parcelas
+        </label>
+        <select
+          id="card-installments"
+          value={installments}
+          onChange={(e) => setInstallments(Number(e.target.value))}
+          className="min-h-12 w-full rounded-control border border-control bg-card px-4 text-base"
+        >
+          {installmentOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.text}
+            </option>
+          ))}
+        </select>
+      </div>
+      {state.status === "declined" && (
+        <div role="alert" className="flex flex-col gap-1">
+          <p className="flex items-center gap-2 font-medium text-error">
+            <AlertIcon className="size-4 shrink-0" />
+            Pagamento não aprovado
+          </p>
+          <p className="text-sm">{state.message}</p>
+        </div>
+      )}
+      {state.status === "failed" && state.message && (
+        <p role="alert" className="flex items-center gap-2 text-sm text-error">
+          <AlertIcon className="size-4 shrink-0" />
+          {state.message}
+        </p>
+      )}
+      <Button variant="primary" onClick={pay} disabled={pending} className="w-full">
+        {pending ? "Processando" : `Pagar ${total}`}
+      </Button>
+      {state.status === "declined" && (
+        <Button variant="secondary" onClick={onPix} className="w-full">
+          Pagar com PIX
+        </Button>
+      )}
+    </section>
   );
 }

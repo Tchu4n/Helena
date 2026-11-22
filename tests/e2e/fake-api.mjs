@@ -163,6 +163,8 @@ const QUOTES = {
     options: [option("pac", 4500, "Chega em até 12 dias úteis"), option("sedex", 6500, "Chega em até 6 dias úteis")],
   },
   // Fixed rate the real API answers with when the shipping provider is down (PRO-11).
+  // Cap R$ 79,00 + PAC R$ 71,00 = an order of R$ 150,00 (CHK-19).
+  "88010000": { city: "Florianópolis", state: "SC", options: [option("pac", 7100, "Chega em até 7 dias úteis")] },
   "99999999": { city: "Salvador", state: "BA", options: [option("pac", 3000, "Chega em até 10 dias úteis")] },
 };
 
@@ -225,6 +227,8 @@ const NOT_FOUND = { type: "about:blank", title: "Não encontrado", status: 404, 
 
 const carts = new Map();
 const requests = [];
+// What the store sent to POST …/payments, so a test can check no card data reached the API (CHK-18).
+const paymentBodies = [];
 // Orders by number, and the first answer given to each Idempotency-Key (CHK-22).
 const orders = new Map();
 const answered = new Map();
@@ -469,6 +473,7 @@ async function route(req, url) {
     if (req.method === "GET" && parts.length === 3) return [200, orderBody(order)];
     if (req.method === "POST" && parts[3] === "payments") {
       const body = await readJson(req);
+      paymentBodies.push(body);
       return once(req, url.pathname, () => pay(order, body));
     }
     return null;
@@ -592,6 +597,7 @@ createServer(async (req, res) => {
     orders.clear();
     answered.clear();
     requests.length = 0;
+    paymentBodies.length = 0;
     return send(res, 200, { ok: true });
   }
   if (req.method === "POST" && url.pathname === "/__carts") {
@@ -630,6 +636,7 @@ createServer(async (req, res) => {
   if (url.pathname === "/__customer") return send(res, 200, carts.get(url.searchParams.get("cartId"))?.customer ?? null);
   // Lets a test check which API paths the store called.
   if (url.pathname === "/__requests") return send(res, 200, requests);
+  if (url.pathname === "/__payment-bodies") return send(res, 200, paymentBodies);
   requests.push(url.pathname);
   if ([...slowSuffixes].some((suffix) => url.pathname.endsWith(suffix))) await new Promise((r) => setTimeout(r, 2000));
   if (failing.has(url.pathname)) return send(res, 500, INTERNAL_ERROR);

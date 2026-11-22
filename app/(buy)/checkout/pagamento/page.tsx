@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PurchaseSteps } from "@/src/components/layout";
 import { ErrorMessage } from "@/src/components/ui";
-import { checkPayment, getPaymentOrder, OrderSummary, PaymentPanel, payWithPix } from "@/src/features/checkout";
+import { checkPayment, getPaymentOrder, OrderSummary, PaymentPanel, payWithCard, payWithPix } from "@/src/features/checkout";
 
 export const metadata: Metadata = { title: "Pagamento · Helena" };
 
@@ -21,8 +21,10 @@ async function PaymentContent() {
         reservationExpiresAt={order.reservationExpiresAt}
         expired={order.status === "reservation_expired"}
         pix={order.pix}
+        installmentOptions={order.installmentOptions}
         summary={<OrderSummary summary={order.summary} />}
         payWithPix={payWithPix}
+        payWithCard={payWithCard}
         checkPayment={checkPayment}
       />
     </div>
