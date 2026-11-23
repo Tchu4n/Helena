@@ -211,6 +211,7 @@ const conflict = (code, title) => ({ type: `https://helena.example/problems/${co
 const CPF_IN_USE = conflict("cpf_in_use", "Não foi possível usar este CPF");
 const DETAILS_ALREADY_SET = conflict("details_already_set", "Os dados desta conta já foram salvos");
 const DETAILS_MISSING = conflict("details_missing", "Complete seus dados para continuar");
+const EMAIL_IN_USE = conflict("email_in_use", "Este e-mail já está em outra conta");
 const NOT_AUTHENTICATED = {
   type: "https://helena.example/problems/not-authenticated",
   title: "Identifique-se para continuar",
@@ -600,6 +601,25 @@ async function route(req, url) {
     const email = sessionEmail(req);
     if (!email) return [401, NOT_AUTHENTICATED];
     return [200, customerBody(email)];
+  }
+  // CTA-06: name and phone; a new e-mail only with its code, checked before saying it has another account.
+  if (req.method === "PATCH" && url.pathname === "/v1/account") {
+    const email = sessionEmail(req);
+    if (!email) return [401, NOT_AUTHENTICATED];
+    const { name, phone, email: newEmail, code } = await readJson(req);
+    const account = accounts.get(email);
+    if ((name !== undefined && !filled(name)) || (phone !== undefined && !filled(phone))) return [422, INVALID_DATA];
+    if (newEmail !== undefined) {
+      if (!filled(code)) return [422, emailNotVerified(422)];
+      if (!takeCode(newEmail, code)) return [401, INVALID_CODE];
+      if (newEmail !== email && accounts.has(newEmail)) return [409, EMAIL_IN_USE];
+      accounts.delete(email);
+      accounts.set(newEmail, account);
+      for (const [token, owner] of sessions) if (owner === email) sessions.set(token, newEmail);
+      for (const order of orders.values()) if (order.accountEmail === email) order.accountEmail = newEmail;
+    }
+    if (account.details) account.details = { ...account.details, ...(name !== undefined ? { name } : {}), ...(phone !== undefined ? { phone } : {}) };
+    return [200, customerBody(newEmail ?? email)];
   }
   // CTA-03, CTA-04: the account's orders, newest first.
   if (req.method === "GET" && url.pathname === "/v1/account/orders") {

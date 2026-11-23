@@ -114,6 +114,9 @@ function toDetails(v: z.infer<z.ZodObject<typeof address>>): AddressDetails {
   };
 }
 
+// CTA-06: name and phone are fixed in Dados pessoais; the CPF never changes.
+export const nameAndPhoneInput = z.object({ name: contact.name, phone: contact.phone });
+
 export const contactInput = z.object(contact).transform((v): Contact => ({ name: v.name, cpf: v.cpf, phone: v.phone }));
 
 // Without a session: name, CPF and phone go with the address.

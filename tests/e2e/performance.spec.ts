@@ -87,3 +87,18 @@ test("GER-08 main content of /checkout/identificacao under 3 s on slow 4G", asyn
   console.log(`LCP /checkout/identificacao: ${Math.round(lcp)} ms`);
   expect(lcp).toBeLessThan(3000);
 });
+
+// /conta/pedidos and /conta/dados need a session: started on the fake API with a password, as the store would.
+for (const path of ["/conta/pedidos", "/conta/dados"]) {
+  test(`GER-08 main content of ${path} signed in under 3 s on slow 4G`, async ({ context, page }) => {
+    test.setTimeout(60_000);
+    const details = { name: "Maria Souza", cpf: "52998224725", phone: "11987654321" };
+    await context.request.post("http://localhost:4011/__accounts", { data: { email: "maria@exemplo.com", password: "certa-123", details } });
+    const session = await (await context.request.post("http://localhost:4011/v1/sessions", { data: { email: "maria@exemplo.com", password: "certa-123" } })).json();
+    const value = JSON.stringify({ token: session.token, email: "maria@exemplo.com", detailsComplete: true, expiresAt: session.expiresAt });
+    await context.addCookies([{ name: "helena_session", value: encodeURIComponent(value), url: "http://localhost:3100" }]);
+    const lcp = await largestContentfulPaint(page, path);
+    console.log(`LCP ${path}: ${Math.round(lcp)} ms`);
+    expect(lcp).toBeLessThan(3000);
+  });
+}

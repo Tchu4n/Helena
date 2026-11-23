@@ -39,8 +39,8 @@ export function apiPut<T>(path: string, body: unknown, headers?: ExtraHeaders): 
   return request<T>(new URL(path, env.apiUrl), { method: "PUT", body: JSON.stringify(body), headers });
 }
 
-export function apiPatch<T>(path: string, body: unknown): Promise<ApiResult<T>> {
-  return request<T>(new URL(path, env.apiUrl), { method: "PATCH", body: JSON.stringify(body) });
+export function apiPatch<T>(path: string, body: unknown, headers?: ExtraHeaders): Promise<ApiResult<T>> {
+  return request<T>(new URL(path, env.apiUrl), { method: "PATCH", body: JSON.stringify(body), headers });
 }
 
 export function apiDelete<T>(path: string, headers?: ExtraHeaders): Promise<ApiResult<T>> {

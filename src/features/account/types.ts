@@ -11,6 +11,17 @@ export type IdentificationState = {
   notice: string | null;
 };
 
+// CTA-06, CTA-07: the three forms of Dados pessoais. Never hold a code or a password.
+export type ContactState = { errors: { name?: string; phone?: string }; error: string | null; notice: string | null };
+export type EmailChangeState = {
+  step: "closed" | "email" | "code";
+  email: string; // the new e-mail, once the code was sent
+  errors: { email?: string; code?: string };
+  error: string | null;
+  notice: string | null;
+};
+export type PasswordState = { errors: { password?: string }; error: string | null; notice: string | null };
+
 // IDT-14: neutral, says nothing about the other account; the form adds the WhatsApp link under it.
 export const CPF_IN_USE = "Não foi possível usar este CPF.";
 

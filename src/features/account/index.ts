@@ -1,6 +1,11 @@
 export { IdentificationForm } from "./components/IdentificationForm.tsx";
 export { AccountHome } from "./components/AccountHome.tsx";
 export { MyOrders } from "./components/MyOrders.tsx";
+export { PersonalDetails } from "./components/PersonalDetails.tsx";
+export { updateContact } from "./actions/updateContact.ts";
+export { requestEmailChange } from "./actions/requestEmailChange.ts";
+export { confirmEmailChange } from "./actions/confirmEmailChange.ts";
+export { setPassword } from "./actions/setPassword.ts";
 export { listMyOrders } from "./queries/listMyOrders.ts";
 export { signOut } from "./actions/signOut.ts";
 export { requestCode } from "./actions/requestCode.ts";

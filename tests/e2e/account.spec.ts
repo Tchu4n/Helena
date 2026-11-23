@@ -166,3 +166,98 @@ test("signed out, Meus pedidos asks for identification", async ({ page }) => {
   await page.goto("/conta/pedidos");
   await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
 });
+
+// CTA-06: Dados pessoais, signed in with details (and the password given, when there is one).
+async function openPersonalDetails(page: Page, request: APIRequestContext, password: string | null = null) {
+  if (password) await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password, details: DETAILS } });
+  else await signIn(page, request, "maria@exemplo.com");
+  if (password) {
+    await page.goto("/conta");
+    await page.getByRole("button", { name: "Já tem senha? Entrar com senha" }).click();
+    await page.getByRole("textbox", { name: "E-mail", exact: true }).fill("maria@exemplo.com");
+    await page.getByLabel("Senha", { exact: true }).fill(password);
+    await page.getByRole("button", { name: "Entrar" }).click();
+    await expect(page.getByRole("button", { name: "Sair" })).toBeVisible();
+  }
+  await page.goto("/conta/dados");
+  await expect(page.getByRole("heading", { level: 1, name: "Dados pessoais" })).toBeVisible();
+}
+
+test("CTA-06 name and phone are fixed with Salvar; the CPF can't be changed", async ({ page, request }) => {
+  await openPersonalDetails(page, request);
+  const name = page.getByLabel("Nome completo", { exact: true });
+  const phone = page.getByLabel("Celular", { exact: true });
+  const cpf = page.getByLabel("CPF", { exact: true });
+  await expect(name).toHaveValue("Maria Souza");
+  await expect(phone).toHaveValue("(11) 98765-4321");
+  await expect(cpf).toHaveValue("***.982.247-**");
+  await expect(cpf).toHaveAttribute("readonly", "");
+  await expect(page.getByText("O CPF não pode ser alterado")).toBeVisible();
+  await name.fill("");
+  await page.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByText("Campo obrigatório")).toBeVisible();
+  await expect(name).toBeFocused();
+  await name.fill("Maria Souza Lima");
+  await phone.fill("(21) 99999-8888");
+  await page.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByText("Dados salvos")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Nome completo", { exact: true })).toHaveValue("Maria Souza Lima");
+  await expect(page.getByLabel("Celular", { exact: true })).toHaveValue("(21) 99999-8888");
+});
+
+test("CTA-06 a new e-mail takes effect only after its code", async ({ context, page, request }) => {
+  await openPersonalDetails(page, request);
+  await expect(page.getByText("maria@exemplo.com")).toBeVisible();
+  await page.getByRole("button", { name: "Trocar e-mail" }).click();
+  await page.getByLabel("Novo e-mail", { exact: true }).fill("nova@exemplo.com");
+  await page.getByRole("button", { name: "Receber código" }).click();
+  await expect(page.getByText("Enviamos um código para nova@exemplo.com")).toBeVisible();
+  const code = await codeFor(request, "nova@exemplo.com");
+  await page.getByLabel("Código", { exact: true }).fill(code === "000000" ? "111111" : "000000");
+  await page.getByRole("button", { name: "Confirmar" }).click();
+  await expect(page.getByText("Código inválido ou vencido")).toBeVisible();
+  await page.getByLabel("Código", { exact: true }).fill(code);
+  await page.getByRole("button", { name: "Confirmar" }).click();
+  await expect(page.getByText("E-mail trocado")).toBeVisible();
+  const session = JSON.parse(decodeURIComponent((await sessionCookie(context))!.value)) as { email: string };
+  expect(session.email).toBe("nova@exemplo.com");
+  await page.goto("/conta");
+  await expect(page.getByText("nova@exemplo.com")).toBeVisible();
+});
+
+test("Review focus 5: an e-mail with another account changes nothing", async ({ context, page, request }) => {
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "outra@exemplo.com", details: { ...DETAILS, cpf: "11144477735" } } });
+  await openPersonalDetails(page, request);
+  await page.getByRole("button", { name: "Trocar e-mail" }).click();
+  await page.getByLabel("Novo e-mail", { exact: true }).fill("outra@exemplo.com");
+  await page.getByRole("button", { name: "Receber código" }).click();
+  await page.getByLabel("Código", { exact: true }).fill(await codeFor(request, "outra@exemplo.com"));
+  await page.getByRole("button", { name: "Confirmar" }).click();
+  await expect(page.getByText("Este e-mail já está em outra conta")).toBeVisible();
+  const session = JSON.parse(decodeURIComponent((await sessionCookie(context))!.value)) as { email: string };
+  expect(session.email).toBe("maria@exemplo.com");
+  await page.goto("/conta");
+  await expect(page.getByText("maria@exemplo.com")).toBeVisible();
+});
+
+test("CTA-07 Criar senha, then sign in with it, then Trocar senha", async ({ context, page, request }) => {
+  await openPersonalDetails(page, request);
+  // The button says "Criar senha" or "Trocar senha" and sends the "Nova senha" field (CTA-07).
+  const password = page.getByLabel("Nova senha", { exact: true });
+  await password.fill("curta");
+  await page.getByRole("button", { name: "Criar senha" }).click();
+  await expect(page.getByText("A senha precisa ter pelo menos 8 caracteres")).toBeVisible();
+  await password.fill("senha-nova-1");
+  await page.getByRole("button", { name: "Criar senha" }).click();
+  await expect(page.getByText("Senha salva")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Trocar senha" })).toBeVisible();
+  await context.clearCookies({ name: "helena_session" });
+  await openPersonalDetails(page, request, "senha-nova-1");
+  await expect(page.getByRole("button", { name: "Trocar senha" })).toBeVisible();
+});
+
+test("signed out, Dados pessoais asks for identification", async ({ page }) => {
+  await page.goto("/conta/dados");
+  await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
+});

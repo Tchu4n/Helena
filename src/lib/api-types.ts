@@ -515,7 +515,13 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Fixes name, e-mail or phone; the CPF does not change (CTA-06) */
+        /**
+         * Fixes name, e-mail or phone; the CPF does not change (CTA-06)
+         * @description A new `email` needs the `code` sent to it (`POST /v1/email-codes`). The
+         *     code is checked first, so `email_in_use` is only answered to someone who
+         *     proved the new e-mail is hers. The account's sessions and orders follow
+         *     the new e-mail.
+         */
         patch: operations["updateAccount"];
         trace?: never;
     };
@@ -2356,7 +2362,23 @@ export interface operations {
                     "application/json": components["schemas"]["Customer"];
                 };
             };
-            401: components["responses"]["NotAuthenticated"];
+            /** @description No valid session (`not_authenticated`), or the new e-mail's code is wrong, expired or tried 5 times (`invalid_code`, as in IDT-04) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/invalid-code",
+                     *       "title": "Código inválido ou vencido",
+                     *       "status": 401,
+                     *       "code": "invalid_code"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description E-mail already used by another account (`email_in_use`); a guest purchase with that e-mail doesn't count */
             409: {
                 headers: {
