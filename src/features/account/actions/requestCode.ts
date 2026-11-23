@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { apiPost } from "@/src/lib/api";
 import { forwardedFor } from "@/src/lib/request-ip";
+import { clearSession } from "@/src/lib/session-cookie";
 import { readIdentification, saveIdentification } from "../identification-cookie.ts";
 import { emailInput, wayInput } from "../schemas/identification.ts";
 import { START, type IdentificationState, type IdentificationWay } from "../types.ts";
@@ -12,6 +13,7 @@ const mode = z.enum(["checkout", "account"]);
 // IDT-01, IDT-02, IDT-05, CTA-01. No authorization to check: anyone may ask for a code, and the API answers
 // the same for any e-mail and limits attempts by e-mail and IP (429), so her IP goes with the call.
 export async function requestCode(prev: IdentificationState, formData: FormData): Promise<IdentificationState> {
+  await clearSession(); // a new identification ends any old session
   let email: string;
   let way: IdentificationWay;
   const resend = formData.get("resend") === "1";

@@ -211,8 +211,20 @@ async function signUp(context: BrowserContext, page: Page, request: APIRequestCo
   await typeCode(page, await codeFor(request, email));
   await page.getByLabel("Crie sua senha", { exact: true }).fill("senha-segura");
   await page.getByRole("button", { name: "Continuar" }).click();
+  await fillAccountDetails(page);
+  await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page).toHaveURL(/\/checkout$/);
 }
+
+// IDT-14: "Seus dados", with the VALID name, CPF and phone.
+// Dados e entrega has a "Seus dados" section too: the URL tells them apart.
+async function fillAccountDetails(page: Page, cpf = "529.982.247-25") {
+  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await expect(page).toHaveURL(/\/checkout\/identificacao$/);
+  for (const [label, value] of VALID.slice(0, 3)) await page.getByLabel(label, { exact: true }).fill(label === "CPF" ? cpf : value);
+}
+
+const DETAILS = { name: "Maria Souza", cpf: "52998224725", phone: "11987654321" };
 
 // A second bag, started another day: its e-mail is not confirmed yet.
 async function newBag(context: BrowserContext): Promise<string> {
@@ -227,6 +239,8 @@ async function fillDetails(page: Page) {
 }
 
 const sessionCookie = async (context: BrowserContext) => (await context.cookies()).find((c) => c.name === "helena_session");
+const sessionValue = async (context: BrowserContext) =>
+  JSON.parse(decodeURIComponent((await sessionCookie(context))!.value)) as { token: string; detailsComplete: boolean };
 
 test("IDT-08 Criar conta with a new e-mail: the password after the code, then Dados e entrega signed in", async ({ context, page, request }) => {
   await openIdentification(context, page);
@@ -241,8 +255,17 @@ test("IDT-08 Criar conta with a new e-mail: the password after the code, then Da
   await expect(password).toHaveValue("");
   await password.fill("senha-segura");
   await page.getByRole("button", { name: "Continuar" }).click();
+  // IDT-14: "Seus dados" before Dados e entrega, with the CHK-03 messages.
+  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.getByText("Campo obrigatório").first()).toBeVisible();
+  await expect(page.getByLabel("Nome completo", { exact: true })).toBeFocused();
+  expect((await sessionValue(context)).detailsComplete).toBe(false);
+  await fillAccountDetails(page);
+  await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page).toHaveURL(/\/checkout$/);
   await expect(page.getByLabel("E-mail", { exact: true })).toHaveValue("nova@exemplo.com");
+  expect((await sessionValue(context)).detailsComplete).toBe(true);
   const session = await sessionCookie(context);
   expect(session?.httpOnly).toBe(true);
   expect(session?.sameSite).toBe("Lax");
@@ -251,8 +274,20 @@ test("IDT-08 Criar conta with a new e-mail: the password after the code, then Da
   expect(stored).not.toContain(decodeURIComponent(session!.value));
 });
 
-test("IDT-09 Criar conta on an e-mail that has one: signed in, no password asked, the old one kept", async ({ context, page, request }) => {
+test("IDT-09 an account without details: the message, then Seus dados", async ({ context, page, request }) => {
   await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "antiga-123" } });
+  await openIdentification(context, page);
+  await askCode(page, "maria@exemplo.com", /Criar conta/);
+  await typeCode(page, await codeFor(request, "maria@exemplo.com"));
+  await expect(page.getByText("Este e-mail já tem uma conta. Você entrou nela e sua senha não mudou.")).toBeVisible();
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await fillAccountDetails(page);
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+});
+
+test("IDT-09 Criar conta on an e-mail that has one: signed in, no password asked, the old one kept", async ({ context, page, request }) => {
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "antiga-123", details: DETAILS } });
   await openIdentification(context, page);
   await askCode(page, "maria@exemplo.com", /Criar conta/);
   await typeCode(page, await codeFor(request, "maria@exemplo.com"));
@@ -271,8 +306,19 @@ test("IDT-09 Criar conta on an e-mail that has one: signed in, no password asked
   await expect(page).toHaveURL(/\/checkout$/);
 });
 
-test("IDT-10 sign in with a password: a wrong one keeps the e-mail and clears the password", async ({ context, page, request }) => {
+test("IDT-10 sign in with a password into an account without details: Seus dados", async ({ context, page, request }) => {
   await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "certa-123" } });
+  await openIdentification(context, page);
+  await page.getByRole("button", { name: "Já tem senha? Entrar com senha" }).click();
+  await page.getByLabel("E-mail", { exact: true }).fill("maria@exemplo.com");
+  await page.getByLabel("Senha", { exact: true }).fill("certa-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await expect(page).toHaveURL(/\/checkout\/identificacao$/);
+});
+
+test("IDT-10 sign in with a password: a wrong one keeps the e-mail and clears the password", async ({ context, page, request }) => {
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "certa-123", details: DETAILS } });
   await openIdentification(context, page);
   await page.getByRole("button", { name: "Já tem senha? Entrar com senha" }).click();
   const email = page.getByLabel("E-mail", { exact: true });
@@ -327,4 +373,63 @@ test("a session ended on the API sends her to the first step, once, and drops th
   await expect(page).toHaveURL(/\/checkout\/identificacao$/);
   await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
   expect(await sessionCookie(context)).toBeUndefined();
+});
+
+// Sign up and stop on "Seus dados".
+async function stopAtDetails(context: BrowserContext, page: Page, request: APIRequestContext, email: string) {
+  await openIdentification(context, page);
+  await askCode(page, email, /Criar conta/);
+  await typeCode(page, await codeFor(request, email));
+  await page.getByLabel("Crie sua senha", { exact: true }).fill("senha-segura");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await expect(page).toHaveURL(/\/checkout\/identificacao$/);
+}
+
+test("IDT-14 a CPF in another account: a neutral message and the WhatsApp link", async ({ context, page, request }) => {
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "outra@exemplo.com", password: "outra-123", details: DETAILS } });
+  await stopAtDetails(context, page, request, "nova@exemplo.com");
+  await fillAccountDetails(page);
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.getByText("Não foi possível usar este CPF.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Fale com a loja no WhatsApp" })).toHaveAttribute("href", "https://wa.me/5511900000000");
+  await expect(page.getByText("outra@exemplo.com")).toHaveCount(0);
+  await expect(page.getByLabel("CPF", { exact: true })).toBeFocused();
+  await expect(page.getByLabel("Nome completo", { exact: true })).toHaveValue("Maria Souza");
+});
+
+test("IDT-14 Review focus 1: after a reload she is still on Seus dados, signed in", async ({ context, page, request }) => {
+  await stopAtDetails(context, page, request, "nova@exemplo.com");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await expect(page.getByLabel("Rua", { exact: true })).toHaveCount(0); // not Dados e entrega
+  expect(await sessionCookie(context)).toBeDefined();
+});
+
+test("IDT-14 Review focus 2: details saved behind the screen's back go on to Dados e entrega with no message", async ({ context, page, request }) => {
+  await stopAtDetails(context, page, request, "nova@exemplo.com");
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "nova@exemplo.com", password: "senha-segura", details: DETAILS } });
+  await fillAccountDetails(page, "111.444.777-35");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0); // Next's route announcer is outside main
+});
+
+test("IDT-14 gate: signed in without details, Dados e entrega and the account show Seus dados", async ({ context, page, request }) => {
+  await stopAtDetails(context, page, request, "nova@exemplo.com");
+  await page.goto("/checkout");
+  await expect(page).toHaveURL(/\/checkout\/identificacao$/);
+  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await page.goto("/conta");
+  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sair" })).toHaveCount(0);
+});
+
+test("IDT-15 Voltar from the password sign-in keeps the typed e-mail", async ({ context, page }) => {
+  await openIdentification(context, page);
+  await page.getByRole("button", { name: "Já tem senha? Entrar com senha" }).click();
+  await page.getByLabel("E-mail", { exact: true }).fill("maria@exemplo.com");
+  await page.getByRole("button", { name: "Voltar" }).click();
+  await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
+  await expect(page.getByLabel("E-mail", { exact: true })).toHaveValue("maria@exemplo.com");
 });

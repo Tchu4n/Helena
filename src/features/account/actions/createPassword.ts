@@ -1,14 +1,13 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { apiPut } from "@/src/lib/api";
 import { bearer, clearSession, readSession } from "@/src/lib/session-cookie";
 import { clearIdentification } from "../identification-cookie.ts";
 import { passwordInput } from "../schemas/identification.ts";
-import { nextPath } from "../next-path.ts";
 import { START, type IdentificationState } from "../types.ts";
 
 // IDT-08, CTA-07: the password of an account the code has just created. Never kept in the state.
+// "Seus dados" comes next (IDT-14): a new account has no name, CPF and phone yet.
 export async function createPassword(prev: IdentificationState, formData: FormData): Promise<IdentificationState> {
   // Authorization: only the account of her own session.
   const session = await readSession();
@@ -26,5 +25,5 @@ export async function createPassword(prev: IdentificationState, formData: FormDa
     return { ...base, error: result.problem.title };
   }
   await clearIdentification();
-  redirect(nextPath(formData));
+  return { ...base, step: "details" };
 }

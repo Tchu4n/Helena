@@ -23,8 +23,11 @@ export async function goToCheckout(): Promise<CheckoutState> {
   }
   // The API's own answer (for example, a bag emptied in another tab): back to the bag, which shows why.
   if (!result.data.canCheckout) redirect("/sacola");
-  // CHK-01, IDT-01, IDT-11: straight to identification when the bag's e-mail isn't confirmed and she isn't signed in. Going through /checkout
+  // CHK-01, IDT-01, IDT-11, IDT-14: straight to identification when the bag's e-mail isn't confirmed and she isn't signed in, or her
+  // account still lacks "Seus dados". Going through /checkout
   // first would leave its streamed redirect in the page Next keeps hidden, and coming back after the code
   // would replay it.
-  redirect(result.data.verifiedEmail || (await readSession()) ? "/checkout" : "/checkout/identificacao");
+  const session = await readSession();
+  const ready = session ? session.detailsComplete : Boolean(result.data.verifiedEmail);
+  redirect(ready ? "/checkout" : "/checkout/identificacao");
 }

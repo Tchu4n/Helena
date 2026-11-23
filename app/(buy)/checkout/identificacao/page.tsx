@@ -12,6 +12,7 @@ import {
   IdentificationForm,
   readIdentification,
   requestCode,
+  saveAccountDetails,
   signInWithPassword,
   START,
   type IdentificationState,
@@ -27,18 +28,21 @@ async function IdentificationContent() {
   if (!result.ok) return <ErrorMessage title={result.title} retryHref="/checkout/identificacao" />;
   if (!result.cart || result.cart.items.length === 0) redirect("/sacola");
   const pending = await readIdentification();
+  const session = await readSession();
   // IDT-11: signed in, the step is skipped, unless the code has just signed her in and a step is left (IDT-08, IDT-09).
-  if (!pending?.done && (await readSession())) redirect("/checkout");
-  // IDT-07: a code already sent brings her back to the code step after a reload.
-  const initial: IdentificationState = !pending
-    ? START
-    : pending.done
-      ? { ...START, step: pending.done, email: pending.email, way: pending.way, notice: pending.done === "existing" ? EXISTING_ACCOUNT : null }
-      : { ...START, step: "code", email: pending.email, way: pending.way, sentAt: pending.sentAt };
+  if (!pending?.done && session?.detailsComplete) redirect("/checkout");
+  // IDT-07: a code already sent brings her back to the code step after a reload; IDT-14: signed in without details, "Seus dados".
+  const initial: IdentificationState = pending?.done
+    ? { ...START, step: pending.done, email: pending.email, way: pending.way, notice: pending.done === "existing" ? EXISTING_ACCOUNT : null }
+    : session
+      ? { ...START, step: "details", email: session.email }
+      : pending
+        ? { ...START, step: "code", email: pending.email, way: pending.way, sentAt: pending.sentAt }
+        : START;
   return (
     <IdentificationForm
       // A new pending e-mail (or none, after "Trocar e-mail") starts the form over.
-      key={pending ? `pending:${pending.email}` : "email"}
+      key={pending ? `pending:${pending.email}` : session ? "details" : "email"}
       initial={initial}
       mode="checkout"
       whatsapp={env.storeWhatsapp}
@@ -47,12 +51,13 @@ async function IdentificationContent() {
       createPassword={createPassword}
       signInWithPassword={signInWithPassword}
       finishIdentification={finishIdentification}
+      saveAccountDetails={saveAccountDetails}
       changeEmail={changeEmail}
     />
   );
 }
 
-// IDT-01 to IDT-11: the e-mail is confirmed with a code before "Dados e entrega" (inside Suspense: cacheComponents).
+// IDT-01 to IDT-11, IDT-14: the e-mail is confirmed with a code before "Dados e entrega" (inside Suspense: cacheComponents).
 export default function IdentificationPage() {
   return (
     <>

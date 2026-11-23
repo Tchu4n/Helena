@@ -8,7 +8,7 @@ import { apiGet, apiPost, apiPut } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
 import { saveOrderAccess } from "@/src/lib/order-cookie";
 import { forwardedFor } from "@/src/lib/request-ip";
-import { bearer, clearSession, readSession } from "@/src/lib/session-cookie";
+import { bearer, clearSession, readSession, saveSession } from "@/src/lib/session-cookie";
 import { customerDetailsInput, fieldErrors } from "../schemas/customerDetails.ts";
 import type { GoToPaymentState } from "../types.ts";
 
@@ -52,6 +52,11 @@ export async function goToPayment(_prev: GoToPaymentState, formData: FormData): 
       redirect("/checkout/identificacao");
     }
     if (details.problem.code === "email_not_verified") redirect("/checkout/identificacao");
+    // IDT-14: the account lost or never had its details (the cookie said otherwise): "Seus dados" first.
+    if (details.problem.code === "details_missing" && session) {
+      await saveSession({ ...session, detailsComplete: false });
+      redirect("/checkout/identificacao");
+    }
     return { errors: {}, error: details.problem.title };
   }
 

@@ -6,6 +6,7 @@ export { confirmCode } from "./actions/confirmCode.ts";
 export { createPassword } from "./actions/createPassword.ts";
 export { signInWithPassword } from "./actions/signInWithPassword.ts";
 export { finishIdentification } from "./actions/finishIdentification.ts";
+export { saveAccountDetails } from "./actions/saveAccountDetails.ts";
 export { changeEmail } from "./actions/changeEmail.ts";
 export { readIdentification } from "./identification-cookie.ts";
 export { EXISTING_ACCOUNT, START } from "./types.ts";

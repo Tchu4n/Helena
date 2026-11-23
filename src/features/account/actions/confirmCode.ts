@@ -10,7 +10,7 @@ import { codeInput } from "../schemas/identification.ts";
 import { nextPath } from "../next-path.ts";
 import { EXISTING_ACCOUNT, START, type IdentificationState } from "../types.ts";
 
-// IDT-03, IDT-04, IDT-08, IDT-09, CTA-01. The e-mail and the way come only from her own httpOnly cookie, never from the form.
+// IDT-03, IDT-04, IDT-08, IDT-09, IDT-14, CTA-01. The e-mail and the way come only from her own httpOnly cookie, never from the form.
 export async function confirmCode(prev: IdentificationState, formData: FormData): Promise<IdentificationState> {
   const pending = await readIdentification();
   if (!pending) return START; // the 10 minutes ran out: start again
@@ -18,7 +18,7 @@ export async function confirmCode(prev: IdentificationState, formData: FormData)
   const code = codeInput.safeParse(String(formData.get("code") ?? "").slice(0, 20));
   if (!code.success) return { ...base, errors: { code: code.error.issues[0]?.message } };
 
-  // CTA-01: at /conta the code only signs in; the bag is left alone and no step follows.
+  // CTA-01: at /conta the bag is left alone and an existing account skips the IDT-09 message.
   const atAccount = nextPath(formData) === "/conta";
   // Authorization: only her own bag, from the httpOnly cart cookie.
   const cartId = atAccount ? null : await readCartId();
@@ -34,10 +34,12 @@ export async function confirmCode(prev: IdentificationState, formData: FormData)
       if (session.problem.status === 401) return { ...base, errors: { code: "Código inválido ou vencido" } };
       return { ...base, error: session.problem.title };
     }
-    await saveSession({ token: session.data.token, email: pending.email }, session.data.expiresAt);
-    if (atAccount) {
+    const detailsComplete = session.data.detailsComplete ?? false;
+    await saveSession({ token: session.data.token, email: pending.email, detailsComplete, expiresAt: session.data.expiresAt });
+    if (atAccount && !session.data.newAccount) {
       await clearIdentification();
-      redirect("/conta");
+      if (detailsComplete) redirect("/conta");
+      return { ...base, step: "details", sentAt: null }; // IDT-14
     }
     const done = session.data.newAccount ? "password" : "existing";
     await saveIdentification({ ...pending, done });

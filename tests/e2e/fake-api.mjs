@@ -206,6 +206,11 @@ const INCOMPLETE_CART = {
   status: 422,
   code: "incomplete_cart",
 };
+// IDT-14: 409s of the account's details; the CPF one never says whose account has it.
+const conflict = (code, title) => ({ type: `https://helena.example/problems/${code.replaceAll("_", "-")}`, title, status: 409, code });
+const CPF_IN_USE = conflict("cpf_in_use", "Não foi possível usar este CPF");
+const DETAILS_ALREADY_SET = conflict("details_already_set", "Os dados desta conta já foram salvos");
+const DETAILS_MISSING = conflict("details_missing", "Complete seus dados para continuar");
 const NOT_AUTHENTICATED = {
   type: "https://helena.example/problems/not-authenticated",
   title: "Identifique-se para continuar",
@@ -248,7 +253,8 @@ const orders = new Map();
 const codes = new Map();
 const codeTimes = new Map();
 const answered = new Map();
-// IDT-08 to IDT-11: accounts by e-mail ({ password: string | null }) and sessions by token (→ e-mail).
+// IDT-08 to IDT-11, IDT-14: accounts by e-mail ({ password: string | null, details: { name, cpf, phone } | null })
+// and sessions by token (→ e-mail).
 const accounts = new Map();
 const sessions = new Map();
 let nextOrder = 100001;
@@ -418,7 +424,7 @@ function startSession({ email, code, password, cartId }) {
   if (typeof code === "string") {
     if (!takeCode(email, code)) return [401, NOT_AUTHENTICATED];
     newAccount = !accounts.has(email);
-    if (newAccount) accounts.set(email, { password: null });
+    if (newAccount) accounts.set(email, { password: null, details: null });
   } else if (typeof password !== "string" || !accounts.get(email)?.password || accounts.get(email).password !== password) {
     return [401, NOT_AUTHENTICATED];
   }
@@ -426,7 +432,8 @@ function startSession({ email, code, password, cartId }) {
   if (cart) cart.verifiedEmail = email;
   const token = randomUUID();
   sessions.set(token, email);
-  return [201, { token, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), newAccount }];
+  const detailsComplete = Boolean(accounts.get(email).details);
+  return [201, { token, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), newAccount, detailsComplete }];
 }
 
 // The e-mail of the bearer session; undefined without the header, null for an unknown token.
@@ -569,6 +576,18 @@ async function route(req, url) {
     accounts.get(email).password = password;
     return [204, null];
   }
+  // IDT-14: once per account, one CPF per account.
+  if (req.method === "PUT" && url.pathname === "/v1/account/details") {
+    const email = sessionEmail(req);
+    if (!email) return [401, NOT_AUTHENTICATED];
+    const { name, cpf, phone } = await readJson(req);
+    if (![name, cpf, phone].every(filled)) return [422, INVALID_DATA];
+    const account = accounts.get(email);
+    if (account.details) return [409, DETAILS_ALREADY_SET];
+    if ([...accounts.entries()].some(([other, a]) => other !== email && a.details?.cpf === cpf)) return [409, CPF_IN_USE];
+    account.details = { name, cpf, phone };
+    return [200, { name, email, phone, maskedCpf: `***.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-**`, hasPassword: Boolean(account.password) }];
+  }
   // PED-05, PED-06: same 404 for any wrong pair; limite@exemplo.com hits the attempt limit.
   if (req.method === "POST" && url.pathname === "/v1/orders/access") {
     const { number, email } = await readJson(req);
@@ -604,9 +623,10 @@ async function route(req, url) {
     }
     if (req.method === "PUT" && parts[3] === "customer") {
       const body = await readJson(req);
-      if (!validCustomer(body)) return [422, INVALID_DATA];
       const signedIn = sessionEmail(req);
       if (signedIn === null) return [401, NOT_AUTHENTICATED];
+      if (signedIn && !accounts.get(signedIn)?.details) return [409, DETAILS_MISSING]; // IDT-14
+      if (!validCustomer(body)) return [422, INVALID_DATA];
       // IDT-11: a session whose e-mail is the body's confirms it for this bag.
       if (signedIn === body.email) cart.verifiedEmail = body.email;
       if (body.email !== cart.verifiedEmail) return [422, emailNotVerified(422)];
@@ -779,8 +799,8 @@ createServer(async (req, res) => {
     return send(res, 200, { ok: Boolean(cart) });
   }
   if (req.method === "POST" && url.pathname === "/__accounts") {
-    const { email, password = null } = await readJson(req);
-    accounts.set(email, { password });
+    const { email, password = null, details = null } = await readJson(req);
+    accounts.set(email, { password, details });
     return send(res, 200, { ok: true });
   }
   if (req.method === "POST" && url.pathname === "/__end-session") {

@@ -9,6 +9,7 @@ import {
   IdentificationForm,
   readIdentification,
   requestCode,
+  saveAccountDetails,
   signInWithPassword,
   signOut,
   START,
@@ -22,14 +23,18 @@ export const metadata: Metadata = { title: "Minha conta · Helena" };
 async function AccountContent() {
   // Authorization: the page shows the account only with her own session cookie.
   const session = await readSession();
-  if (session) return <AccountHome email={session.email} signOut={signOut} />;
+  if (session?.detailsComplete) return <AccountHome email={session.email} signOut={signOut} />;
   // IDT-07 here too: a code already sent brings her back to the code step after a reload.
+  // IDT-14, CTA-01: signed in without details, "Crie sua senha" (a new account) or "Seus dados" first.
   const pending = await readIdentification();
-  const waiting = pending && !pending.done ? pending : null;
-  const initial: IdentificationState = waiting ? { ...START, step: "code", email: waiting.email, way: "account", sentAt: waiting.sentAt } : START;
+  const initial: IdentificationState = session
+    ? { ...START, step: pending?.done === "password" ? "password" : "details", email: session.email, way: "account" }
+    : pending && !pending.done
+      ? { ...START, step: "code", email: pending.email, way: "account", sentAt: pending.sentAt }
+      : START;
   return (
     <IdentificationForm
-      key={waiting ? `pending:${waiting.email}` : "email"}
+      key={`${initial.step}:${initial.email}`}
       initial={initial}
       mode="account"
       whatsapp={env.storeWhatsapp}
@@ -38,6 +43,7 @@ async function AccountContent() {
       createPassword={createPassword}
       signInWithPassword={signInWithPassword}
       finishIdentification={finishIdentification}
+      saveAccountDetails={saveAccountDetails}
       changeEmail={changeEmail}
     />
   );

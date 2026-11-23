@@ -12,8 +12,11 @@ const codeFor = async (request: APIRequestContext, email: string) =>
 
 const sessionCookie = async (context: BrowserContext) => (await context.cookies()).find((c) => c.name === "helena_session");
 
-// CTA-01: the code always signs in at /conta; a new e-mail gets a new, empty account.
+const DETAILS = { name: "Maria Souza", cpf: "52998224725", phone: "11987654321" };
+
+// CTA-01: the code always signs in at /conta, here into an account that already has its details.
 async function signIn(page: Page, request: APIRequestContext, email: string) {
+  await request.post(`${FAKE_API}/__accounts`, { data: { email, details: DETAILS } });
   await page.goto("/conta");
   await page.getByRole("textbox", { name: "E-mail", exact: true }).fill(email);
   await page.getByRole("button", { name: "Receber código" }).click();
@@ -32,13 +35,25 @@ test("CTA-01 the Conta tab signs in with a code, no way to choose", async ({ pag
   await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Já tem senha? Entrar com senha" })).toBeVisible();
   await expect(page.getByRole("radiogroup")).toHaveCount(0);
-  await signIn(page, request, "nova@exemplo.com");
+  // A new e-mail goes through the full sign-up: "Crie sua senha", then "Seus dados" (IDT-14).
+  await page.getByRole("textbox", { name: "E-mail", exact: true }).fill("nova@exemplo.com");
+  await page.getByRole("button", { name: "Receber código" }).click();
+  await expect(page.getByText("Enviamos um código para nova@exemplo.com")).toBeVisible();
+  await page.getByLabel("Código", { exact: true }).fill(await codeFor(request, "nova@exemplo.com"));
+  await page.getByRole("button", { name: "Confirmar" }).click();
+  await page.getByLabel("Crie sua senha", { exact: true }).fill("senha-segura");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await page.getByLabel("Nome completo", { exact: true }).fill("Maria Souza");
+  await page.getByLabel("CPF", { exact: true }).fill("529.982.247-25");
+  await page.getByLabel("Celular", { exact: true }).fill("(11) 98765-4321");
+  await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page).toHaveURL(/\/conta$/);
-  await expect(page.getByLabel("Crie sua senha", { exact: true })).toHaveCount(0); // the password comes with Dados pessoais
+  await expect(page.getByRole("button", { name: "Sair" })).toBeVisible();
 });
 
 test("CTA-01 sign in with a password at /conta", async ({ page, request }) => {
-  await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "certa-123" } });
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "certa-123", details: DETAILS } });
   await page.goto("/conta");
   await page.getByRole("button", { name: "Já tem senha? Entrar com senha" }).click();
   await page.getByRole("textbox", { name: "E-mail", exact: true }).fill("maria@exemplo.com");

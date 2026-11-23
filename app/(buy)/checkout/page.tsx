@@ -17,6 +17,8 @@ async function CheckoutContent() {
   if (!cart || cart.items.length === 0) redirect("/sacola");
   // IDT-11: signed in, the e-mail is the session's (a new bag isn't confirmed yet; the customer step confirms it).
   const session = await readSession();
+  // IDT-14: an account without name, CPF and phone fills "Seus dados" first.
+  if (session && !session.detailsComplete) redirect("/checkout/identificacao");
   const email = session?.email ?? cart.verifiedEmail;
   // IDT-12: no confirmed e-mail, no "Dados e entrega".
   if (!email) redirect("/checkout/identificacao");
