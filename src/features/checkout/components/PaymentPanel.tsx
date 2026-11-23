@@ -127,7 +127,7 @@ function PaymentMethods({ total, retry, savedPix, installmentOptions, payWithPix
       const answer = await checkPayment();
       if (answer.status === "paid" && answer.number) {
         clearInterval(id);
-        router.push(`/?pedido=${answer.number}`);
+        router.push(`/pedido/${answer.number}?confirmado=1`);
       } else if (answer.status === "expired") {
         clearInterval(id);
         onExpired();

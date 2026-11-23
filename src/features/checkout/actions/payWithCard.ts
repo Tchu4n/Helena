@@ -17,7 +17,7 @@ const CardPayment = z.object({
   idempotencyKey: z.uuid(),
 });
 
-// CHK-18 to CHK-21: approved goes to the success message; declined shows the gateway's message.
+// CHK-18 to CHK-21: approved goes to the order confirmation; declined shows the gateway's message.
 export async function payWithCard(_prev: PayState, formData: FormData): Promise<PayState> {
   // Authorization: the order only from her own httpOnly order cookie.
   const access = await readOrderAccess();
@@ -33,12 +33,12 @@ export async function payWithCard(_prev: PayState, formData: FormData): Promise<
   );
   if (!result.ok) {
     const { status, code } = result.problem;
-    if (status === 409 && code === "order_already_paid") redirect(`/?pedido=${access.number}`);
+    if (status === 409 && code === "order_already_paid") redirect(`/pedido/${access.number}?confirmado=1`);
     if (status === 409) redirect("/sacola"); // CHK-13 / CHK-21: a piece sold out; the bag says which
     if (status === 401 || status === 404) redirect("/checkout");
     return { status: "failed", pix: null, message: result.problem.title };
   }
-  if (result.data.status === "approved") redirect(`/?pedido=${access.number}`);
+  if (result.data.status === "approved") redirect(`/pedido/${access.number}?confirmado=1`);
   refresh(); // a decline ends the reservation: the timer goes away
   return { status: "declined", pix: null, message: result.data.message ?? FAILED };
 }

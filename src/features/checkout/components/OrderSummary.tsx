@@ -14,9 +14,10 @@ function Line({ label, value }: { label: string; value: string }) {
 }
 
 // CHK-11: closed by default to keep the form close; opens to items, discount, shipping, delivery time and total.
-export function OrderSummary({ summary }: { summary: SummaryView }) {
+// PED-01: the confirmation opens it, since there it is the content itself.
+export function OrderSummary({ summary, open = false }: { summary: SummaryView; open?: boolean }) {
   return (
-    <details className="group bg-card">
+    <details open={open} className="group bg-card">
       <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-[0.9375rem] [&::-webkit-details-marker]:hidden">
         <span>Resumo · {pieces(summary.pieceCount)}</span>
         <span className="flex items-center gap-2">

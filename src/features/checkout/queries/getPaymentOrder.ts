@@ -6,7 +6,7 @@ import { toPaymentView, type PaymentView } from "../views.ts";
 
 type Order = components["schemas"]["Order"];
 
-// Statuses after the payment went through: the payment page sends her to the success message instead.
+// Statuses after the payment went through: the payment page sends her to the order confirmation instead.
 export function isPaid(status: Order["status"]): boolean {
   return status !== "awaiting_payment" && status !== "reservation_expired";
 }

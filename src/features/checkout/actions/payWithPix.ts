@@ -25,7 +25,7 @@ export async function payWithPix(_prev: PayState, formData: FormData): Promise<P
   );
   if (!result.ok) {
     const { status, code } = result.problem;
-    if (status === 409 && code === "order_already_paid") redirect(`/?pedido=${access.number}`);
+    if (status === 409 && code === "order_already_paid") redirect(`/pedido/${access.number}?confirmado=1`);
     if (status === 409) redirect("/sacola"); // CHK-13: a piece sold out; the bag says which
     if (status === 401 || status === 404) redirect("/checkout");
     return { status: "failed", pix: null, message: result.problem.title };

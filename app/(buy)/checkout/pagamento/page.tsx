@@ -12,7 +12,7 @@ async function PaymentContent() {
   if (!result.ok && result.reason === "no_order") redirect("/checkout");
   if (!result.ok) return <ErrorMessage title={result.title ?? "Não foi possível concluir. Tente de novo"} retryHref="/checkout/pagamento" />;
   const order = result.order;
-  if (order.status !== "awaiting_payment" && order.status !== "reservation_expired") redirect(`/?pedido=${order.number}`);
+  if (order.status !== "awaiting_payment" && order.status !== "reservation_expired") redirect(`/pedido/${order.number}?confirmado=1`);
   return (
     <div className="flex flex-col gap-3 px-4 pt-2 pb-6">
       <h1 className="sr-only">Pagamento</h1>
