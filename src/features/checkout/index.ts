@@ -12,3 +12,4 @@ export { checkPayment } from "./actions/checkPayment.ts";
 export { PaymentPanel } from "./components/PaymentPanel.tsx";
 export { ReservationTimer } from "./components/ReservationTimer.tsx";
 export { finishPurchase } from "./actions/finishPurchase.ts";
+export { addressDetailsInput, CONTACT_FIELDS, contactInput } from "./schemas/customerDetails.ts";

@@ -29,6 +29,8 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | `/checkout/pagamento` | `PaymentPage` |
 | `/privacidade` (política de privacidade; page still to build) | `PrivacyPage` |
 | `/conta` | `AccountPage` |
+| `/conta/pedidos` (meus pedidos) | `MyOrdersPage` |
+| `/conta/dados` (dados pessoais) | `PersonalDetailsPage` |
 | `/pedido` (consultar pedido sem conta) | `OrderLookupPage` |
 | `/pedido/[numero]` (confirmação e acompanhamento) | `OrderPage` |
 | `?confirmado=1` (confirmação logo após o pagamento) | `confirmed` |
@@ -38,7 +40,8 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | `?precoMin=`, `?precoMax=` | `minPrice`, `maxPrice` |
 | `?busca=` | `search` |
 | `?ordem=` | `sort` |
-| `?pagina=` | `page` |
+| `?pagina=` (catálogo, busca, meus pedidos) | `page` |
+| `?sessao=encerrada` (identificação depois de a sessão terminar na API) | `sessionEnded` |
 | `ordem`: `novidades`, `menor-preco`, `maior-preco`, `maior-desconto`, `mais-vendidos` | `newest`, `lowest_price`, `highest_price`, `biggest_discount`, `best_sellers` |
 | `categoria`: `camisetas`, `calcas`, `jaquetas`, `acessorios` | `tshirts`, `pants`, `jackets`, `accessories` |
 
@@ -160,6 +163,11 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | cookie da sessão | `helena_session` (`readSession`, `saveSession`, `clearSession`) |
 | cookie da identificação (código pendente) | `helena_identification` (`readIdentification`, `saveIdentification`, `clearIdentification`) |
 | início da conta (tela) | `AccountHome` |
+| seus dados (cadastro da conta: nome, CPF, celular) | `details` step, `saveAccountDetails`, `AccountDetails`, `detailsComplete` |
+| dados de contato (nome, CPF, celular) | `contact` (`contactInput`, `CONTACT_FIELDS`) |
+| conta (registro) e cliente de compra sem conta (lead) | `is_account` = 1 / 0 in `customer` |
+| meus pedidos | `MyOrders`, `listMyOrders`, `MyOrderView` |
+| dados pessoais | `PersonalDetails`, `updateContact`, `requestEmailChange`, `confirmEmailChange`, `setPassword` |
 | WhatsApp da loja | `STORE_WHATSAPP` |
 | consentimento, canal, versão do texto | `consent`, `channel`, `textVersion` |
 | pedido de dados: cópia, exclusão (status: aberto, concluído) | `dataRequest`: `copy`, `deletion` (`open`, `completed`) |

@@ -69,7 +69,7 @@ Code and docs are written in plain English, so any dev, beginners included, can 
 
 | File | Content |
 |---|---|
-| `docs/SPEC-CLIENT.md` | The 8 customer screens plus the identification step, in 117 scenarios |
+| `docs/SPEC-CLIENT.md` | The 8 customer screens plus the identification step, in 119 scenarios |
 | `docs/DESIGN.md` | Colors, type and interface components |
 | `contract/openapi.yaml` | Contract of the API used by the customer screens |
 | `database/schema.sql` | Database schema (draft) |

@@ -403,6 +403,7 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 - **Given** the customer filled in all required fields with valid values
 - **When** she leaves the last field, even without moving on to payment
 - **Then** the data is saved as a lead
+- **And** every purchase keeps its own full details (name, CPF, email, phone, address), with or without an account; a signed-in purchase gets a copy of the account's name, CPF and phone (owner's decision of 2026-11-23)
 
 **CHK-06 — Reminder notice** (LGPD)
 - **Then** next to the phone field the screen warns that the phone may be used to remind about the unfinished purchase, with a link to the privacy policy (the email part of the notice moved to `IDT-01` on 2026-11-23, where the email is given)
@@ -419,6 +420,7 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 - **When** the customer fills in the form
 - **Then** the purchase goes on with no duplicate error and no login request
 - **And** the screen neither shows nor fills in any old data tied to that CPF or email
+- **And** a signed-in customer's details come from her own account (`IDT-11`), never from earlier purchases
 
 **CHK-09 — Choose delivery** (E7)
 - **Given** the address filled in
@@ -531,20 +533,21 @@ Owner's decisions of 2026-11-23: every purchase needs an email confirmed with a 
 **IDT-08 — Create an account**
 - **Given** "Criar conta" and an email with no account
 - **When** she confirms the code
-- **Then** she is asked "Crie sua senha" (8 to 72 characters) and, after "Continuar", goes to "Dados e entrega" signed in
+- **Then** she is asked "Crie sua senha" (8 to 72 characters), then "Seus dados" (`IDT-14`), and goes to "Dados e entrega" signed in
 
 **IDT-09 — Create an account on an email that has one**
 - **Given** "Criar conta" and an email that already has an account
 - **When** she confirms the code
-- **Then** the screen says "Este e-mail já tem uma conta. Você entrou nela e sua senha não mudou.", asks for no password, and "Continuar" goes to "Dados e entrega" signed in
+- **Then** the screen says "Este e-mail já tem uma conta. Você entrou nela e sua senha não mudou.", asks for no password, and "Continuar" goes to "Dados e entrega" signed in (through "Seus dados" first if the account lacks them, `IDT-14`)
 
 **IDT-10 — Sign in with a password**
 - **When** she taps "Já tem senha? Entrar com senha" and enters email and password
-- **Then** with the right password she goes to "Dados e entrega" signed in; with a wrong one the screen says "E-mail ou senha não conferem", keeps the email and clears the password
+- **Then** with the right password she goes to "Dados e entrega" signed in (through "Seus dados" first if the account lacks them); with a wrong one the screen says "E-mail ou senha não conferem", keeps the email and clears the password
 
 **IDT-11 — Already signed in**
 - **Given** the customer is signed in
-- **Then** "Finalizar compra" skips identification and "Dados e entrega" comes with her account's email, read-only, without "Trocar e-mail"
+- **Then** "Finalizar compra" skips identification and "Dados e entrega" comes with her account's email, name, CPF (partly hidden, as "***.456.789-**") and phone, all read-only, without "Trocar e-mail"; she fills in only the address, the delivery and the boxes
+- **And** these details are changed only in Dados pessoais (`CTA-06`); the purchase keeps a copy of them
 
 **IDT-12 — No confirmed email**
 - **When** she opens "Dados e entrega" or taps "Ir para pagamento" without a confirmed email
@@ -553,6 +556,17 @@ Owner's decisions of 2026-11-23: every purchase needs an email confirmed with a 
 **IDT-13 — Change the email**
 - **When** she taps "Trocar e-mail"
 - **Then** the confirmation is dropped and she is back on the first step, with the email empty
+
+**IDT-14 — Sign-up details** (owner's decision of 2026-11-23)
+- **Given** an account without name, CPF and phone (just created, or left without them)
+- **Then** before "Dados e entrega" or the account's sections she sees "Seus dados" with "Nome completo", "CPF" and "Celular", the `CHK-03` validation, and "Continuar"
+- **And** a CPF already in another account shows "Não foi possível usar este CPF." with the link "Fale com a loja no WhatsApp", and says nothing about that account
+- **And** after a reload she is back on "Seus dados", still signed in
+- **And** the address comes at her first purchase (`CTA-05`)
+
+**IDT-15 — Back from the password**
+- **When** she is on "Já tem senha? Entrar com senha" and taps "Voltar"
+- **Then** she is back on the first step, with the email she typed
 
 ## 9. Confirmation and tracking (PED)
 
@@ -633,7 +647,7 @@ Owner's decisions of 2026-11-23: every purchase needs an email confirmed with a 
 - **Given** the customer is not identified
 - **When** she opens the Conta tab and enters her email
 - **Then** the screen says "Enviamos um código para {e-mail}", whatever the email
-- **And** the 6-number code she gets opens the account, works only once and expires in 10 minutes; an email with no account gets a new, empty account (`CTA-04`)
+- **And** the 6-number code she gets opens the account, works only once and expires in 10 minutes; an email with no account goes through the full sign-up: "Crie sua senha", then "Seus dados" (`IDT-14`)
 - **And** she can also use "Já tem senha? Entrar com senha" (owner's decision of 2026-11-23: code instead of link)
 
 **CTA-02 — Account sections**
@@ -641,12 +655,12 @@ Owner's decisions of 2026-11-23: every purchase needs an email confirmed with a 
 - **Then** she sees Meus pedidos, Meus endereços, Dados pessoais and Privacidade
 
 **CTA-03 — My orders**
-- **Then** the customer sees her orders from newest to oldest, with number, date, total and state
+- **Then** the customer sees "Meus pedidos" from newest to oldest, with number, date, total and state, 24 per page with "Anterior" and "Próxima"
 - **And** tapping an order opens tracking (`PED-03`) with the full details
 
 **CTA-04 — No orders**
 - **Given** an account with no orders
-- **Then** the screen says there are no orders yet and offers "Ver novidades"
+- **Then** the screen says "Você ainda não tem pedidos" and offers "Ver novidades"
 
 **CTA-05 — My addresses**
 - **Then** the customer can add, edit and remove addresses, with the same validation as checkout
@@ -656,9 +670,13 @@ Owner's decisions of 2026-11-23: every purchase needs an email confirmed with a 
 - **Then** the customer sees name, email, phone and CPF (partly hidden) and can fix name, email and phone, with the `CHK-03` validation
 - **And** the CPF can't be changed from the screen
 - **And** a new email only takes effect after she enters the code sent to it (owner's decision of 2026-11-23)
+- **Then** the screen "Dados pessoais" shows "O CPF não pode ser alterado" next to the CPF; "Salvar" saves name and phone and says "Dados salvos"
+- **When** she taps "Trocar e-mail", types the "Novo e-mail", taps "Receber código" and confirms the "Código"
+- **Then** the screen says "E-mail trocado"; an email that belongs to another account shows "Este e-mail já está em outra conta" and nothing changes
 
 **CTA-07 — Optional password** (E18)
 - **Then** the customer can create a password of 8 to 72 characters to sign in without the code, in the account or at identification with "Criar conta" (`IDT-08`)
+- **And** in Dados pessoais the button says "Criar senha" or "Trocar senha", the field "Nova senha", and the screen confirms "Senha salva"
 - **And** nothing in the account or the purchase depends on having a password
 
 **CTA-08 — Privacy: consents** (LGPD)
@@ -708,6 +726,9 @@ The requirements didn't settle these points. The owner decided on 2026-11-14; th
 | 20 | Name of the same-day courier option (decided on 2026-11-20) | The customer sees "Entrega Helena", never "Motoboy", on every screen (product, bag, checkout, order). In the code it stays `courier` |
 | 21 | Email before paying (decided on 2026-11-23) | Every purchase needs an email confirmed with a 6-number code; two ways: only email, or account with password (`IDT-*`). If the email service is down, the store doesn't sell |
 | 22 | "Criar conta" on an email that has an account (decided on 2026-11-23) | Denied: she is signed in by the code and the old password stays (`IDT-09`) |
+| 23 | Details of a purchase and of an account (decided on 2026-11-23) | Every purchase keeps its own full details, with or without an account. An account is complete (name, CPF, phone) before it buys; the address comes at the first purchase (`IDT-14`, `CHK-05`). **Replaces "a new email gets an empty account"** (`CTA-01`) |
+| 24 | One CPF per account (decided on 2026-11-23) | A CPF already in another account is refused with a neutral message; guest purchases with that CPF don't count (`IDT-14`) |
+| 25 | Signed-in checkout (decided on 2026-11-23) | Name, CPF (partly hidden) and phone come from the account, read-only; changed only in Dados pessoais (`IDT-11`, `CTA-06`) |
 
 **Settled in the contract (`contract/openapi.yaml`):** the delivery time of each option, including the courier cutoff time, comes as ready-made text from the API; the catalog is paginated (24 per page, 48 max). Sorting is in the launch by the owner's decision (`CAT-09`).
 

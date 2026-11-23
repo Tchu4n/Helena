@@ -34,19 +34,24 @@ GO
 -- existing record: someone typing another person's CPF must not be able to
 -- change her e-mail (which is where the access link goes). The typed details
 -- stay in the cart and in the order.
+-- Rows 23, 24 (2026-11-23): a guest's lead (is_account = 0) and an account
+-- (is_account = 1) are different rows, each kind with its own unique CPF and
+-- e-mail, so an account can use a CPF a guest purchase used before. An account
+-- may lack name, CPF and phone only until "Seus dados" (IDT-14). A signed-in
+-- order points to the account row and keeps its own copy of the details.
 CREATE TABLE dbo.customer (
     customer_id          INT IDENTITY(1,1) NOT NULL,
-    name                 NVARCHAR(100)     NOT NULL,
-    cpf                  CHAR(11)          NOT NULL,
+    is_account           BIT               NOT NULL CONSTRAINT df_customer_is_account DEFAULT 0,
+    name                 NVARCHAR(100)     NULL,
+    cpf                  CHAR(11)          NULL,
     email                NVARCHAR(150)     NOT NULL,
-    phone                VARCHAR(15)       NOT NULL,
+    phone                VARCHAR(15)       NULL,
     status               VARCHAR(10)       NOT NULL CONSTRAINT df_customer_status DEFAULT 'lead',
     password_hash        VARCHAR(255)      NULL,     -- optional (E18)
     last_interaction_at  DATETIME2(3)      NOT NULL CONSTRAINT df_customer_interaction DEFAULT SYSUTCDATETIME(),
     created_at           DATETIME2(3)      NOT NULL CONSTRAINT df_customer_created DEFAULT SYSUTCDATETIME(),
     CONSTRAINT pk_customer PRIMARY KEY CLUSTERED (customer_id),
-    CONSTRAINT uq_customer_cpf UNIQUE (cpf),
-    CONSTRAINT uq_customer_email UNIQUE (email),
+    CONSTRAINT ck_customer_details CHECK (is_account = 1 OR (name IS NOT NULL AND cpf IS NOT NULL AND phone IS NOT NULL)),
     CONSTRAINT ck_customer_status CHECK (status IN ('lead', 'customer')),
     CONSTRAINT ck_customer_cpf CHECK (cpf NOT LIKE '%[^0-9]%' AND LEN(cpf) = 11),
     CONSTRAINT ck_customer_phone CHECK (phone NOT LIKE '%[^0-9]%'),
@@ -54,6 +59,11 @@ CREATE TABLE dbo.customer (
 );
 -- E10: list of leads that did not buy, from the most recent contact to the oldest.
 CREATE NONCLUSTERED INDEX ix_customer_leads ON dbo.customer (last_interaction_at DESC) WHERE status = 'lead';
+-- One CPF and one e-mail per account, and per lead; a lead and an account may share them.
+CREATE UNIQUE NONCLUSTERED INDEX uq_account_cpf ON dbo.customer (cpf) WHERE is_account = 1 AND cpf IS NOT NULL;
+CREATE UNIQUE NONCLUSTERED INDEX uq_account_email ON dbo.customer (email) WHERE is_account = 1;
+CREATE UNIQUE NONCLUSTERED INDEX uq_lead_cpf ON dbo.customer (cpf) WHERE is_account = 0;
+CREATE UNIQUE NONCLUSTERED INDEX uq_lead_email ON dbo.customer (email) WHERE is_account = 0;
 GO
 
 -- CTA-05: addresses saved in the account.

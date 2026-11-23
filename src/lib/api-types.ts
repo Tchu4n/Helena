@@ -263,6 +263,12 @@ export interface paths {
          *     The e-mail must be the cart's `verifiedEmail` (IDT-03). Sent with a
          *     customer session whose e-mail equals the body's, it confirms that e-mail
          *     for the cart (IDT-11). Otherwise `422` with `code: email_not_verified`.
+         *
+         *     With a customer session, `name`, `cpf` and `phone` are left out: the
+         *     API copies the account's into this purchase (IDT-11, CHK-05; the front
+         *     end only knows the masked CPF). An account still without them answers
+         *     `409` with `code: details_missing` (IDT-14). Without a session, the
+         *     three are required and a missing one answers `422` `invalid_data`.
          */
         put: operations["saveCustomerDetails"];
         post?: never;
@@ -519,6 +525,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/account/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Saves the account's name, CPF and phone once, before its first purchase (IDT-14)
+         * @description Called once, right after the account is created (or when it was left
+         *     without them). Afterwards the CPF never changes, and name and phone are
+         *     fixed with `PATCH /v1/account` (CTA-06). One CPF per account; guest
+         *     purchases with that CPF don't count.
+         */
+        put: operations["saveAccountDetails"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/account/orders": {
         parameters: {
             query?: never;
@@ -671,7 +700,7 @@ export interface components {
             detail?: string;
             instance?: string;
             /** @enum {string} */
-            code: "invalid_data" | "not_authenticated" | "not_found" | "out_of_stock" | "invalid_coupon" | "delivery_unavailable" | "incomplete_cart" | "order_already_paid" | "return_already_requested" | "return_period_ended" | "order_not_delivered" | "email_in_use" | "too_many_requests" | "email_not_verified" | "invalid_code" | "internal_error";
+            code: "invalid_data" | "not_authenticated" | "not_found" | "out_of_stock" | "invalid_coupon" | "delivery_unavailable" | "incomplete_cart" | "order_already_paid" | "return_already_requested" | "return_period_ended" | "order_not_delivered" | "email_in_use" | "too_many_requests" | "email_not_verified" | "invalid_code" | "cpf_in_use" | "details_already_set" | "details_missing" | "internal_error";
             /** @description Present in `invalid_data` */
             errors?: {
                 /** @example cpf */
@@ -1001,16 +1030,20 @@ export interface components {
             /** Format: uuid */
             id: string;
         };
+        /**
+         * @description `name`, `cpf` and `phone` are required without a customer session and
+         *     left out with one (the account's are copied; see `saveCustomerDetails`).
+         */
         CustomerDetails: {
             /** @example Maria Souza */
-            name: string;
-            cpf: components["schemas"]["Cpf"];
+            name?: string;
+            cpf?: components["schemas"]["Cpf"];
             /**
              * Format: email
              * @example maria@exemplo.com
              */
             email: string;
-            phone: components["schemas"]["Phone"];
+            phone?: components["schemas"]["Phone"];
             address: components["schemas"]["Address"];
             /** @description One consent per channel, both false by default (CHK-07) */
             consents: {
@@ -1206,6 +1239,17 @@ export interface components {
              * @example false
              */
             newAccount?: boolean;
+            /**
+             * @description `true` when the account has name, CPF and phone (IDT-14)
+             * @example true
+             */
+            detailsComplete?: boolean;
+        };
+        AccountDetails: {
+            /** @example Maria Souza */
+            name: string;
+            cpf: components["schemas"]["Cpf"];
+            phone: components["schemas"]["Phone"];
         };
         Customer: {
             /** @example Maria Souza */
@@ -1769,6 +1813,15 @@ export interface operations {
             200: components["responses"]["Cart"];
             401: components["responses"]["NotAuthenticated"];
             404: components["responses"]["NotFound"];
+            /** @description Sent with a session whose account has no name, CPF and phone yet (`details_missing`, IDT-14) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description Invalid input (`invalid_data`, with `errors`), or an e-mail that is not the cart's confirmed one (`email_not_verified`, IDT-12) */
             422: {
                 headers: {
@@ -2303,6 +2356,45 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["NotAuthenticated"];
+            422: components["responses"]["InvalidData"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    saveAccountDetails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountDetails"];
+            };
+        };
+        responses: {
+            /** @description Details saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            401: components["responses"]["NotAuthenticated"];
+            /**
+             * @description The CPF is in another account (`cpf_in_use`; the answer never says
+             *     whose), or this account already has its details (`details_already_set`)
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             422: components["responses"]["InvalidData"];
             500: components["responses"]["InternalError"];
         };

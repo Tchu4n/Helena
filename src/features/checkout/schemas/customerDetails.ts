@@ -4,7 +4,9 @@ import { z } from "zod";
 import type { components } from "../../../lib/api-types.ts";
 
 // IDT-03: the e-mail is not a form field; the server adds the one confirmed with the code.
-type CustomerDetails = Omit<components["schemas"]["CustomerDetails"], "email">;
+// The contract leaves name, CPF and phone out of `required` (signed in, the API copies the account's).
+type AddressDetails = Omit<components["schemas"]["CustomerDetails"], "email" | "name" | "cpf" | "phone">;
+type Contact = components["schemas"]["AccountDetails"];
 
 // Version of the consent text the boxes show (CHK-07); bump it when the text changes.
 export const CONSENT_TEXT_VERSION = "2026-11";
@@ -22,6 +24,8 @@ export const DETAILS_FIELDS = [
   "state",
 ] as const;
 export type DetailsField = (typeof DETAILS_FIELDS)[number];
+// IDT-14: "Seus dados" asks only these; IDT-11: signed in, checkout shows them read-only.
+export const CONTACT_FIELDS = ["name", "cpf", "phone"] as const;
 
 const REQUIRED = "Campo obrigatório";
 const TOO_LONG = "Texto muito longo"; // only reachable by getting around the field's maxLength
@@ -49,65 +53,76 @@ const required = (max: number) => text(z.string().trim().min(1, REQUIRED).max(ma
 // An unchecked box is simply missing from the form data.
 const box = z.unknown().optional().transform((v) => v === "on");
 
+// One place for the name, CPF and phone rules: checkout and "Seus dados" (IDT-14) show the same messages.
+const contact = {
+  name: required(100),
+  cpf: text(
+    z
+      .string()
+      .trim()
+      .min(1, REQUIRED)
+      .transform(digits)
+      .pipe(z.string().regex(/^\d{11}$/, "CPF deve ter 11 números").refine(isValidCpf, "CPF inválido")),
+  ),
+  phone: text(
+    z
+      .string()
+      .trim()
+      .min(1, REQUIRED)
+      .transform(digits)
+      .pipe(
+        z
+          .string()
+          .regex(/^\d+$/, "Digite só números")
+          .min(10, "Digite o celular com DDD")
+          .max(11, "Digite o celular com DDD"),
+      ),
+  ),
+};
+
+const address = {
+  cep: text(z.string().trim().min(1, REQUIRED).transform(digits).pipe(z.string().regex(/^\d{8}$/, "Digite um CEP com 8 números"))),
+  street: required(100),
+  number: required(10),
+  complement: text(z.string().trim().max(40, TOO_LONG)),
+  neighborhood: required(60),
+  city: required(60),
+  state: text(
+    z
+      .string()
+      .trim()
+      .min(1, REQUIRED)
+      .regex(/^[A-Za-z]{2}$/, "Digite a sigla do estado, como SP")
+      .transform((v) => v.toUpperCase()),
+  ),
+  marketingEmail: box,
+  marketingWhatsapp: box,
+};
+
+function toDetails(v: z.infer<z.ZodObject<typeof address>>): AddressDetails {
+  return {
+    address: {
+      cep: v.cep,
+      street: v.street,
+      number: v.number,
+      complement: v.complement || null,
+      neighborhood: v.neighborhood,
+      city: v.city,
+      state: v.state,
+    },
+    consents: { email: v.marketingEmail, whatsapp: v.marketingWhatsapp, textVersion: CONSENT_TEXT_VERSION },
+  };
+}
+
+export const contactInput = z.object(contact).transform((v): Contact => ({ name: v.name, cpf: v.cpf, phone: v.phone }));
+
+// Without a session: name, CPF and phone go with the address.
 export const customerDetailsInput = z
-  .object({
-    name: required(100),
-    cpf: text(
-      z
-        .string()
-        .trim()
-        .min(1, REQUIRED)
-        .transform(digits)
-        .pipe(z.string().regex(/^\d{11}$/, "CPF deve ter 11 números").refine(isValidCpf, "CPF inválido")),
-    ),
-    phone: text(
-      z
-        .string()
-        .trim()
-        .min(1, REQUIRED)
-        .transform(digits)
-        .pipe(
-          z
-            .string()
-            .regex(/^\d+$/, "Digite só números")
-            .min(10, "Digite o celular com DDD")
-            .max(11, "Digite o celular com DDD"),
-        ),
-    ),
-    cep: text(z.string().trim().min(1, REQUIRED).transform(digits).pipe(z.string().regex(/^\d{8}$/, "Digite um CEP com 8 números"))),
-    street: required(100),
-    number: required(10),
-    complement: text(z.string().trim().max(40, TOO_LONG)),
-    neighborhood: required(60),
-    city: required(60),
-    state: text(
-      z
-        .string()
-        .trim()
-        .min(1, REQUIRED)
-        .regex(/^[A-Za-z]{2}$/, "Digite a sigla do estado, como SP")
-        .transform((v) => v.toUpperCase()),
-    ),
-    marketingEmail: box,
-    marketingWhatsapp: box,
-  })
-  .transform(
-    (v): CustomerDetails => ({
-      name: v.name,
-      cpf: v.cpf,
-      phone: v.phone,
-      address: {
-        cep: v.cep,
-        street: v.street,
-        number: v.number,
-        complement: v.complement || null,
-        neighborhood: v.neighborhood,
-        city: v.city,
-        state: v.state,
-      },
-      consents: { email: v.marketingEmail, whatsapp: v.marketingWhatsapp, textVersion: CONSENT_TEXT_VERSION },
-    }),
-  );
+  .object({ ...contact, ...address })
+  .transform((v): Contact & AddressDetails => ({ name: v.name, cpf: v.cpf, phone: v.phone, ...toDetails(v) }));
+
+// IDT-11: signed in, only the address part; the API copies the account's name, CPF and phone.
+export const addressDetailsInput = z.object(address).transform(toDetails);
 
 // The first message of each field, in screen order (CHK-03: focus goes to the first one).
 export function fieldErrors(error: z.ZodError): Partial<Record<DetailsField, string>> {
