@@ -392,3 +392,15 @@ test("shipping row stays inside the 16px gutter, also with an error", async ({ p
   expect(box.height).toBeLessThanOrEqual(56);
 });
 });
+
+// VIT-06: an Instagram ad link opens its own screen, with no home page or sign-up in between.
+test("VIT-06 a product or category link from an ad lands right on that screen", async ({ page }) => {
+  await page.goto(JACKET);
+  await expect(page).toHaveURL(JACKET);
+  await expect(page.getByRole("heading", { level: 1, name: "Jaqueta sarja" })).toBeVisible();
+  await expect(page.locator('input[type="password"]')).toHaveCount(0);
+  await page.goto("/catalogo?categoria=jaquetas");
+  await expect(page).toHaveURL("/catalogo?categoria=jaquetas");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator('input[type="password"]')).toHaveCount(0);
+});
