@@ -9,5 +9,7 @@ export { finishIdentification } from "./actions/finishIdentification.ts";
 export { saveAccountDetails } from "./actions/saveAccountDetails.ts";
 export { changeEmail } from "./actions/changeEmail.ts";
 export { readIdentification } from "./identification-cookie.ts";
+export { getAccount } from "./queries/getAccount.ts";
+export type { AccountView } from "./queries/getAccount.ts";
 export { EXISTING_ACCOUNT, START } from "./types.ts";
 export type { IdentificationState } from "./types.ts";

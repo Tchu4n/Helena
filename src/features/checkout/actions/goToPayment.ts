@@ -9,7 +9,7 @@ import type { components } from "@/src/lib/api-types";
 import { saveOrderAccess } from "@/src/lib/order-cookie";
 import { forwardedFor } from "@/src/lib/request-ip";
 import { bearer, clearSession, readSession, saveSession } from "@/src/lib/session-cookie";
-import { customerDetailsInput, fieldErrors } from "../schemas/customerDetails.ts";
+import { addressDetailsInput, customerDetailsInput, fieldErrors } from "../schemas/customerDetails.ts";
 import type { GoToPaymentState } from "../types.ts";
 
 const FAILED = "Não foi possível concluir. Tente de novo";
@@ -22,7 +22,9 @@ export async function goToPayment(_prev: GoToPaymentState, formData: FormData): 
   if (!cartId) redirect("/sacola");
 
   const idempotencyKey = key.safeParse(formData.get("idempotencyKey"));
-  const parsed = customerDetailsInput.safeParse(Object.fromEntries(formData));
+  const session = await readSession();
+  // IDT-11: signed in, only the address part; the API copies the account's name, CPF and phone.
+  const parsed = (session ? addressDetailsInput : customerDetailsInput).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { errors: fieldErrors(parsed.error), error: null };
   if (!idempotencyKey.success) return { errors: {}, error: FAILED };
 
@@ -32,7 +34,6 @@ export async function goToPayment(_prev: GoToPaymentState, formData: FormData): 
     return { errors: {}, error: cart.problem.title };
   }
   // IDT-11, IDT-12: the e-mail is her session's or the one confirmed for this bag, read here, never a form value.
-  const session = await readSession();
   const email = session?.email ?? cart.data.verifiedEmail;
   if (!email) redirect("/checkout/identificacao");
   // Rare race: the CEP she typed isn't the cart's yet. Save it and stop, so the CHK-10 note shows the new total first.

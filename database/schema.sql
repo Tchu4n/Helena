@@ -35,10 +35,14 @@ GO
 -- change her e-mail (which is where the access link goes). The typed details
 -- stay in the cart and in the order.
 -- Rows 23, 24 (2026-11-23): a guest's lead (is_account = 0) and an account
--- (is_account = 1) are different rows, each kind with its own unique CPF and
--- e-mail, so an account can use a CPF a guest purchase used before. An account
--- may lack name, CPF and phone only until "Seus dados" (IDT-14). A signed-in
--- order points to the account row and keeps its own copy of the details.
+-- (is_account = 1) are different rows, so an account can use a CPF a guest
+-- purchase used before. One CPF and one e-mail per account. An account may lack
+-- name, CPF and phone only until "Seus dados" (IDT-14). A signed-in order
+-- points to the account row and keeps its own copy of the details.
+-- Row 26 (2026-11-23): a lead is found by its confirmed e-mail only, never by
+-- the CPF; the same CPF may be on several leads.
+-- Row 27 (2026-11-23): a lead that never bought (status 'lead') is deleted 30
+-- days after last_interaction_at.
 CREATE TABLE dbo.customer (
     customer_id          INT IDENTITY(1,1) NOT NULL,
     is_account           BIT               NOT NULL CONSTRAINT df_customer_is_account DEFAULT 0,
@@ -59,11 +63,13 @@ CREATE TABLE dbo.customer (
 );
 -- E10: list of leads that did not buy, from the most recent contact to the oldest.
 CREATE NONCLUSTERED INDEX ix_customer_leads ON dbo.customer (last_interaction_at DESC) WHERE status = 'lead';
--- One CPF and one e-mail per account, and per lead; a lead and an account may share them.
+-- One CPF and one e-mail per account; one e-mail per lead (row 26: not one CPF).
+-- A lead and an account may share them.
 CREATE UNIQUE NONCLUSTERED INDEX uq_account_cpf ON dbo.customer (cpf) WHERE is_account = 1 AND cpf IS NOT NULL;
 CREATE UNIQUE NONCLUSTERED INDEX uq_account_email ON dbo.customer (email) WHERE is_account = 1;
-CREATE UNIQUE NONCLUSTERED INDEX uq_lead_cpf ON dbo.customer (cpf) WHERE is_account = 0;
 CREATE UNIQUE NONCLUSTERED INDEX uq_lead_email ON dbo.customer (email) WHERE is_account = 0;
+-- Support and invoice lookups by CPF.
+CREATE NONCLUSTERED INDEX ix_customer_cpf ON dbo.customer (cpf) WHERE cpf IS NOT NULL;
 GO
 
 -- CTA-05: addresses saved in the account.
@@ -253,7 +259,10 @@ GO
 /* ---------- Cart ---------- */
 
 -- public_id is the secret the front end keeps in a cookie (SAC-06).
--- The details typed at checkout stay here until they become an order (CHK-05).
+-- The details typed at checkout stay here until they become an order (CHK-05);
+-- signed in, the account's name, CPF and phone are copied here (IDT-11).
+-- Row 27: the personal details of a cart that never became an order are erased
+-- 30 days after updated_at.
 CREATE TABLE dbo.cart (
     cart_id        INT IDENTITY(1,1) NOT NULL,
     public_id      UNIQUEIDENTIFIER  NOT NULL CONSTRAINT df_cart_public DEFAULT NEWID(),
@@ -261,6 +270,7 @@ CREATE TABLE dbo.cart (
     coupon_id      INT               NULL,    -- one coupon per purchase (SAC-15)
     delivery_type  VARCHAR(10)       NULL,
     name           NVARCHAR(100)     NULL,
+    cpf            CHAR(11)          NULL,
     email          NVARCHAR(150)     NULL,
     verified_email NVARCHAR(150)     NULL,    -- confirmed with a code (IDT-03); no order without it (IDT-12)
     verified_at    DATETIME2(3)      NULL,
@@ -278,7 +288,8 @@ CREATE TABLE dbo.cart (
     CONSTRAINT uq_cart_public UNIQUE (public_id),
     CONSTRAINT fk_cart_customer FOREIGN KEY (customer_id) REFERENCES dbo.customer (customer_id),
     CONSTRAINT fk_cart_coupon FOREIGN KEY (coupon_id) REFERENCES dbo.coupon (coupon_id),
-    CONSTRAINT ck_cart_delivery CHECK (delivery_type IS NULL OR delivery_type IN ('courier', 'pac', 'sedex'))
+    CONSTRAINT ck_cart_delivery CHECK (delivery_type IS NULL OR delivery_type IN ('courier', 'pac', 'sedex')),
+    CONSTRAINT ck_cart_cpf CHECK (cpf IS NULL OR (cpf NOT LIKE '%[^0-9]%' AND LEN(cpf) = 11))
 );
 GO
 

@@ -729,6 +729,8 @@ The requirements didn't settle these points. The owner decided on 2026-11-14; th
 | 23 | Details of a purchase and of an account (decided on 2026-11-23) | Every purchase keeps its own full details, with or without an account. An account is complete (name, CPF, phone) before it buys; the address comes at the first purchase (`IDT-14`, `CHK-05`). **Replaces "a new email gets an empty account"** (`CTA-01`) |
 | 24 | One CPF per account (decided on 2026-11-23) | A CPF already in another account is refused with a neutral message; guest purchases with that CPF don't count (`IDT-14`) |
 | 25 | Signed-in checkout (decided on 2026-11-23) | Name, CPF (partly hidden) and phone come from the account, read-only; changed only in Dados pessoais (`IDT-11`, `CTA-06`) |
+| 26 | Which lead a guest purchase belongs to (decided on 2026-11-23) | The lead is found by the email confirmed with the code, never by the CPF (anyone can type someone else's CPF). The same CPF may be on several leads; an existing lead is never overwritten; the bag and the order keep what was typed, CPF included (`CHK-05`, `CHK-08`) |
+| 27 | How long an unfinished purchase is kept (decided on 2026-11-23) | The details of a bag that never became an order, and a lead that never bought, are deleted 30 days after the last interaction. Orders keep their details for the invoice (`CHK-05`) |
 
 **Settled in the contract (`contract/openapi.yaml`):** the delivery time of each option, including the courier cutoff time, comes as ready-made text from the API; the catalog is paginated (24 per page, 48 max). Sorting is in the launch by the owner's decision (`CAT-09`).
 

@@ -17,3 +17,9 @@ const DELIVERY_LABELS = { courier: "Entrega Helena", pac: "PAC", sedex: "Sedex" 
 export function deliveryLabel(type: keyof typeof DELIVERY_LABELS): string {
   return DELIVERY_LABELS[type];
 }
+
+// IDT-11: the account's phone travels as digits and is shown as (11) 98765-4321.
+export function formatPhone(digits: string): string {
+  const match = /^(\d{2})(\d{4,5})(\d{4})$/.exec(digits);
+  return match ? `(${match[1]}) ${match[2]}-${match[3]}` : digits;
+}

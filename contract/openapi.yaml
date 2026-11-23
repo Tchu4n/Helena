@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Helena — store API (customer screens)
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Contract between the front end (Next.js) and the back end (Java + SQL Server)
     for the 8 customer screens. Derived from `docs/SPEC-CLIENT.md`; the codes in
@@ -20,6 +20,9 @@ info:
     - Every response has the `X-Request-Id` header.
     - Changes to this contract are additive. Version 0.2.0 renamed everything
       to English (owner decision, 15/11/2026), before any consumer existed.
+      Version 0.3.0 (23/11/2026) added the e-mail code, the account's details
+      and `Session.detailsComplete`, and marked the access link as deprecated.
+    - Every `Problem.code` a response can send is named in that response.
 servers:
   - url: http://localhost:4010
     description: Mock server (Prism)
@@ -299,10 +302,15 @@ paths:
         "200": { $ref: "#/components/responses/Cart" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422":
-          description: Option not available for the CEP (for example, courier outside the metropolitan area)
+          description: Option not available for the CEP (`delivery_unavailable`; for example, courier outside the metropolitan area)
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/delivery-unavailable
+                title: Esta entrega não está disponível para o seu CEP
+                status: 422
+                code: delivery_unavailable
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/carts/{cartId}/coupon:
@@ -355,7 +363,11 @@ paths:
       description: |
         Called when all required fields are valid, before payment (CHK-05). A
         CPF or e-mail that already exists does not cause an error, and the
-        response never includes data from earlier records (CHK-08).
+        response never includes data from earlier records (CHK-08). The lead is
+        found by the confirmed e-mail only, never by the CPF, and an existing
+        lead is never overwritten; the cart keeps what was typed (spec decision
+        26). Details of a cart that never became an order are erased 30 days
+        after its last change (decision 27).
 
         The front end forwards the customer's IP in the `X-Forwarded-For`
         header; the date, time and IP of each consent are recorded by the back
@@ -398,6 +410,11 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/details-missing
+                title: Complete seus dados para continuar
+                status: 409
+                code: details_missing
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/orders:
@@ -455,10 +472,15 @@ paths:
                     status: 409
                     code: email_not_verified
         "422":
-          description: Incomplete cart (empty, no customer details or no delivery option chosen)
+          description: Incomplete cart (`incomplete_cart`; empty, no customer details or no delivery option chosen)
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/incomplete-cart
+                title: Preencha seus dados e escolha a entrega para continuar
+                status: 422
+                code: incomplete_cart
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/orders/access:
@@ -558,6 +580,11 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/order-already-paid
+                title: Este pedido já foi pago
+                status: 409
+                code: order_already_paid
         "422": { $ref: "#/components/responses/InvalidData" }
         "500": { $ref: "#/components/responses/InternalError" }
 
@@ -679,7 +706,12 @@ paths:
     post:
       tags: [Account]
       operationId: requestAccessLink
+      deprecated: true
       summary: Sends the access link by e-mail (CTA-01)
+      description: |
+        Not used by the store since 23/11/2026: the account is opened with the
+        e-mail code (`POST /v1/email-codes`, decision 10 of the spec). Kept
+        because changes are additive; the back end does not need to build it.
       requestBody:
         required: true
         content:
@@ -700,11 +732,12 @@ paths:
     post:
       tags: [Account]
       operationId: startSession
-      summary: Starts the session with the e-mail code, the received link, or e-mail and password (CTA-01, CTA-07, IDT-08 to IDT-10)
+      summary: Starts the session with the e-mail code, or e-mail and password (CTA-01, CTA-07, IDT-08 to IDT-10)
       description: |
         With `email` and `code`, an e-mail with no account gets a new account
         (`newAccount: true`). With `cartId`, the cart's `verifiedEmail` becomes
-        the session's e-mail in the same call.
+        the session's e-mail in the same call. `detailsComplete: false` sends
+        her to "Seus dados" first (IDT-14). `linkToken` is deprecated.
       requestBody:
         required: true
         content:
@@ -717,10 +750,15 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Session" }
         "401":
-          description: Code or link used, expired or invalid; or e-mail and password do not match. Same response for every case.
+          description: Code or link used, expired or invalid; or e-mail and password do not match. Same response for every case (`not_authenticated`).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/not-authenticated
+                title: Identifique-se para continuar
+                status: 401
+                code: not_authenticated
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
@@ -741,7 +779,7 @@ paths:
     get:
       tags: [Account]
       operationId: getAccount
-      summary: Personal details (CTA-06)
+      summary: Personal details (CTA-06), and the read-only details of signed-in checkout (IDT-11)
       security:
         - customerSession: []
       responses:
@@ -782,10 +820,15 @@ paths:
               schema: { $ref: "#/components/schemas/Customer" }
         "401": { $ref: "#/components/responses/NotAuthenticated" }
         "409":
-          description: E-mail already used by another customer
+          description: E-mail already used by another account (`email_in_use`); a guest purchase with that e-mail doesn't count
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/email-in-use
+                title: Este e-mail já está em outra conta
+                status: 409
+                code: email_in_use
         "422":
           description: Invalid input (`invalid_data`), or a new e-mail without its code (`email_not_verified`, CTA-06)
           content:
@@ -852,6 +895,11 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/cpf-in-use
+                title: Não foi possível usar este CPF
+                status: 409
+                code: cpf_in_use
         "422": { $ref: "#/components/responses/InvalidData" }
         "500": { $ref: "#/components/responses/InternalError" }
 
@@ -1715,9 +1763,9 @@ components:
 
     NewSession:
       type: object
-      description: Send `email` and `code`, or `linkToken`, or `email` and `password`. `cartId` is optional with any of them.
+      description: Send `email` and `code`, or `email` and `password` (or the deprecated `linkToken`). `cartId` is optional with any of them.
       properties:
-        linkToken: { type: string, description: "Single use, short-lived" }
+        linkToken: { type: string, deprecated: true, description: "Single use, short-lived. Not used by the store since 23/11/2026" }
         email: { type: string, format: email, maxLength: 150 }
         password: { type: string, format: password, maxLength: 72 }
         code: { type: string, pattern: "^[0-9]{6}$", description: "From `POST /v1/email-codes`" }

@@ -187,10 +187,10 @@ const INVALID_COUPON = {
   code: "invalid_coupon",
 };
 const UNAVAILABLE_DELIVERY = {
-  type: "https://helena.example/problems/invalid-data",
+  type: "https://helena.example/problems/delivery-unavailable",
   title: "Esta entrega não está disponível para o seu CEP",
   status: 422,
-  code: "invalid_data",
+  code: "delivery_unavailable",
 };
 const INVALID_QUANTITY = {
   type: "https://helena.example/problems/invalid-data",
@@ -228,7 +228,7 @@ const DECLINED_MESSAGE = "O banco do cartão não aprovou esta compra. Tente out
 // Any small valid PNG stands in for the QR code the real API sends as a data URI (CHK-15).
 const QR_CODE =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-const NOT_FOUND = { type: "about:blank", title: "Não encontrado", status: 404, code: "not_found" };
+const NOT_FOUND = { type: "https://helena.example/problems/not-found", title: "Não encontrado", status: 404, code: "not_found" };
 const INVALID_CODE = { type: "https://helena.example/problems/invalid-code", title: "Código inválido ou vencido", status: 401, code: "invalid_code" };
 const emailNotVerified = (status) => ({
   type: "https://helena.example/problems/email-not-verified",
@@ -247,6 +247,8 @@ const carts = new Map();
 const requests = [];
 // What the store sent to POST …/payments, so a test can check no card data reached the API (CHK-18).
 const paymentBodies = [];
+// What the store sent to PUT …/customer, so a test can check a signed-in purchase never sends the CPF (IDT-11).
+const customerBodies = [];
 // Orders by number, and the first answer given to each Idempotency-Key (CHK-22).
 const orders = new Map();
 // IDT-02 to IDT-05: the pending code per e-mail, and when each code was sent (5 per hour).
@@ -436,6 +438,19 @@ function startSession({ email, code, password, cartId }) {
   return [201, { token, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), newAccount, detailsComplete }];
 }
 
+// The Customer schema of an account (IDT-11, IDT-14, CTA-06).
+function customerBody(email) {
+  const { details, password } = accounts.get(email);
+  const cpf = details?.cpf ?? "";
+  return {
+    name: details?.name ?? "",
+    email,
+    phone: details?.phone ?? "",
+    maskedCpf: `***.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-**`,
+    hasPassword: Boolean(password),
+  };
+}
+
 // The e-mail of the bearer session; undefined without the header, null for an unknown token.
 function sessionEmail(req) {
   const auth = req.headers.authorization;
@@ -576,6 +591,12 @@ async function route(req, url) {
     accounts.get(email).password = password;
     return [204, null];
   }
+  // IDT-11, CTA-06: the account's details, with the CPF partly hidden.
+  if (req.method === "GET" && url.pathname === "/v1/account") {
+    const email = sessionEmail(req);
+    if (!email) return [401, NOT_AUTHENTICATED];
+    return [200, customerBody(email)];
+  }
   // IDT-14: once per account, one CPF per account.
   if (req.method === "PUT" && url.pathname === "/v1/account/details") {
     const email = sessionEmail(req);
@@ -586,7 +607,7 @@ async function route(req, url) {
     if (account.details) return [409, DETAILS_ALREADY_SET];
     if ([...accounts.entries()].some(([other, a]) => other !== email && a.details?.cpf === cpf)) return [409, CPF_IN_USE];
     account.details = { name, cpf, phone };
-    return [200, { name, email, phone, maskedCpf: `***.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-**`, hasPassword: Boolean(account.password) }];
+    return [200, customerBody(email)];
   }
   // PED-05, PED-06: same 404 for any wrong pair; limite@exemplo.com hits the attempt limit.
   if (req.method === "POST" && url.pathname === "/v1/orders/access") {
@@ -622,10 +643,14 @@ async function route(req, url) {
       return [200, cartBody(cart)];
     }
     if (req.method === "PUT" && parts[3] === "customer") {
-      const body = await readJson(req);
+      const sent = await readJson(req);
+      customerBodies.push(sent);
       const signedIn = sessionEmail(req);
       if (signedIn === null) return [401, NOT_AUTHENTICATED];
-      if (signedIn && !accounts.get(signedIn)?.details) return [409, DETAILS_MISSING]; // IDT-14
+      const details = signedIn ? accounts.get(signedIn)?.details : null;
+      if (signedIn && !details) return [409, DETAILS_MISSING]; // IDT-14
+      // IDT-11: signed in, the purchase gets a copy of the account's name, CPF and phone.
+      const body = details ? { ...sent, ...details } : sent;
       if (!validCustomer(body)) return [422, INVALID_DATA];
       // IDT-11: a session whose e-mail is the body's confirms it for this bag.
       if (signedIn === body.email) cart.verifiedEmail = body.email;
@@ -752,6 +777,7 @@ createServer(async (req, res) => {
     answered.clear();
     requests.length = 0;
     paymentBodies.length = 0;
+    customerBodies.length = 0;
     return send(res, 200, { ok: true });
   }
   if (req.method === "POST" && url.pathname === "/__carts") {
@@ -810,6 +836,7 @@ createServer(async (req, res) => {
   // Lets a test check which API paths the store called.
   if (url.pathname === "/__requests") return send(res, 200, requests);
   if (url.pathname === "/__payment-bodies") return send(res, 200, paymentBodies);
+  if (url.pathname === "/__customer-bodies") return send(res, 200, customerBodies);
   requests.push(url.pathname);
   if ([...slowSuffixes].some((suffix) => url.pathname.endsWith(suffix))) await new Promise((r) => setTimeout(r, 2000));
   if (failing.has(url.pathname)) return send(res, 500, INTERNAL_ERROR);

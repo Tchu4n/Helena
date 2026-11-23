@@ -1,6 +1,6 @@
 # Account, plan 2: sign-up details, signed-in checkout, my orders and personal details — implementation plan
 
-> **Status:** approved by the owner on 2026-11-23. Task 1 done and committed (`f22542c`); Task 2 done on 2026-11-23, waiting for the owner's commit; Tasks 3 to 5 to do. Same way of working as before: tasks run inline, one at a time; finish a task, report, stop and wait for the go-ahead. The owner makes every commit; "Commit" steps mean "leave the changes in the working tree and suggest the message in Portuguese".
+> **Status:** approved by the owner on 2026-11-23. Task 1 done and committed (`f22542c`); Task 2 done and committed (`ec04a80`); Task 3 done on 2026-11-23, waiting for the owner's commit; Tasks 4 and 5 to do. Same way of working as before: tasks run inline, one at a time; finish a task, report, stop and wait for the go-ahead. The owner makes every commit; "Commit" steps mean "leave the changes in the working tree and suggest the message in Portuguese".
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

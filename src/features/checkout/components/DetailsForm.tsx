@@ -6,12 +6,22 @@ import { Field } from "@/src/components/ui/Field.tsx";
 import { AlertIcon } from "@/src/components/ui/icons.tsx";
 import type { DeliveryOptionView } from "@/src/features/cart/client.ts";
 import { readDetails, writeDetails, type StoredDetails } from "../checkout-storage.ts";
-import { customerDetailsInput, DETAILS_FIELDS, digits, fieldErrors, type DetailsField } from "../schemas/customerDetails.ts";
+import {
+  addressDetailsInput,
+  CONTACT_FIELDS,
+  customerDetailsInput,
+  DETAILS_FIELDS,
+  digits,
+  fieldErrors,
+  type DetailsField,
+} from "../schemas/customerDetails.ts";
 import type { GoToPaymentState } from "../types.ts";
 
 type Props = {
   email: string; // IDT-03: the confirmed e-mail, read-only here
   changeEmail?: () => Promise<void>; // IDT-13; absent when signed in
+  // IDT-11: signed in, the account's name, CPF (partly hidden) and phone (formatted), shown read-only.
+  account?: { name: string; maskedCpf: string; phone: string };
   total: string;
   // The bag's CEP, options and choice, as the API last calculated them.
   cep: string | null;
@@ -64,10 +74,13 @@ const EMPTY: StoredDetails = {
   marketingWhatsapp: false,
 };
 
+const isContact = (field: DetailsField) => (CONTACT_FIELDS as readonly string[]).includes(field);
+
 // What the schema and the server actions read: the text fields, and a box only when checked (like a real form post).
-function toFormData(values: StoredDetails): FormData {
+// IDT-11: signed in, the contact fields are left out; the API copies the account's.
+function toFormData(values: StoredDetails, signedIn: boolean): FormData {
   const data = new FormData();
-  for (const field of DETAILS_FIELDS) data.set(field, values[field]);
+  for (const field of DETAILS_FIELDS) if (!signedIn || !isContact(field)) data.set(field, values[field]);
   if (values.marketingEmail) data.set("marketingEmail", "on");
   if (values.marketingWhatsapp) data.set("marketingWhatsapp", "on");
   return data;
@@ -77,7 +90,9 @@ const heading = "font-mono text-xs font-medium uppercase tracking-[0.08em]";
 
 // CHK-02 to CHK-08, CHK-23. Nothing is ever filled in from an earlier purchase (CHK-08): only what she typed in this tab.
 export function DetailsForm(props: Props) {
-  const { total, cep, deliveryOptions, chosenDelivery, saveLead, saveCheckoutCep, chooseDelivery } = props;
+  const { total, cep, deliveryOptions, chosenDelivery, saveLead, saveCheckoutCep, chooseDelivery, account } = props;
+  const signedIn = account !== undefined;
+  const schema = signedIn ? addressDetailsInput : customerDetailsInput;
   const [values, setValues] = useState<StoredDetails>(EMPTY);
   const [errors, setErrors] = useState<GoToPaymentState["errors"]>({});
   const [, startSaving] = useTransition();
@@ -137,18 +152,27 @@ export function DetailsForm(props: Props) {
     const stored = readDetails();
     if (!stored) return;
     const next = { ...EMPTY };
-    for (const field of DETAILS_FIELDS) if (typeof stored[field] === "string") next[field] = stored[field];
+    for (const field of DETAILS_FIELDS) if (typeof stored[field] === "string" && !(signedIn && isContact(field))) next[field] = stored[field];
     next.marketingEmail = stored.marketingEmail === true;
     next.marketingWhatsapp = stored.marketingWhatsapp === true;
+    if (signedIn) writeDetails(storable(next)); // a guest's earlier contact details don't stay in the tab
     setValues(next); // eslint-disable-line react-hooks/set-state-in-effect -- storage is only readable after mount
     watchCep(next.cep);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, []);
 
+  // CHK-23, IDT-11: signed in, the tab never keeps a name, CPF or phone.
+  function storable(details: StoredDetails): StoredDetails {
+    if (!signedIn) return details;
+    const copy: Partial<StoredDetails> = { ...details };
+    for (const field of CONTACT_FIELDS) delete copy[field];
+    return copy as StoredDetails;
+  }
+
   function update(change: Partial<StoredDetails>) {
     setValues((current) => {
       const next = { ...current, ...change };
-      writeDetails(next);
+      writeDetails(storable(next));
       return next;
     });
   }
@@ -156,7 +180,7 @@ export function DetailsForm(props: Props) {
   // Errors show once she leaves a field she typed in, or one already marked; nothing typed is cleared (CHK-04).
   // CHK-05: when everything required is valid, the lead is saved, once per change.
   function leave(field: DetailsField) {
-    const result = customerDetailsInput.safeParse(Object.fromEntries(toFormData(values)));
+    const result = schema.safeParse(Object.fromEntries(toFormData(values, signedIn)));
     if (values[field] !== "" || errors[field]) {
       setErrors((current) => ({ ...current, [field]: result.success ? undefined : fieldErrors(result.error)[field] }));
     }
@@ -165,21 +189,21 @@ export function DetailsForm(props: Props) {
     if (snapshot === lastSaved.current) return;
     lastSaved.current = snapshot;
     startSaving(async () => {
-      const saved = await saveLead(toFormData(values));
+      const saved = await saveLead(toFormData(values, signedIn));
       if (!saved.ok) lastSaved.current = null; // try again on the next field she leaves
     });
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = customerDetailsInput.safeParse(Object.fromEntries(toFormData(values)));
+    const result = schema.safeParse(Object.fromEntries(toFormData(values, signedIn)));
     if (result.success) {
       setErrors({});
       if (sending.current) return;
       sending.current = true;
       setTotalBefore(null); // the note stays until she moves on
       attemptKey.current ??= crypto.randomUUID();
-      const data = toFormData(values);
+      const data = toFormData(values, signedIn);
       data.set("idempotencyKey", attemptKey.current);
       startTransition(() => dispatch(data));
       return;
@@ -192,7 +216,14 @@ export function DetailsForm(props: Props) {
 
   const showOptions = deliveryOptions.length > 0 && cep !== null && digits(values.cep) === cep;
 
-  const field = (spec: FieldSpec) => (
+  // IDT-11: shown, not editable and not sent (an `id` without `name` leaves it out of the form).
+  const accountValue: Partial<Record<DetailsField, string>> = { name: account?.name, cpf: account?.maskedCpf, phone: account?.phone };
+  const readOnlyField = (spec: FieldSpec) => (
+    <div key={spec.name} className="col-span-3 min-w-0">
+      <Field id={spec.name} label={spec.label} type={spec.type} value={accountValue[spec.name] ?? ""} readOnly />
+    </div>
+  );
+  const editableField = (spec: FieldSpec) => (
     <div key={spec.name} className={`min-w-0 ${spec.span === "short" ? "" : spec.span === "wide" ? "col-span-2" : "col-span-3"}`}>
       <Field
         label={spec.label}
@@ -211,6 +242,7 @@ export function DetailsForm(props: Props) {
       />
     </div>
   );
+  const field = (spec: FieldSpec) => (signedIn && isContact(spec.name) ? readOnlyField(spec) : editableField(spec));
 
   return (
     <form noValidate onSubmit={submit} className="flex flex-col gap-3">

@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PurchaseSteps } from "@/src/components/layout";
 import { ErrorMessage } from "@/src/components/ui";
-import { changeEmail } from "@/src/features/account";
+import { changeEmail, getAccount } from "@/src/features/account";
 import { chooseDelivery, getCart } from "@/src/features/cart";
 import { DetailsForm, goToPayment, OrderSummary, saveCheckoutCep, saveLead, summaryFromCart } from "@/src/features/checkout";
+import { formatPhone } from "@/src/lib/format";
 import { readSession } from "@/src/lib/session-cookie";
 
 export const metadata: Metadata = { title: "Dados e entrega · Helena" };
@@ -19,6 +20,12 @@ async function CheckoutContent() {
   const session = await readSession();
   // IDT-14: an account without name, CPF and phone fills "Seus dados" first.
   if (session && !session.detailsComplete) redirect("/checkout/identificacao");
+  // IDT-11: signed in, name, CPF (partly hidden) and phone come from the account, read-only.
+  // Review focus 3: a session ended on the API goes to identification's first step, once.
+  const found = session ? await getAccount() : null;
+  if (found && !found.ok && found.reason === "signed_out") redirect("/checkout/identificacao?sessao=encerrada");
+  if (found && !found.ok) return <ErrorMessage title={found.title ?? "Não foi possível concluir. Tente de novo"} retryHref="/checkout" />;
+  const account = found?.ok ? { name: found.account.name, maskedCpf: found.account.maskedCpf, phone: formatPhone(found.account.phone) } : undefined;
   const email = session?.email ?? cart.verifiedEmail;
   // IDT-12: no confirmed e-mail, no "Dados e entrega".
   if (!email) redirect("/checkout/identificacao");
@@ -28,6 +35,7 @@ async function CheckoutContent() {
       <OrderSummary summary={summaryFromCart(cart)} />
       <DetailsForm
         email={email}
+        account={account}
         changeEmail={session ? undefined : changeEmail}
         total={cart.total}
         cep={cart.cep}

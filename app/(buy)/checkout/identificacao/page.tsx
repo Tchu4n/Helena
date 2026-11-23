@@ -23,12 +23,14 @@ import { readSession } from "@/src/lib/session-cookie";
 
 export const metadata: Metadata = { title: "Identificação · Helena" };
 
-async function IdentificationContent() {
+async function IdentificationContent({ searchParams }: { searchParams: PageProps<"/checkout/identificacao">["searchParams"] }) {
   const result = await getCart();
   if (!result.ok) return <ErrorMessage title={result.title} retryHref="/checkout/identificacao" />;
   if (!result.cart || result.cart.items.length === 0) redirect("/sacola");
   const pending = await readIdentification();
-  const session = await readSession();
+  // Review focus 3: the session ended on the API; its cookie goes with the next identification (requestCode, signInWithPassword).
+  const sessionEnded = (await searchParams).sessao === "encerrada";
+  const session = sessionEnded ? null : await readSession();
   // IDT-11: signed in, the step is skipped, unless the code has just signed her in and a step is left (IDT-08, IDT-09).
   if (!pending?.done && session?.detailsComplete) redirect("/checkout");
   // IDT-07: a code already sent brings her back to the code step after a reload; IDT-14: signed in without details, "Seus dados".
@@ -58,12 +60,12 @@ async function IdentificationContent() {
 }
 
 // IDT-01 to IDT-11, IDT-14: the e-mail is confirmed with a code before "Dados e entrega" (inside Suspense: cacheComponents).
-export default function IdentificationPage() {
+export default function IdentificationPage({ searchParams }: PageProps<"/checkout/identificacao">) {
   return (
     <>
       <PurchaseSteps current="identification" />
       <Suspense fallback={null}>
-        <IdentificationContent />
+        <IdentificationContent searchParams={searchParams} />
       </Suspense>
     </>
   );

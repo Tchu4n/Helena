@@ -253,7 +253,11 @@ export interface paths {
          * Saves the purchase details as a lead (CHK-02 to CHK-08, CHK-10)
          * @description Called when all required fields are valid, before payment (CHK-05). A
          *     CPF or e-mail that already exists does not cause an error, and the
-         *     response never includes data from earlier records (CHK-08).
+         *     response never includes data from earlier records (CHK-08). The lead is
+         *     found by the confirmed e-mail only, never by the CPF, and an existing
+         *     lead is never overwritten; the cart keeps what was typed (spec decision
+         *     26). Details of a cart that never became an order are erased 30 days
+         *     after its last change (decision 27).
          *
          *     The front end forwards the customer's IP in the `X-Forwarded-For`
          *     header; the date, time and IP of each consent are recorded by the back
@@ -443,7 +447,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sends the access link by e-mail (CTA-01) */
+        /**
+         * Sends the access link by e-mail (CTA-01)
+         * @deprecated
+         * @description Not used by the store since 23/11/2026: the account is opened with the
+         *     e-mail code (`POST /v1/email-codes`, decision 10 of the spec). Kept
+         *     because changes are additive; the back end does not need to build it.
+         */
         post: operations["requestAccessLink"];
         delete?: never;
         options?: never;
@@ -461,10 +471,11 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Starts the session with the e-mail code, the received link, or e-mail and password (CTA-01, CTA-07, IDT-08 to IDT-10)
+         * Starts the session with the e-mail code, or e-mail and password (CTA-01, CTA-07, IDT-08 to IDT-10)
          * @description With `email` and `code`, an e-mail with no account gets a new account
          *     (`newAccount: true`). With `cartId`, the cart's `verifiedEmail` becomes
-         *     the session's e-mail in the same call.
+         *     the session's e-mail in the same call. `detailsComplete: false` sends
+         *     her to "Seus dados" first (IDT-14). `linkToken` is deprecated.
          */
         post: operations["startSession"];
         delete?: never;
@@ -497,7 +508,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Personal details (CTA-06) */
+        /** Personal details (CTA-06), and the read-only details of signed-in checkout (IDT-11) */
         get: operations["getAccount"];
         put?: never;
         post?: never;
@@ -1214,9 +1225,12 @@ export interface components {
             /** @example 24 */
             perPage: number;
         };
-        /** @description Send `email` and `code`, or `linkToken`, or `email` and `password`. `cartId` is optional with any of them. */
+        /** @description Send `email` and `code`, or `email` and `password` (or the deprecated `linkToken`). `cartId` is optional with any of them. */
         NewSession: {
-            /** @description Single use, short-lived */
+            /**
+             * @deprecated
+             * @description Single use, short-lived. Not used by the store since 23/11/2026
+             */
             linkToken?: string;
             /** Format: email */
             email?: string;
@@ -1726,12 +1740,20 @@ export interface operations {
         responses: {
             200: components["responses"]["Cart"];
             404: components["responses"]["NotFound"];
-            /** @description Option not available for the CEP (for example, courier outside the metropolitan area) */
+            /** @description Option not available for the CEP (`delivery_unavailable`; for example, courier outside the metropolitan area) */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/delivery-unavailable",
+                     *       "title": "Esta entrega não está disponível para o seu CEP",
+                     *       "status": 422,
+                     *       "code": "delivery_unavailable"
+                     *     }
+                     */
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
@@ -1819,6 +1841,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/details-missing",
+                     *       "title": "Complete seus dados para continuar",
+                     *       "status": 409,
+                     *       "code": "details_missing"
+                     *     }
+                     */
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
@@ -1883,12 +1913,20 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Incomplete cart (empty, no customer details or no delivery option chosen) */
+            /** @description Incomplete cart (`incomplete_cart`; empty, no customer details or no delivery option chosen) */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/incomplete-cart",
+                     *       "title": "Preencha seus dados e escolha a entrega para continuar",
+                     *       "status": 422,
+                     *       "code": "incomplete_cart"
+                     *     }
+                     */
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
@@ -2003,6 +2041,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/order-already-paid",
+                     *       "title": "Este pedido já foi pago",
+                     *       "status": 409,
+                     *       "code": "order_already_paid"
+                     *     }
+                     */
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
@@ -2218,12 +2264,20 @@ export interface operations {
                     "application/json": components["schemas"]["Session"];
                 };
             };
-            /** @description Code or link used, expired or invalid; or e-mail and password do not match. Same response for every case. */
+            /** @description Code or link used, expired or invalid; or e-mail and password do not match. Same response for every case (`not_authenticated`). */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/not-authenticated",
+                     *       "title": "Identifique-se para continuar",
+                     *       "status": 401,
+                     *       "code": "not_authenticated"
+                     *     }
+                     */
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
@@ -2303,12 +2357,20 @@ export interface operations {
                 };
             };
             401: components["responses"]["NotAuthenticated"];
-            /** @description E-mail already used by another customer */
+            /** @description E-mail already used by another account (`email_in_use`); a guest purchase with that e-mail doesn't count */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/email-in-use",
+                     *       "title": "Este e-mail já está em outra conta",
+                     *       "status": 409,
+                     *       "code": "email_in_use"
+                     *     }
+                     */
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
@@ -2392,6 +2454,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/cpf-in-use",
+                     *       "title": "Não foi possível usar este CPF",
+                     *       "status": 409,
+                     *       "code": "cpf_in_use"
+                     *     }
+                     */
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };

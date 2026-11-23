@@ -233,9 +233,22 @@ async function newBag(context: BrowserContext): Promise<string> {
   return id;
 }
 
-async function fillDetails(page: Page) {
-  for (const [label, value] of VALID) await page.getByLabel(label, { exact: true }).fill(value);
+// IDT-11: signed in, name, CPF and phone come from the account; only the address is typed.
+async function fillAddress(page: Page) {
+  for (const [label, value] of VALID.slice(3)) await page.getByLabel(label, { exact: true }).fill(value);
   await expect(page.getByRole("radio", { name: /PAC/ })).toBeChecked();
+}
+
+// Signs in with a password into an account that has its details, from a bag's identification.
+async function signInWithDetails(context: BrowserContext, page: Page, request: APIRequestContext) {
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "certa-123", details: DETAILS } });
+  const cartId = await openIdentification(context, page);
+  await page.getByRole("button", { name: "Já tem senha? Entrar com senha" }).click();
+  await page.getByLabel("E-mail", { exact: true }).fill("maria@exemplo.com");
+  await page.getByLabel("Senha", { exact: true }).fill("certa-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  return cartId;
 }
 
 const sessionCookie = async (context: BrowserContext) => (await context.cookies()).find((c) => c.name === "helena_session");
@@ -348,9 +361,43 @@ test("IDT-11 Review focus 5: signed in, a new bag skips identification and pays 
   await expect(email).toHaveValue("nova@exemplo.com");
   await expect(email).toHaveAttribute("readonly", "");
   await expect(page.getByRole("button", { name: "Trocar e-mail" })).toHaveCount(0);
-  await fillDetails(page);
+  await fillAddress(page);
   await page.getByRole("button", { name: "Ir para pagamento" }).click();
   await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+});
+
+test("IDT-11 signed in: name, masked CPF and phone from the account, read-only, and never sent by the store", async ({ context, page, request }) => {
+  const cartId = await signInWithDetails(context, page, request);
+  for (const [label, value] of [
+    ["Nome completo", "Maria Souza"],
+    ["CPF", "***.982.247-**"],
+    ["Celular", "(11) 98765-4321"],
+  ]) {
+    const field = page.getByLabel(label, { exact: true });
+    await expect(field).toHaveValue(value);
+    await expect(field).toHaveAttribute("readonly", "");
+  }
+  await fillAddress(page);
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+  const customer = await (await request.get(`${FAKE_API}/__customer?cartId=${cartId}`)).json();
+  expect(customer.cpf).toBe("52998224725"); // copied by the API from the account
+  const bodies = (await (await request.get(`${FAKE_API}/__customer-bodies`)).json()) as object[];
+  expect(bodies.length).toBeGreaterThan(0);
+  for (const body of bodies) expect(Object.keys(body)).not.toEqual(expect.arrayContaining(["cpf"]));
+  expect(JSON.stringify(bodies)).not.toContain("52998224725");
+});
+
+test("CHK-23 signed in: the tab keeps no name, CPF or phone", async ({ context, page, request }) => {
+  await signInWithDetails(context, page, request);
+  // What a guest typed earlier in this tab must not come back, nor stay.
+  await page.evaluate(() => sessionStorage.setItem("helena_checkout", JSON.stringify({ name: "Outra Pessoa", cpf: "11144477735", phone: "21999998888" })));
+  await page.reload();
+  await expect(page.getByLabel("Nome completo", { exact: true })).toHaveValue("Maria Souza");
+  await fillAddress(page);
+  const stored = await page.evaluate(() => sessionStorage.getItem("helena_checkout") ?? "");
+  expect(stored).toContain("Avenida Paulista");
+  for (const value of ["Maria Souza", "52998224725", "982.247", "98765", "Outra Pessoa", "11144477735", "21999998888"]) expect(stored).not.toContain(value);
 });
 
 test("Review focus 1 (account): an e-mail with an account shows nothing of it before the code", async ({ context, page, request }) => {
@@ -362,17 +409,20 @@ test("Review focus 1 (account): an e-mail with an account shows nothing of it be
   expect(await sessionCookie(context)).toBeUndefined();
 });
 
-test("a session ended on the API sends her to the first step, once, and drops the cookie", async ({ context, page, request }) => {
+test("Review focus 3: a session ended on the API sends her to the first step once, and she can buy as a guest", async ({ context, page, request }) => {
   await signUp(context, page, request, "nova@exemplo.com");
-  const { token } = JSON.parse(decodeURIComponent((await sessionCookie(context))!.value)) as { token: string };
+  const { token } = await sessionValue(context);
   await request.post(`${FAKE_API}/__end-session?token=${token}`);
-  await newBag(context);
   await page.goto("/checkout");
-  await fillDetails(page);
-  await page.getByRole("button", { name: "Ir para pagamento" }).click();
-  await expect(page).toHaveURL(/\/checkout\/identificacao$/);
-  await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
-  expect(await sessionCookie(context)).toBeUndefined();
+  await expect(page).toHaveURL(/\/checkout\/identificacao\?sessao=encerrada$/);
+  await askCode(page, "nova@exemplo.com");
+  expect(await sessionCookie(context)).toBeUndefined(); // a new identification ends the old session
+  await typeCode(page, await codeFor(request, "nova@exemplo.com"));
+  await expect(page).toHaveURL(/\/checkout$/);
+  const name = page.getByLabel("Nome completo", { exact: true });
+  await expect(name).toBeEditable();
+  await page.waitForTimeout(1000); // never bounced back
+  await expect(page).toHaveURL(/\/checkout$/);
 });
 
 // Sign up and stop on "Seus dados".
