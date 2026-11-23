@@ -143,6 +143,7 @@ src/
 - **Low stock:** notice when the size has 15 units or fewer in sale stock.
 - **Shipping:** by CEP (8 digits), with same-day courier in the metro area, PAC or Sedex. If the shipping API goes down, a fixed fee per region applies and checkout doesn't block. Shipping cost and time show on the product page and in the bag, before checkout.
 - **Customer details:** purchase without account and without password. Required fields: name, CPF (11 digits), email, phone, address. The data is saved as a lead as soon as it is filled in, before payment.
+- **E-mail:** confirmed with a 6-digit code before paying, at the identification step (owner's decision of 2026-11-23). The customer chooses "Comprar só com e-mail" (no account, no password) or "Criar conta". If the e-mail service is down, the store doesn't sell.
 - **Returns:** requested by the customer herself, with a required reason, up to 7 calendar days after delivery; one request per order.
 - **Performance:** page loaded in 2 to 3 seconds on 3G/4G. Mobile first.
 

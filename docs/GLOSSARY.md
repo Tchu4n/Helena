@@ -25,8 +25,10 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | `/sacola` | cart page |
 | `/cookies` | `CookiesPage` |
 | `/checkout` (dados e entrega) | `CheckoutPage` |
+| `/checkout/identificacao` | `IdentificationPage` |
 | `/checkout/pagamento` | `PaymentPage` |
 | `/privacidade` (política de privacidade; page still to build) | `PrivacyPage` |
+| `/conta` | `AccountPage` |
 | `/pedido` (consultar pedido sem conta) | `OrderLookupPage` |
 | `/pedido/[numero]` (confirmação e acompanhamento) | `OrderPage` |
 | `?confirmado=1` (confirmação logo após o pagamento) | `confirmed` |
@@ -148,7 +150,17 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 
 | Portuguese | Code |
 |---|---|
-| conta, sessão, link de acesso | `account`, `session`, `accessLink` |
+| conta, sessão, link de acesso (não usado pela loja desde 2026-11-23) | `account`, `session`, `accessLink` |
+| identificação (etapa antes de "Dados e entrega") | `identification`, `IdentificationForm` |
+| comprar só com e-mail, criar conta | `way`: `guest`, `account` |
+| código enviado por e-mail, e-mail confirmado | `code`, `verifiedEmail` |
+| pedir código, confirmar código, trocar e-mail | `requestCode`, `confirmCode`, `changeEmail` |
+| criar senha, entrar com senha, sair | `createPassword`, `signInWithPassword`, `signOut` |
+| conta nova (criada agora) | `newAccount` |
+| cookie da sessão | `helena_session` (`readSession`, `saveSession`, `clearSession`) |
+| cookie da identificação (código pendente) | `helena_identification` (`readIdentification`, `saveIdentification`, `clearIdentification`) |
+| início da conta (tela) | `AccountHome` |
+| WhatsApp da loja | `STORE_WHATSAPP` |
 | consentimento, canal, versão do texto | `consent`, `channel`, `textVersion` |
 | pedido de dados: cópia, exclusão (status: aberto, concluído) | `dataRequest`: `copy`, `deletion` (`open`, `completed`) |
 | usuário do painel; perfis: administrador, atendimento, operacional | `adminUser` / `admin_user`; `admin`, `support`, `operations` |

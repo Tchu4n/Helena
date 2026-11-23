@@ -257,7 +257,12 @@ export interface paths {
          *
          *     The front end forwards the customer's IP in the `X-Forwarded-For`
          *     header; the date, time and IP of each consent are recorded by the back
-         *     end (CHK-07).
+         *     end (CHK-07). An unchecked consent here never revokes one given before;
+         *     revoking is done only through `PUT /v1/account/consents/{channel}` (CTA-08).
+         *
+         *     The e-mail must be the cart's `verifiedEmail` (IDT-03). Sent with a
+         *     customer session whose e-mail equals the body's, it confirms that e-mail
+         *     for the cart (IDT-11). Otherwise `422` with `code: email_not_verified`.
          */
         put: operations["saveCustomerDetails"];
         post?: never;
@@ -381,6 +386,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/email-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sends a 6-digit code to the e-mail (IDT-02, IDT-05, CTA-01)
+         * @description Same `202` for any e-mail. The code is valid for 10 minutes and once;
+         *     5 wrong tries kill it; a new request replaces the previous code. At most
+         *     5 codes per hour per e-mail, plus a limit per IP (`X-Forwarded-For`).
+         */
+        post: operations["requestEmailCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/carts/{cartId}/email-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cartId: components["parameters"]["CartId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirms the cart's e-mail with the code, without an account (IDT-03) */
+        post: operations["verifyCartEmail"];
+        /** Drops the cart's confirmed e-mail ("Trocar e-mail", IDT-13) */
+        delete: operations["dropCartEmail"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sessions/links": {
         parameters: {
             query?: never;
@@ -407,7 +454,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Starts the session with the received link or with e-mail and password (CTA-01, CTA-07) */
+        /**
+         * Starts the session with the e-mail code, the received link, or e-mail and password (CTA-01, CTA-07, IDT-08 to IDT-10)
+         * @description With `email` and `code`, an e-mail with no account gets a new account
+         *     (`newAccount: true`). With `cartId`, the cart's `verifiedEmail` becomes
+         *     the session's e-mail in the same call.
+         */
         post: operations["startSession"];
         delete?: never;
         options?: never;
@@ -878,6 +930,11 @@ export interface components {
         Cart: {
             /** Format: uuid */
             id: string;
+            /**
+             * Format: email
+             * @description E-mail confirmed with a code for this cart (IDT-03); null until then
+             */
+            verifiedEmail?: string | null;
             items: components["schemas"]["CartItem"][];
             /** @example 2 */
             pieceCount: number;
@@ -1124,7 +1181,7 @@ export interface components {
             /** @example 24 */
             perPage: number;
         };
-        /** @description Send `linkToken`, or `email` and `password`. */
+        /** @description Send `email` and `code`, or `linkToken`, or `email` and `password`. `cartId` is optional with any of them. */
         NewSession: {
             /** @description Single use, short-lived */
             linkToken?: string;
@@ -1132,11 +1189,23 @@ export interface components {
             email?: string;
             /** Format: password */
             password?: string;
+            /** @description From `POST /v1/email-codes` */
+            code?: string;
+            /**
+             * Format: uuid
+             * @description Confirms this cart's e-mail too (IDT-08 to IDT-10)
+             */
+            cartId?: string;
         };
         Session: {
             token: string;
             /** Format: date-time */
             expiresAt: string;
+            /**
+             * @description `true` only when this call created the account (IDT-08, IDT-09)
+             * @example false
+             */
+            newAccount?: boolean;
         };
         Customer: {
             /** @example Maria Souza */
@@ -1698,8 +1767,25 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["Cart"];
+            401: components["responses"]["NotAuthenticated"];
             404: components["responses"]["NotFound"];
-            422: components["responses"]["InvalidData"];
+            /** @description Invalid input (`invalid_data`, with `errors`), or an e-mail that is not the cart's confirmed one (`email_not_verified`, IDT-12) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/email-not-verified",
+                     *       "title": "Confirme seu e-mail para continuar",
+                     *       "status": 422,
+                     *       "code": "email_not_verified"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };
@@ -1732,7 +1818,18 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
-            409: components["responses"]["OutOfStock"];
+            /**
+             * @description A piece without enough sale stock (`out_of_stock`, with `items`; SAC-04, CHK-13),
+             *     or a cart without a confirmed e-mail (`email_not_verified`, IDT-12)
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description Incomplete cart (empty, no customer details or no delivery option chosen) */
             422: {
                 headers: {
@@ -1920,6 +2017,104 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    requestEmailCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Same response whether or not the e-mail has an account or purchases */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["InvalidData"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    verifyCartEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cartId: components["parameters"]["CartId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The cart's `verifiedEmail` is now this e-mail */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Code wrong, expired, already used or tried 5 times. Same response for every case (IDT-04). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/invalid-code",
+                     *       "title": "Código inválido ou vencido",
+                     *       "status": 401,
+                     *       "code": "invalid_code"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    dropCartEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cartId: components["parameters"]["CartId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cart has no `verifiedEmail` until a new confirmation */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     requestAccessLink: {
         parameters: {
             query?: never;
@@ -1970,7 +2165,7 @@ export interface operations {
                     "application/json": components["schemas"]["Session"];
                 };
             };
-            /** @description Link used, expired or invalid; or e-mail and password do not match. Same response for every case. */
+            /** @description Code or link used, expired or invalid; or e-mail and password do not match. Same response for every case. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2039,6 +2234,8 @@ export interface operations {
                     /** Format: email */
                     email?: string;
                     phone?: components["schemas"]["Phone"];
+                    /** @description Required when `email` changes; the code sent to the new e-mail (CTA-06) */
+                    code?: string;
                 };
             };
         };
@@ -2062,7 +2259,23 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            422: components["responses"]["InvalidData"];
+            /** @description Invalid input (`invalid_data`), or a new e-mail without its code (`email_not_verified`, CTA-06) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/email-not-verified",
+                     *       "title": "Confirme seu e-mail para continuar",
+                     *       "status": 422,
+                     *       "code": "email_not_verified"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

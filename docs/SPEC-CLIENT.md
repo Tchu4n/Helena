@@ -16,6 +16,7 @@ Behavior spec of the 8 customer screens of the Helena store, as Given/When/Then 
 | 3 | Product | `/produto/[slug]` | `PRO` |
 | 4 | Bag (panel and page) | `/sacola` | `SAC` |
 | 5 | Checkout (details, delivery, payment) | `/checkout` | `CHK` |
+| 5a | Identification before checkout | `/checkout/identificacao` | `IDT` |
 | 6 | Confirmation and tracking | `/pedido/[numero]` | `PED` |
 | 7 | Returns | `/devolucao` | `DEV` |
 | 8 | My account | `/conta` | `CTA` |
@@ -275,7 +276,7 @@ Routes are in Portuguese because the customer sees them in the browser. The pref
 
 **SAC-02 — Bag page**
 - **When** the customer opens the bag
-- **Then** she sees the 3-step progress (Sacola, Dados e entrega, Pagamento), each item with photo, name, color, size, price and quantity, the shipping calculation, the coupon field, the total with installments and "Finalizar compra"
+- **Then** she sees the 4-step progress (Sacola, Identificação, Dados e entrega, Pagamento), each item with photo, name, color, size, price and quantity, the shipping calculation, the coupon field, the total with installments and "Finalizar compra"
 - **And** the coupon field is always open, not hidden behind a link
 
 **SAC-03 — Empty bag**
@@ -369,7 +370,7 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 
 **CHK-01 — Buying without an account** (E18)
 - **When** the customer taps "Finalizar compra"
-- **Then** she goes straight to the details form, with no login screen, no password and no CAPTCHA
+- **Then** she goes to identification (`IDT-01`), where "Comprar só com e-mail" asks only for the e-mail and its code: no account, no password and no CAPTCHA (owner's decision of 2026-11-23)
 
 **CHK-02 — Required fields** (E1)
 - **Then** the form asks only for: name, CPF, email, phone and delivery address
@@ -382,7 +383,6 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 |---|---|---|
 | CPF | `123.456.789-0` (10 digits) | error "CPF deve ter 11 números" |
 | CPF | `1234567890a` | error "CPF deve ter 11 números" |
-| Email | `maria.exemplo.com` | error "Digite um e-mail válido" |
 | Phone | `(11) 9abc-0000` | error "Digite só números" |
 | CEP | `0131010` | error "Digite um CEP com 8 números" |
 | CPF | `111.444.777-00` (wrong check digits) | error "CPF inválido" |
@@ -392,6 +392,7 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 
 - **And** dots, dashes and parentheses typed by the customer are accepted and dropped before validating
 - **And** each error shows next to the field, with border, icon and text, and focus goes to the first field with an error
+- **And** the email comes filled in with the confirmed one (`IDT-03`) and can't be edited here; it is checked at identification (owner's decision of 2026-11-23)
 
 **CHK-04 — Data kept after an error**
 - **Given** a form with an invalid field
@@ -404,11 +405,12 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 - **Then** the data is saved as a lead
 
 **CHK-06 — Reminder notice** (LGPD)
-- **Then** next to the contact fields the screen warns that email and phone may be used to remind about the unfinished purchase, with a link to the privacy policy
+- **Then** next to the phone field the screen warns that the phone may be used to remind about the unfinished purchase, with a link to the privacy policy (the email part of the notice moved to `IDT-01` on 2026-11-23, where the email is given)
 
 **CHK-07 — Marketing consents** (LGPD)
 - **Then** there are two separate unchecked boxes: "Quero receber novidades por e-mail" and "Quero receber novidades por WhatsApp"
 - **And** the purchase completes normally with both unchecked
+- **And** an unchecked box never revokes a consent given before; revoking is done only in Privacidade (`CTA-08`)
 - **When** the customer checks one of them and completes the step
 - **Then** the consent is recorded only for that channel
 
@@ -488,6 +490,70 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 - **When** the customer goes back from payment to details, or from details to the bag
 - **Then** everything filled in and chosen is still there
 
+## 8a. Identification (IDT)
+
+Owner's decisions of 2026-11-23: every purchase needs an email confirmed with a code before paying; the customer chooses between buying with the email only or creating an account; if the email service is down, the store doesn't sell.
+
+**IDT-01 — Two ways, none chosen**
+- **Given** a bag with items and the customer not signed in
+- **When** she taps "Finalizar compra"
+- **Then** she sees "Identificação" with the email field and "Como você quer comprar?": "Comprar só com e-mail" ("Você confirma o e-mail a cada compra.") and "Criar conta" ("Sua conta guarda pedidos e endereços."), neither chosen
+- **And** the screen says "Usaremos este e-mail para o pedido e para lembrar você de uma compra não concluída."
+- **When** she taps "Receber código" with nothing filled in
+- **Then** she sees "Campo obrigatório" and "Escolha como quer comprar", and focus goes to the email
+
+**IDT-02 — Code sent, same answer for any email**
+- **When** she enters a valid email, picks a way and taps "Receber código"
+- **Then** the screen says "Enviamos um código para {e-mail}", the same for any email, and shows nothing saved about that email
+
+**IDT-03 — Guest: right code**
+- **Given** "Comprar só com e-mail" and the code sent
+- **When** she enters the 6 numbers, with or without spaces, and taps "Confirmar"
+- **Then** she goes to "Dados e entrega" with the email filled in, read-only, and "Trocar e-mail"
+
+**IDT-04 — Wrong or expired code**
+- **When** the code is wrong, expired or was already wrong 5 times
+- **Then** the screen says "Código inválido ou vencido" and the email stays
+
+**IDT-05 — Resend**
+- **Then** "Reenviar código" works 30 seconds after the code was sent; tapping it sends a new code and says "Código reenviado"
+
+**IDT-06 — Code doesn't arrive**
+- **Given** 2 minutes since the code was sent
+- **Then** the screen offers "Não recebeu? Fale com a loja no WhatsApp"
+- **And** the purchase can't go on without the code
+
+**IDT-07 — Back after a reload**
+- **Given** the code was sent
+- **When** the page reloads (for example after switching to the email app)
+- **Then** she is back on "Enviamos um código para {e-mail}" with the same way chosen
+
+**IDT-08 — Create an account**
+- **Given** "Criar conta" and an email with no account
+- **When** she confirms the code
+- **Then** she is asked "Crie sua senha" (8 to 72 characters) and, after "Continuar", goes to "Dados e entrega" signed in
+
+**IDT-09 — Create an account on an email that has one**
+- **Given** "Criar conta" and an email that already has an account
+- **When** she confirms the code
+- **Then** the screen says "Este e-mail já tem uma conta. Você entrou nela e sua senha não mudou.", asks for no password, and "Continuar" goes to "Dados e entrega" signed in
+
+**IDT-10 — Sign in with a password**
+- **When** she taps "Já tem senha? Entrar com senha" and enters email and password
+- **Then** with the right password she goes to "Dados e entrega" signed in; with a wrong one the screen says "E-mail ou senha não conferem", keeps the email and clears the password
+
+**IDT-11 — Already signed in**
+- **Given** the customer is signed in
+- **Then** "Finalizar compra" skips identification and "Dados e entrega" comes with her account's email, read-only, without "Trocar e-mail"
+
+**IDT-12 — No confirmed email**
+- **When** she opens "Dados e entrega" or taps "Ir para pagamento" without a confirmed email
+- **Then** she is taken to identification
+
+**IDT-13 — Change the email**
+- **When** she taps "Trocar e-mail"
+- **Then** the confirmation is dropped and she is back on the first step, with the email empty
+
 ## 9. Confirmation and tracking (PED)
 
 **PED-01 — Order confirmed**
@@ -566,8 +632,9 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 **CTA-01 — Sign in without a password** (E18)
 - **Given** the customer is not identified
 - **When** she opens the Conta tab and enters her email
-- **Then** the screen says "Se este e-mail tiver compras, enviamos um link de acesso", whatever the email
-- **And** the link she gets opens the account, works only once and expires
+- **Then** the screen says "Enviamos um código para {e-mail}", whatever the email
+- **And** the 6-number code she gets opens the account, works only once and expires in 10 minutes; an email with no account gets a new, empty account (`CTA-04`)
+- **And** she can also use "Já tem senha? Entrar com senha" (owner's decision of 2026-11-23: code instead of link)
 
 **CTA-02 — Account sections**
 - **Given** the customer is identified
@@ -588,9 +655,10 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 **CTA-06 — Personal details** (E1)
 - **Then** the customer sees name, email, phone and CPF (partly hidden) and can fix name, email and phone, with the `CHK-03` validation
 - **And** the CPF can't be changed from the screen
+- **And** a new email only takes effect after she enters the code sent to it (owner's decision of 2026-11-23)
 
 **CTA-07 — Optional password** (E18)
-- **Then** the customer can create a password of at least 8 characters to sign in without the link
+- **Then** the customer can create a password of 8 to 72 characters to sign in without the code, in the account or at identification with "Criar conta" (`IDT-08`)
 - **And** nothing in the account or the purchase depends on having a password
 
 **CTA-08 — Privacy: consents** (LGPD)
@@ -627,7 +695,7 @@ The requirements didn't settle these points. The owner decided on 2026-11-14; th
 | 7 | "Últimas peças" | 15 units or fewer of the size in sale stock (`PRO-13`) |
 | 8 | Address (E1 had a single field) | CEP, street, number, complement (optional), neighborhood, city and state |
 | 9 | Incomplete lead | Saved only with all required fields valid (`CHK-05`) |
-| 10 | Access to account and order | No password: email link (`CTA-01`) and lookup by number + email with reduced data (`PED-05`) |
+| 10 | Access to account and order | No password needed: email code (`CTA-01`, replaced the link on 2026-11-23) and lookup by number + email with reduced data (`PED-05`) |
 | 11 | Visible order steps | Pagamento confirmado, Em separação, Enviado, Entregue (`PED-03`) |
 | 12 | New return after a rejected one | No; one request per order (`DEV-05`) |
 | 13 | Return per item and comment field | Out: whole order, reason only |
@@ -638,6 +706,8 @@ The requirements didn't settle these points. The owner decided on 2026-11-14; th
 | 18 | Status of a missing product page (decided on 2026-11-19, following the Next.js docs) | The page streams, so it answers `200` with the not-found screen and a `noindex` tag (a "soft 404"). A real `404` would mean looking up the product before the page starts, which slows down every product page |
 | 19 | Bag controls (decided on 2026-11-19) | Quantity with "−" and "+" buttons; delivery option chosen only on the bag page; panel closes only by her tap; coupon field always open; "Desfazer" for 10 seconds, fading out; `SAC-17` built with checkout. Same day: "Finalizar compra" is never disabled by a sold-out item; tapping it shows an error naming the piece (`SAC-07`), so she knows why she can't move on; the stock limit reads "Apenas N unidades restantes" (`SAC-04`); on a computer the panel of `SAC-01` opens from the right side, like Hering's; once free shipping is reached there is no line about it, the cheapest option just shows "Grátis" (`SAC-10`) |
 | 20 | Name of the same-day courier option (decided on 2026-11-20) | The customer sees "Entrega Helena", never "Motoboy", on every screen (product, bag, checkout, order). In the code it stays `courier` |
+| 21 | Email before paying (decided on 2026-11-23) | Every purchase needs an email confirmed with a 6-number code; two ways: only email, or account with password (`IDT-*`). If the email service is down, the store doesn't sell |
+| 22 | "Criar conta" on an email that has an account (decided on 2026-11-23) | Denied: she is signed in by the code and the old password stays (`IDT-09`) |
 
 **Settled in the contract (`contract/openapi.yaml`):** the delivery time of each option, including the courier cutoff time, comes as ready-made text from the API; the catalog is paginated (24 per page, 48 max). Sorting is in the launch by the owner's decision (`CAT-09`).
 
