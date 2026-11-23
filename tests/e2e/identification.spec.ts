@@ -101,7 +101,14 @@ test("IDT-04 a wrong code is refused, and after 5 wrong tries the right one is t
   await typeCode(page, wrong);
   await expect(page.getByText("Código inválido ou vencido")).toBeVisible();
   await expect(page.getByText("Enviamos um código para maria@exemplo.com")).toBeVisible();
-  for (let i = 0; i < 4; i++) await typeCode(page, wrong);
+  // Each wrong try must reach the API before the next one: typing while the last one is still on its way
+  // would be wiped by the form reset and sent empty.
+  for (let tries = 2; tries <= 5; tries++) {
+    await typeCode(page, wrong);
+    await expect
+      .poll(async () => ((await (await request.get(`${FAKE_API}/__codes?email=maria%40exemplo.com`)).json()) as { tries: number }).tries)
+      .toBe(tries);
+  }
   await typeCode(page, code);
   await expect(page.getByText("Código inválido ou vencido")).toBeVisible();
   await expect(page).toHaveURL(/\/checkout\/identificacao$/);

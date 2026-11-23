@@ -116,6 +116,7 @@ export function IdentificationForm({ initial, mode, whatsapp, requestCode, confi
         <h1 className="font-serif text-[1.75rem] font-normal">{heading}</h1>
         <form action={dispatch} noValidate className="flex flex-col gap-4 bg-card p-4">
           <input type="hidden" name="intent" value="confirm" />
+          <input type="hidden" name="next" value={next} />
           <p>Enviamos um código para {state.email}</p>
           <Field label="Código" name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={11} error={state.errors.code} />
           {state.error && <Alert>{state.error}</Alert>}

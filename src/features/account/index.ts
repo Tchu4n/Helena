@@ -1,4 +1,6 @@
 export { IdentificationForm } from "./components/IdentificationForm.tsx";
+export { AccountHome } from "./components/AccountHome.tsx";
+export { signOut } from "./actions/signOut.ts";
 export { requestCode } from "./actions/requestCode.ts";
 export { confirmCode } from "./actions/confirmCode.ts";
 export { createPassword } from "./actions/createPassword.ts";

@@ -43,11 +43,11 @@ export function apiPatch<T>(path: string, body: unknown): Promise<ApiResult<T>> 
   return request<T>(new URL(path, env.apiUrl), { method: "PATCH", body: JSON.stringify(body) });
 }
 
-export function apiDelete<T>(path: string): Promise<ApiResult<T>> {
-  return request<T>(new URL(path, env.apiUrl), { method: "DELETE" });
+export function apiDelete<T>(path: string, headers?: ExtraHeaders): Promise<ApiResult<T>> {
+  return request<T>(new URL(path, env.apiUrl), { method: "DELETE", headers });
 }
 
-// Extra request headers: Idempotency-Key, X-Order-Access, X-Forwarded-For (checkout).
+// Extra request headers: Idempotency-Key, X-Order-Access, X-Forwarded-For (checkout), Authorization (session).
 type ExtraHeaders = Record<string, string>;
 
 async function request<T>(url: URL, init: { method: string; body?: string; headers?: ExtraHeaders }): Promise<ApiResult<T>> {

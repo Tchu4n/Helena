@@ -556,6 +556,11 @@ async function route(req, url) {
   }
   if (req.method === "POST" && url.pathname === "/v1/email-codes") return sendCode((await readJson(req)).email);
   if (req.method === "POST" && url.pathname === "/v1/sessions") return startSession(await readJson(req));
+  // CTA-10: the token stops working at once.
+  if (req.method === "DELETE" && url.pathname === "/v1/sessions/current") {
+    const token = req.headers.authorization?.replace(/^Bearer /, "");
+    return token && sessions.delete(token) ? [204, null] : [401, NOT_AUTHENTICATED];
+  }
   if (req.method === "PUT" && url.pathname === "/v1/account/password") {
     const email = sessionEmail(req);
     if (!email) return [401, NOT_AUTHENTICATED];

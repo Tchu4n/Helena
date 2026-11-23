@@ -28,7 +28,7 @@ async function largestContentfulPaint(page: Page, path: string): Promise<number>
 
 test.beforeEach(async ({ context }) => skipCookieBanner(context));
 
-for (const path of ["/", "/catalogo", "/produto/jaqueta-sarja-verde", "/pedido"]) {
+for (const path of ["/", "/catalogo", "/produto/jaqueta-sarja-verde", "/pedido", "/conta"]) {
   test(`GER-08 main content of ${path} under 3 s on slow 4G`, async ({ page }) => {
     test.setTimeout(60_000);
     const lcp = await largestContentfulPaint(page, path);
@@ -72,5 +72,18 @@ test("GER-08 main content of /checkout under 3 s on slow 4G", async ({ context, 
   await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
   const lcp = await largestContentfulPaint(page, "/checkout");
   console.log(`LCP /checkout: ${Math.round(lcp)} ms`);
+  expect(lcp).toBeLessThan(3000);
+});
+
+// /checkout/identificacao needs a bag with pieces, or it goes back to the bag.
+test("GER-08 main content of /checkout/identificacao under 3 s on slow 4G", async ({ context, page }) => {
+  test.setTimeout(60_000);
+  const response = await context.request.post("http://localhost:4011/__carts", {
+    data: { lines: [{ productSizeId: "5a1e0000-0000-4000-8000-000000000002" }] },
+  });
+  const { id } = await response.json();
+  await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
+  const lcp = await largestContentfulPaint(page, "/checkout/identificacao");
+  console.log(`LCP /checkout/identificacao: ${Math.round(lcp)} ms`);
   expect(lcp).toBeLessThan(3000);
 });
