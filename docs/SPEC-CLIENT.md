@@ -453,7 +453,7 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 **CHK-16 — PIX confirmed instantly** (E5)
 - **Given** the PIX screen open
 - **When** the payment is confirmed
-- **Then** the customer is taken, without reloading the page, to the home page, which shows "Pagamento concluído com sucesso" with the order number until she closes it (owner's decision of 2026-11-20)
+- **Then** the customer is taken, without reloading the page, to the order confirmation (`PED-01`) (owner's decision of 2026-11-22)
 
 **CHK-17 — Reservation expired** (E4)
 - **Given** the 15 minutes ran out with no payment
@@ -472,7 +472,7 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 
 **CHK-20 — Card approved** (E5)
 - **When** the payment is approved
-- **Then** the customer is taken to the home page, which shows "Pagamento concluído com sucesso" with the order number until she closes it (owner's decision of 2026-11-20)
+- **Then** the customer is taken to the order confirmation (`PED-01`) (owner's decision of 2026-11-22)
 
 **CHK-21 — Card declined** (E5)
 - **When** the payment is declined
@@ -493,12 +493,14 @@ Step 2 (details and delivery) and step 3 (payment) of the bag progress.
 **PED-01 — Order confirmed**
 - **Given** an approved payment
 - **Then** the screen shows "Pedido confirmado", the order number, the items, the total paid, the payment method, the delivery option and the delivery time
+- **And** a large check icon in the success color shows above "Pedido confirmado"
 - **And** it says the confirmation was sent to the given email, partly hidden (`m***@exemplo.com`)
 - **And** it offers "Acompanhar pedido" and "Continuar comprando"
+- **And** with no interaction, the screen goes to the home page after 8 seconds; any interaction (tap, scroll, key, focus moving) cancels it; no countdown shows (owner's decision of 2026-11-22)
 
 **PED-02 — Bag emptied**
 - **Given** a confirmed order
-- **Then** the bag is empty and there is no reservation timer anymore
+- **Then** when the confirmation opens, the bag is empty and there is no reservation timer anymore
 
 **PED-03 — Order steps** (E15)
 - **When** the customer opens tracking

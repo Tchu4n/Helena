@@ -27,7 +27,9 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | `/checkout` (dados e entrega) | `CheckoutPage` |
 | `/checkout/pagamento` | `PaymentPage` |
 | `/privacidade` (política de privacidade; page still to build) | `PrivacyPage` |
-| `?pedido=` (home page after payment) | `orderNumber` |
+| `/pedido` (consultar pedido sem conta) | `OrderLookupPage` |
+| `/pedido/[numero]` (confirmação e acompanhamento) | `OrderPage` |
+| `?confirmado=1` (confirmação logo após o pagamento) | `confirmed` |
 | `?categoria=` | `category` |
 | `?tamanho=` | `size` |
 | `?cor=` | `color` |
@@ -105,7 +107,6 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | campos do cartão (gateway simulado), token do cartão | `SimulatedCardFields` (its handle: `CardGateway`), `cardToken` (field and the function that makes the fake token) |
 | conferir os campos do cartão | `checkCard` |
 | pagar com cartão | `payWithCard` |
-| mensagem de pagamento concluído | `PaymentSuccess` (checks the order), `SuccessNotice` (the box) |
 | gerar código PIX | `payWithPix` |
 | conferir pagamento (PIX) | `checkPayment` |
 | encerrar a compra (apagar sacola e cookie do pedido) | `finishPurchase`, `forgetCart` |
@@ -124,6 +125,13 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | parcelas, valor da parcela | `installments`, `installmentAmount` |
 | código do PIX (copia e cola) | `pixCode` |
 | código de rastreio | `trackingCode` |
+| pedido na tela (textos prontos), montar a partir da API | `OrderView`, `toOrderView` |
+| ler o pedido (com o acesso do cookie) | `getOrder` |
+| consultar pedido (número + e-mail) | `lookUpOrder`, `OrderLookupForm` |
+| confirmação do pedido (tela) | `OrderConfirmation` |
+| acompanhamento do pedido (tela) | `OrderTracking` |
+| copiar código de rastreio | `CopyTrackingCode` |
+| cookie de acompanhamento | `helena_tracking`, `readTrackingAccess`, `saveTrackingAccess` |
 | nota fiscal (status: emitida, erro) | `invoice` (`issued`, `error`) |
 | etiqueta (thermal format) | `shippingLabel` / `shipping_label` (`thermal`) |
 
@@ -151,7 +159,7 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | Meaning | Code |
 |---|---|
 | features, by domain | `src/features/<domain>/` |
-| domains: catalog, bag, checkout, account, returns, privacy (cookies and consents) | `catalog`, `cart`, `checkout`, `account`, `returns`, `privacy` |
+| domains: catalog, bag, checkout, orders (confirmation and tracking), account, returns, privacy (cookies and consents) | `catalog`, `cart`, `checkout`, `orders`, `account`, `returns`, `privacy` |
 | components, actions, queries, schemas | `components/`, `actions/`, `queries/`, `schemas/` |
 | primitives: button, field, badge | `src/components/ui/`: `Button`, `Field`, `Badge` |
 | tests | `tests/` |
