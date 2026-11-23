@@ -1,5 +1,7 @@
 export { IdentificationForm } from "./components/IdentificationForm.tsx";
 export { AccountHome } from "./components/AccountHome.tsx";
+export { MyOrders } from "./components/MyOrders.tsx";
+export { listMyOrders } from "./queries/listMyOrders.ts";
 export { signOut } from "./actions/signOut.ts";
 export { requestCode } from "./actions/requestCode.ts";
 export { confirmCode } from "./actions/confirmCode.ts";

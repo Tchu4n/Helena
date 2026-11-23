@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { skipCookieBanner } from "./consent";
-import { FAKE_API } from "./order-helpers";
+import { FAKE_API, JACKET_M, paths, startPayment, VALID } from "./order-helpers";
 
 test.beforeEach(async ({ context, request }) => {
   await skipCookieBanner(context);
@@ -97,4 +97,72 @@ test("a tampered session cookie is treated as signed out", async ({ context, pag
   await page.goto("/conta");
   await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sair" })).toHaveCount(0);
+});
+
+// CTA-03: a purchase through the screens, signed in (name, CPF and phone come from the account).
+async function buySignedIn(context: BrowserContext, page: Page, request: APIRequestContext): Promise<string> {
+  const { id } = await (await context.request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId: JACKET_M }] } })).json();
+  await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
+  await page.goto("/checkout");
+  for (const [label, value] of VALID.slice(3)) await page.getByLabel(label, { exact: true }).fill(value);
+  await expect(page.getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+  return (await paths(request)).findLast((p) => /^\/v1\/orders\/HL-\d+$/.test(p))!.split("/").pop()!;
+}
+
+const today = () => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" }).format(new Date());
+
+test("CTA-03 Meus pedidos: newest first with number, date, total and state; an order opens with its address", async ({ context, page, request }) => {
+  await signIn(page, request, "maria@exemplo.com");
+  const first = await buySignedIn(context, page, request);
+  const second = await buySignedIn(context, page, request);
+  await page.goto("/conta/pedidos");
+  await expect(page.getByRole("heading", { level: 1, name: "Meus pedidos" })).toBeVisible();
+  const orders = page.getByRole("main").getByRole("link", { name: /HL-/ });
+  await expect(orders).toHaveCount(2);
+  await expect(orders.nth(0)).toContainText(second);
+  await expect(orders.nth(1)).toContainText(first);
+  for (const text of [today(), "R$ 219,00", "Aguardando pagamento"]) await expect(orders.nth(0)).toContainText(text);
+  expect((await orders.nth(0).boundingBox())!.height).toBeGreaterThanOrEqual(48);
+  await orders.nth(1).click();
+  await expect(page).toHaveURL(new RegExp(`/pedido/${first}$`));
+  await expect(page.getByText("Avenida Paulista, 1000")).toBeVisible();
+});
+
+test("CTA-04 no orders: the message and Ver novidades", async ({ page, request }) => {
+  await signIn(page, request, "maria@exemplo.com");
+  await page.goto("/conta/pedidos");
+  await expect(page.getByText("Você ainda não tem pedidos")).toBeVisible();
+  await page.getByRole("link", { name: "Ver novidades" }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test("CTA-11 someone else's order: the same lookup form as a number that doesn't exist", async ({ browser, page, request }) => {
+  const maria = await browser.newContext();
+  await skipCookieBanner(maria);
+  const number = await startPayment(maria, await maria.newPage(), request);
+  await maria.close();
+  await signIn(page, request, "ana@exemplo.com");
+  await page.goto(`/pedido/${number}`);
+  await expect(page.getByRole("button", { name: "Ver pedido" })).toBeVisible();
+  await expect(page.getByText("Avenida Paulista")).toHaveCount(0);
+});
+
+test("Review focus 4: an order followed by the lookup still shows, without the address, when signed in as someone else", async ({ context, page, request }) => {
+  const number = await startPayment(context, page, request);
+  await context.clearCookies({ name: "helena_order" });
+  await page.goto(`/pedido/${number}`);
+  await page.getByLabel("E-mail").fill("maria@exemplo.com");
+  await page.getByRole("button", { name: "Ver pedido" }).click();
+  await expect(page.getByRole("heading", { name: "Acompanhar pedido" })).toBeVisible();
+  await signIn(page, request, "ana@exemplo.com");
+  await page.goto(`/pedido/${number}`);
+  await expect(page.getByRole("heading", { name: "Acompanhar pedido" })).toBeVisible();
+  await expect(page.getByText("Avenida Paulista")).toHaveCount(0);
+});
+
+test("signed out, Meus pedidos asks for identification", async ({ page }) => {
+  await page.goto("/conta/pedidos");
+  await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
 });

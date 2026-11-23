@@ -352,7 +352,8 @@ function advanceOrder(order, to, code) {
   return true;
 }
 
-function orderBody(order) {
+// CTA-03: the full address goes only to the account that bought it (PED-05).
+function orderBody(order, { withAddress = false } = {}) {
   const now = Date.now();
   const status = orderStatus(order, now);
   return {
@@ -367,7 +368,7 @@ function orderBody(order) {
     ...order.totals,
     reservationExpiresAt: isReserved(order, now) ? new Date(order.reservationEndsAt).toISOString() : null,
     payment: order.payment,
-    delivery: order.delivery,
+    delivery: withAddress ? { ...order.delivery, address: order.customer.address } : order.delivery,
     maskedEmail: maskEmail(order.email),
     return: order.return ?? null,
     returnAvailability: order.returnAvailability ?? { allowed: false, deadline: null, reason: "order_not_delivered" },
@@ -505,6 +506,9 @@ function createOrder(cartId) {
       deliveredAt: null,
     },
     email: cart.customer.email,
+    // The purchase keeps its own copy of the details (CHK-05), and the account it was made with (CTA-03).
+    customer: structuredClone(cart.customer),
+    accountEmail: cart.accountEmail ?? null,
     payment: null,
   };
   orders.set(order.number, order);
@@ -597,6 +601,19 @@ async function route(req, url) {
     if (!email) return [401, NOT_AUTHENTICATED];
     return [200, customerBody(email)];
   }
+  // CTA-03, CTA-04: the account's orders, newest first.
+  if (req.method === "GET" && url.pathname === "/v1/account/orders") {
+    const email = sessionEmail(req);
+    if (!email) return [401, NOT_AUTHENTICATED];
+    const pageNumber = Math.max(1, Number(url.searchParams.get("page")) || 1);
+    const perPage = Math.min(48, Math.max(1, Number(url.searchParams.get("perPage")) || 24));
+    const mine = [...orders.values()].filter((o) => o.accountEmail === email).reverse(); // inserted oldest first
+    const now = Date.now();
+    const items = mine
+      .slice((pageNumber - 1) * perPage, pageNumber * perPage)
+      .map((o) => ({ number: o.number, createdAt: o.createdAt, status: orderStatus(o, now), total: o.totals.total }));
+    return [200, { items, total: mine.length, page: pageNumber, perPage }];
+  }
   // IDT-14: once per account, one CPF per account.
   if (req.method === "PUT" && url.pathname === "/v1/account/details") {
     const email = sessionEmail(req);
@@ -624,6 +641,12 @@ async function route(req, url) {
   if (parts[1] === "orders" && parts.length >= 3) {
     const order = orders.get(decodeURIComponent(parts[2]));
     if (!order) return [404, NOT_FOUND];
+    // CTA-03, CTA-11: with a session, only the account's own orders, with the address; another's is a 404.
+    if (req.method === "GET" && parts.length === 3 && req.headers.authorization) {
+      const email = sessionEmail(req);
+      if (!email) return [401, NOT_AUTHENTICATED];
+      return order.accountEmail === email ? [200, orderBody(order, { withAddress: true })] : [404, NOT_FOUND];
+    }
     if (req.headers["x-order-access"] !== order.access) return [401, NOT_AUTHENTICATED];
     if (req.method === "GET" && parts.length === 3) return [200, orderBody(order)];
     if (req.method === "POST" && parts[3] === "payments") {
@@ -656,6 +679,7 @@ async function route(req, url) {
       if (signedIn === body.email) cart.verifiedEmail = body.email;
       if (body.email !== cart.verifiedEmail) return [422, emailNotVerified(422)];
       cart.customer = body;
+      cart.accountEmail = signedIn ?? null;
       return [200, cartBody(cart)];
     }
     if (parts[3] === "email-verification") {

@@ -5,8 +5,9 @@ import { CopyTrackingCode } from "./CopyTrackingCode.tsx";
 
 const label = "font-mono text-xs font-medium uppercase tracking-[0.08em]";
 
-// PED-03, PED-04, PED-05, PED-07, PED-08: steps, tracking or courier, city/state (never the address), support and return.
-export function OrderTracking({ order, summary }: { order: OrderView; summary: ReactNode }) {
+// PED-03, PED-04, PED-05, PED-07, PED-08: steps, tracking or courier, city/state, support and return.
+// CTA-03: the full address only when she reads her own order signed in.
+export function OrderTracking({ order, summary, address = null }: { order: OrderView; summary: ReactNode; address?: string | null }) {
   return (
     <div className="flex flex-col gap-4 px-4 pt-6 pb-8">
       <div className="flex flex-col gap-1">
@@ -36,7 +37,7 @@ export function OrderTracking({ order, summary }: { order: OrderView; summary: R
       </section>
 
       <section aria-label="Entrega" className="flex flex-col gap-2 bg-card p-4">
-        <p>{order.place}</p>
+        <p>{address ?? order.place}</p>
         <p className="text-muted">{order.deliveryTime}</p>
         {order.tracking && (
           <div className="flex flex-col gap-2 pt-2">

@@ -1,7 +1,7 @@
 // PED-01, PED-03 to PED-08: the order screens get only the fields they show, with texts ready.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { toOrderView } from "../src/features/orders/views.ts";
+import { addressLine, toMyOrderView, toOrderView } from "../src/features/orders/views.ts";
 
 const order = {
   number: "HL-100482",
@@ -100,4 +100,28 @@ test("no step done: currentStep is null", () => {
 test("PED-05 the view carries no CPF, phone or address", () => {
   assert.deepEqual(Object.keys(toOrderView(order)).sort(), [...KEYS].sort());
   assert.doesNotMatch(JSON.stringify(toOrderView(order)), /Paulista/);
+});
+
+test("CTA-03 the address line, only when the API sends the address (signed in)", () => {
+  const full = { ...order, delivery: { ...order.delivery, address: { cep: "01310100", street: "Avenida Paulista", number: "1000", complement: null, neighborhood: "Bela Vista", city: "São Paulo", state: "SP" } } };
+  assert.equal(addressLine(full), "Avenida Paulista, 1000 · Bela Vista · São Paulo/SP · CEP 01310-100");
+  assert.equal(addressLine({ ...full, delivery: { ...full.delivery, address: { ...full.delivery.address, complement: "Apto 12" } } }), "Avenida Paulista, 1000, Apto 12 · Bela Vista · São Paulo/SP · CEP 01310-100");
+  const withoutAddress = { ...order.delivery, address: undefined };
+  assert.equal(addressLine({ ...order, delivery: withoutAddress }), null);
+});
+
+test("CTA-03 an order in the list: number, date dd/mm/yyyy in São Paulo, total and state in Portuguese", () => {
+  assert.deepEqual(toMyOrderView({ number: "HL-100482", createdAt: "2026-11-23T02:30:00.000Z", status: "awaiting_payment", total: 21900 }), {
+    number: "HL-100482",
+    date: "22/11/2026",
+    total: "R$\u00a0219,00", // formatPrice puts a no-break space after R$
+    status: "Aguardando pagamento",
+  });
+  const label = (status) => toMyOrderView({ number: "HL-1", createdAt: "2026-11-22T12:00:00.000Z", status, total: 0 }).status;
+  assert.equal(label("reservation_expired"), "Cancelado");
+  assert.equal(label("payment_confirmed"), "Pagamento confirmado");
+  assert.equal(label("preparing"), "Em separação");
+  assert.equal(label("shipped"), "Enviado");
+  assert.equal(label("delivered"), "Entregue");
+  assert.equal(label("support_in_progress"), "Suporte em andamento");
 });

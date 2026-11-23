@@ -18,10 +18,10 @@ async function OrderContent({ params, searchParams }: PageProps<"/pedido/[numero
   if (confirmado === "1" && order.paid) {
     return <OrderConfirmation order={order} summary={<OrderSummary summary={summary} open />} finishPurchase={finishPurchase} />;
   }
-  return <OrderTracking order={order} summary={<OrderSummary summary={summary} open />} />;
+  return <OrderTracking order={order} address={result.address} summary={<OrderSummary summary={summary} open />} />;
 }
 
-// PED-01 to PED-08: the order is read with her own access cookie (inside Suspense: cacheComponents).
+// PED-01 to PED-08, CTA-03: the order is read with her session or her own access cookie (inside Suspense: cacheComponents).
 export default function OrderPage(props: PageProps<"/pedido/[numero]">) {
   return (
     <Suspense fallback={null}>
