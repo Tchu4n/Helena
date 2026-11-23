@@ -90,6 +90,7 @@ Routes are in Portuguese because the customer sees them in the browser. The pref
 - **When** the customer taps "Gerenciar preferências"
 - **Then** she sees each cookie category described, all optional ones unchecked
 - **And** she can change the choice later, at any time, through a link in the footer, without signing in
+- **And** the optional categories are "Análise", "Marketing" and "Funcionais" ("Lembram os CEPs que você pesquisou para calcular o frete, só neste aparelho.", `PRO-15`); "Aceitar" accepts all of them and "Rejeitar" refuses all of them (added on 2026-11-23)
 
 **GER-06 — API failure** (RFC 9457)
 - **Given** an API call failed or took too long
@@ -265,6 +266,16 @@ Routes are in Portuguese because the customer sees them in the browser. The pref
 - **When** she taps "Avise-me quando estiver disponível" without having picked a size
 - **Then** focus goes to the sizes and the card says "Escolha o tamanho para receber o aviso."; on tapping a size, the card already asks for the contact
 
+**PRO-15 — CEPs searched before** (owner's decision of 2026-11-23)
+- **Given** the customer accepted the "Funcionais" cookies (`GER-05`)
+- **When** she taps the CEP field with fewer than 8 digits typed
+- **Then** she sees "Pesquisados recentemente" with the last 5 CEPs whose shipping she calculated, newest first, each with its city/UF when known ("01310-100 · São Paulo/SP"), and "Limpar histórico"
+- **And** tapping one puts it in the field and calculates the shipping right away; a CEP calculated again moves to the top instead of repeating; a CEP whose calculation failed is not kept
+- **And** the list hides with 8 digits typed, with Escape, or when focus leaves the field and the list; each suggestion is a 48px button
+- **And** the history stays only on her device and is deleted by "Limpar histórico" or when she withdraws "Funcionais"
+- **Given** she didn't accept "Funcionais" (or chose before it existed)
+- **Then** nothing is kept or shown, and the calculator works as before
+
 ## 7. Bag (SAC)
 
 **SAC-01 — Panel on add**
@@ -361,6 +372,9 @@ Routes are in Portuguese because the customer sees them in the browser. The pref
 - **Then** the bag and the panel show the reservation time left
 - **Given** no payment was started
 - **Then** there is no timer in the bag
+
+**SAC-18 — CEPs searched before, in the bag** (owner's decision of 2026-11-23)
+- **Then** the bag's CEP field follows `PRO-15`; a CEP calculated in the bag also goes into the history (without city/UF unless already known)
 
 ## 8. Checkout (CHK)
 
@@ -662,9 +676,21 @@ Owner's decisions of 2026-11-23: every purchase needs an email confirmed with a 
 - **Given** an account with no orders
 - **Then** the screen says "Você ainda não tem pedidos" and offers "Ver novidades"
 
-**CTA-05 — My addresses**
-- **Then** the customer can add, edit and remove addresses, with the same validation as checkout
-- **And** in a new identified purchase, the saved address comes as a suggestion
+**CTA-05 — My addresses** (owner's decisions of 2026-11-23)
+- **Then** "Meus endereços" lists her addresses, the favorite first with "Favorito" (icon and text), then the newest first; with none, "Você ainda não tem endereços salvos" and "Adicionar endereço"
+- **And** "Adicionar endereço" and "Editar" open the checkout's address fields with the `CHK-03` validation; "Salvar endereço" says "Endereço salvo"
+- **And** "Remover" asks "Remover este endereço?" with "Remover" and "Cancelar" (same size and color), then says "Endereço removido"
+- **And** "Tornar favorito" makes that address the only favorite and says "Endereço favorito atualizado"; the first address saved becomes the favorite; removing the favorite passes it to the newest remaining one
+- **And** at 10 addresses "Adicionar endereço" gives way to "Você chegou ao limite de 10 endereços. Remova um para adicionar outro."
+- **And** removing or editing an address never changes a past order (decision 23)
+
+**CTA-12 — Saved addresses in checkout** (owner's decisions of 2026-11-23)
+- **Given** the customer is signed in and has saved addresses
+- **Then** "Dados e entrega" shows "Seus endereços" as choices, the favorite first with "Favorito", **none chosen**, and the address fields empty
+- **When** she taps one
+- **Then** the address fields get its values as if she had typed them (`CHK-09`, `CHK-10` apply: another CEP recalculates the shipping and shows the note); editing any of them afterwards clears the choice
+- **And** signed in, "Salvar este endereço na minha conta" comes checked; on "Ir para pagamento", checked, the address is also saved in the account, without a duplicate of an equal one (CEP, street, number, complement) and skipped at 10 addresses; the purchase never fails because of it, and the lead save of `CHK-05` never saves it
+- **And** a guest sees neither the choices nor the box
 
 **CTA-06 — Personal details** (E1)
 - **Then** the customer sees name, email, phone and CPF (partly hidden) and can fix name, email and phone, with the `CHK-03` validation
@@ -719,7 +745,7 @@ The requirements didn't settle these points. The owner decided on 2026-11-14; th
 | 13 | Return per item and comment field | Out: whole order, reason only |
 | 14 | Cancellation before shipping | Not in the launch |
 | 15 | Performance measure | Main content visible (LCP) within 3 s on simulated slow 4G (`GER-08`) |
-| 16 | Where the `PRO-08` CEP is kept (decided on 2026-11-18) | Inside the bag, in the API (`setCartCep`); no cookie of its own. Calculating shipping creates the bag if it doesn't exist |
+| 16 | Where the `PRO-08` CEP is kept (decided on 2026-11-18) | Inside the bag, in the API (`setCartCep`); no cookie of its own. Calculating shipping creates the bag if it doesn't exist. The CEP history of `PRO-15` is apart from this: only on her device, only with "Funcionais" (row 29) |
 | 17 | Panel on add (decided on 2026-11-18) | Comes with the bag; until then the `PRO-07` message applies |
 | 18 | Status of a missing product page (decided on 2026-11-19, following the Next.js docs) | The page streams, so it answers `200` with the not-found screen and a `noindex` tag (a "soft 404"). A real `404` would mean looking up the product before the page starts, which slows down every product page |
 | 19 | Bag controls (decided on 2026-11-19) | Quantity with "−" and "+" buttons; delivery option chosen only on the bag page; panel closes only by her tap; coupon field always open; "Desfazer" for 10 seconds, fading out; `SAC-17` built with checkout. Same day: "Finalizar compra" is never disabled by a sold-out item; tapping it shows an error naming the piece (`SAC-07`), so she knows why she can't move on; the stock limit reads "Apenas N unidades restantes" (`SAC-04`); on a computer the panel of `SAC-01` opens from the right side, like Hering's; once free shipping is reached there is no line about it, the cheapest option just shows "Grátis" (`SAC-10`) |
@@ -731,6 +757,8 @@ The requirements didn't settle these points. The owner decided on 2026-11-14; th
 | 25 | Signed-in checkout (decided on 2026-11-23) | Name, CPF (partly hidden) and phone come from the account, read-only; changed only in Dados pessoais (`IDT-11`, `CTA-06`) |
 | 26 | Which lead a guest purchase belongs to (decided on 2026-11-23) | The lead is found by the email confirmed with the code, never by the CPF (anyone can type someone else's CPF). The same CPF may be on several leads; an existing lead is never overwritten; the bag and the order keep what was typed, CPF included (`CHK-05`, `CHK-08`) |
 | 27 | How long an unfinished purchase is kept (decided on 2026-11-23) | The details of a bag that never became an order, and a lead that never bought, are deleted 30 days after the last interaction. Orders keep their details for the invoice (`CHK-05`) |
+| 28 | Saving the checkout address in the account (decided on 2026-11-23) | A box "Salvar este endereço na minha conta", **checked by default**, signed in only. It is not a marketing or cookie box (those stay unchecked): it serves the account she chose to create ("Sua conta guarda pedidos e endereços") and the purchase (LGPD art. 7, V). At most 10 addresses, one favorite (`CTA-05`, `CTA-12`) |
+| 29 | CEP history (decided on 2026-11-23) | The shipping calculator remembers the last 5 CEPs, on her device only, and only with the optional "Funcionais" cookies, unchecked by default (`PRO-15`, `SAC-18`, `GER-05`). Nothing is ever filled in without her tap |
 
 **Settled in the contract (`contract/openapi.yaml`):** the delivery time of each option, including the courier cutoff time, comes as ready-made text from the API; the catalog is paginated (24 per page, 48 max). Sorting is in the launch by the owner's decision (`CAT-09`).
 

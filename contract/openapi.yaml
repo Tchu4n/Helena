@@ -940,7 +940,7 @@ paths:
     get:
       tags: [Account]
       operationId: listMyAddresses
-      summary: My addresses (CTA-05)
+      summary: My addresses (CTA-05), the favorite first, then the newest first
       security:
         - customerSession: []
       responses:
@@ -958,6 +958,9 @@ paths:
       tags: [Account]
       operationId: addAddress
       summary: Adds an address (CTA-05)
+      description: |
+        At most 10 addresses per account; the first one saved becomes the
+        favorite.
       security:
         - customerSession: []
       requestBody:
@@ -972,6 +975,16 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SavedAddress" }
         "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "409":
+          description: The account already has 10 addresses (`address_limit`)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+              example:
+                type: https://helena.example/problems/address-limit
+                title: Você chegou ao limite de 10 endereços
+                status: 409
+                code: address_limit
         "422": { $ref: "#/components/responses/InvalidData" }
         "500": { $ref: "#/components/responses/InternalError" }
 
@@ -1005,12 +1018,37 @@ paths:
     delete:
       tags: [Account]
       operationId: removeAddress
-      summary: Removes an address (CTA-05)
+      summary: Removes an address (CTA-05); removing the favorite passes it to the newest remaining one
       security:
         - customerSession: []
       responses:
         "204":
           description: Address removed
+        "401": { $ref: "#/components/responses/NotAuthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/account/addresses/{addressId}/favorite:
+    parameters:
+      - name: addressId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [Account]
+      operationId: makeFavoriteAddress
+      summary: Makes this address the account's only favorite (CTA-05)
+      security:
+        - customerSession: []
+      responses:
+        "200":
+          description: The addresses, in the list's order
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items: { $ref: "#/components/schemas/SavedAddress" }
         "401": { $ref: "#/components/responses/NotAuthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
@@ -1290,6 +1328,7 @@ components:
             - cpf_in_use
             - details_already_set
             - details_missing
+            - address_limit
             - internal_error
         errors:
           type: array
@@ -1590,9 +1629,10 @@ components:
       allOf:
         - $ref: "#/components/schemas/Address"
         - type: object
-          required: [id]
+          required: [id, favorite]
           properties:
             id: { type: string, format: uuid }
+            favorite: { type: boolean, description: "At most one per account (CTA-05)", example: false }
 
     CustomerDetails:
       type: object
@@ -1606,6 +1646,14 @@ components:
         email: { type: string, format: email, maxLength: 150, example: maria@exemplo.com }
         phone: { $ref: "#/components/schemas/Phone" }
         address: { $ref: "#/components/schemas/Address" }
+        saveAddress:
+          type: boolean
+          description: |
+            Only with a customer session, and only from "Ir para pagamento"
+            (CTA-12; ignored without a session). `true` also saves `address` in
+            the account, unless an equal one (CEP, street, number, complement)
+            is already there or the account has 10; either way the step
+            succeeds. The first address saved becomes the favorite.
         consents:
           type: object
           description: One consent per channel, both false by default (CHK-07)

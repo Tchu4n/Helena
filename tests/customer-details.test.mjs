@@ -1,7 +1,7 @@
 // CHK-02 to CHK-07: the details form and the server actions share one schema, with the screen's exact messages.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { customerDetailsInput, digits, fieldErrors, isValidCpf } from "../src/features/checkout/schemas/customerDetails.ts";
+import { ADDRESS_FIELDS, addressDetailsInput, addressInput, customerDetailsInput, digits, fieldErrors, isValidCpf } from "../src/features/checkout/schemas/customerDetails.ts";
 
 const VALID = {
   name: "Maria Souza",
@@ -109,4 +109,32 @@ test("isValidCpf checks both check digits and rejects repeated digits", () => {
 
 test("IDT-03 an e-mail sent in the form is ignored", () => {
   assert.equal("email" in customerDetailsInput.parse({ ...VALID, email: "outra@exemplo.com" }), false);
+});
+
+// CTA-05: Meus endereços uses the checkout's address rules and messages, without the boxes.
+const ADDRESS = { cep: "01310-100", street: "Avenida Paulista", number: "1000", complement: "", neighborhood: "Bela Vista", city: "São Paulo", state: "sp" };
+const addressError = (overrides, field) => addressInput.safeParse({ ...ADDRESS, ...overrides }).error?.issues.find((i) => i.path[0] === field)?.message;
+
+test("CTA-05 addressInput gives the checkout's messages", () => {
+  assert.equal(addressError({ cep: "1234" }, "cep"), "Digite um CEP com 8 números");
+  assert.equal(addressError({ street: "" }, "street"), "Campo obrigatório");
+  assert.equal(addressError({ state: "S" }, "state"), "Digite a sigla do estado, como SP");
+});
+
+test("CTA-05 addressInput gives the contract's Address", () => {
+  assert.deepEqual(addressInput.parse(ADDRESS), {
+    cep: "01310100",
+    street: "Avenida Paulista",
+    number: "1000",
+    complement: null,
+    neighborhood: "Bela Vista",
+    city: "São Paulo",
+    state: "SP",
+  });
+  assert.deepEqual(ADDRESS_FIELDS, ["cep", "street", "number", "complement", "neighborhood", "city", "state"]);
+});
+
+test("IDT-11 addressDetailsInput is unchanged: the address and the consents", () => {
+  const full = customerDetailsInput.parse(VALID);
+  assert.deepEqual(addressDetailsInput.parse(VALID), { address: full.address, consents: full.consents });
 });

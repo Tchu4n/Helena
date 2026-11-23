@@ -72,7 +72,9 @@ CREATE UNIQUE NONCLUSTERED INDEX uq_lead_email ON dbo.customer (email) WHERE is_
 CREATE NONCLUSTERED INDEX ix_customer_cpf ON dbo.customer (cpf) WHERE cpf IS NOT NULL;
 GO
 
--- CTA-05: addresses saved in the account.
+-- CTA-05, CTA-12: addresses saved in the account. At most 10 per account and
+-- no two equal ones (CEP, street, number, complement): both checked by the API.
+-- One favorite at most (index below); the list is favorite first, then newest.
 CREATE TABLE dbo.customer_address (
     address_id    INT IDENTITY(1,1) NOT NULL,
     public_id     UNIQUEIDENTIFIER  NOT NULL CONSTRAINT df_customer_address_public DEFAULT NEWID(),
@@ -84,12 +86,15 @@ CREATE TABLE dbo.customer_address (
     neighborhood  NVARCHAR(60)      NOT NULL,
     city          NVARCHAR(60)      NOT NULL,
     state         CHAR(2)           NOT NULL,
+    is_favorite   BIT               NOT NULL CONSTRAINT df_customer_address_favorite DEFAULT 0,
+    created_at    DATETIME2(3)      NOT NULL CONSTRAINT df_customer_address_created DEFAULT SYSUTCDATETIME(),
     CONSTRAINT pk_customer_address PRIMARY KEY CLUSTERED (address_id),
     CONSTRAINT uq_customer_address_public UNIQUE (public_id),
     CONSTRAINT fk_customer_address_customer FOREIGN KEY (customer_id) REFERENCES dbo.customer (customer_id),
     CONSTRAINT ck_customer_address_cep CHECK (cep NOT LIKE '%[^0-9]%' AND LEN(cep) = 8)
 );
 CREATE NONCLUSTERED INDEX ix_customer_address_customer ON dbo.customer_address (customer_id);
+CREATE UNIQUE NONCLUSTERED INDEX uq_customer_address_favorite ON dbo.customer_address (customer_id) WHERE is_favorite = 1;
 GO
 
 -- LGPD: history of consents per channel. Only receives INSERTs; the current

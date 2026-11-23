@@ -12,4 +12,7 @@ export { checkPayment } from "./actions/checkPayment.ts";
 export { PaymentPanel } from "./components/PaymentPanel.tsx";
 export { ReservationTimer } from "./components/ReservationTimer.tsx";
 export { finishPurchase } from "./actions/finishPurchase.ts";
-export { addressDetailsInput, CONTACT_FIELDS, contactInput, nameAndPhoneInput } from "./schemas/customerDetails.ts";
+export { ADDRESS_FIELDS, addressDetailsInput, addressInput, CONTACT_FIELDS, contactInput, nameAndPhoneInput } from "./schemas/customerDetails.ts";
+export type { AddressField } from "./schemas/customerDetails.ts";
+export { ADDRESS_FIELD_SPECS } from "./address-fields.ts";
+export type { AddressFieldSpec } from "./address-fields.ts";

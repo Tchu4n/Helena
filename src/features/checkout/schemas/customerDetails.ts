@@ -7,6 +7,7 @@ import type { components } from "../../../lib/api-types.ts";
 // The contract leaves name, CPF and phone out of `required` (signed in, the API copies the account's).
 type AddressDetails = Omit<components["schemas"]["CustomerDetails"], "email" | "name" | "cpf" | "phone">;
 type Contact = components["schemas"]["AccountDetails"];
+type Address = components["schemas"]["Address"];
 
 // Version of the consent text the boxes show (CHK-07); bump it when the text changes.
 export const CONSENT_TEXT_VERSION = "2026-11";
@@ -26,6 +27,9 @@ export const DETAILS_FIELDS = [
 export type DetailsField = (typeof DETAILS_FIELDS)[number];
 // IDT-14: "Seus dados" asks only these; IDT-11: signed in, checkout shows them read-only.
 export const CONTACT_FIELDS = ["name", "cpf", "phone"] as const;
+// CTA-05, CTA-12: the address part, shared by checkout and Meus endereços.
+export const ADDRESS_FIELDS = ["cep", "street", "number", "complement", "neighborhood", "city", "state"] as const;
+export type AddressField = (typeof ADDRESS_FIELDS)[number];
 
 const REQUIRED = "Campo obrigatório";
 const TOO_LONG = "Texto muito longo"; // only reachable by getting around the field's maxLength
@@ -80,7 +84,7 @@ const contact = {
   ),
 };
 
-const address = {
+const addressFields = {
   cep: text(z.string().trim().min(1, REQUIRED).transform(digits).pipe(z.string().regex(/^\d{8}$/, "Digite um CEP com 8 números"))),
   street: required(100),
   number: required(10),
@@ -95,21 +99,28 @@ const address = {
       .regex(/^[A-Za-z]{2}$/, "Digite a sigla do estado, como SP")
       .transform((v) => v.toUpperCase()),
   ),
-  marketingEmail: box,
-  marketingWhatsapp: box,
 };
+
+const address = { ...addressFields, marketingEmail: box, marketingWhatsapp: box };
+
+function toAddress(v: z.infer<z.ZodObject<typeof addressFields>>): Address {
+  return {
+    cep: v.cep,
+    street: v.street,
+    number: v.number,
+    complement: v.complement || null,
+    neighborhood: v.neighborhood,
+    city: v.city,
+    state: v.state,
+  };
+}
+
+// CTA-05: an address alone (Meus endereços), with the checkout's messages.
+export const addressInput = z.object(addressFields).transform(toAddress);
 
 function toDetails(v: z.infer<z.ZodObject<typeof address>>): AddressDetails {
   return {
-    address: {
-      cep: v.cep,
-      street: v.street,
-      number: v.number,
-      complement: v.complement || null,
-      neighborhood: v.neighborhood,
-      city: v.city,
-      state: v.state,
-    },
+    address: toAddress(v),
     consents: { email: v.marketingEmail, whatsapp: v.marketingWhatsapp, textVersion: CONSENT_TEXT_VERSION },
   };
 }

@@ -5,6 +5,7 @@ import { Button } from "@/src/components/ui/Button.tsx";
 import { Field } from "@/src/components/ui/Field.tsx";
 import { AlertIcon } from "@/src/components/ui/icons.tsx";
 import type { DeliveryOptionView } from "@/src/features/cart/client.ts";
+import { ADDRESS_FIELD_SPECS } from "../address-fields.ts";
 import { readDetails, writeDetails, type StoredDetails } from "../checkout-storage.ts";
 import {
   addressDetailsInput,
@@ -58,15 +59,7 @@ const CONTACT: FieldSpec[] = [
   { name: "cpf", label: "CPF", autoComplete: "off", maxLength: 14, inputMode: "numeric" },
   { name: "phone", label: "Celular", autoComplete: "tel-national", maxLength: 15, type: "tel", inputMode: "tel" },
 ];
-const ADDRESS: FieldSpec[] = [
-  { name: "cep", label: "CEP", autoComplete: "postal-code", maxLength: 9, inputMode: "numeric", span: "wide" },
-  { name: "street", label: "Rua", autoComplete: "address-line1", maxLength: 100 },
-  { name: "number", label: "Número", autoComplete: "off", maxLength: 10, inputMode: "numeric", span: "short" },
-  { name: "complement", label: "Complemento (opcional)", autoComplete: "address-line2", maxLength: 40, span: "wide" },
-  { name: "neighborhood", label: "Bairro", autoComplete: "address-level3", maxLength: 60 },
-  { name: "city", label: "Cidade", autoComplete: "address-level2", maxLength: 60, span: "wide" },
-  { name: "state", label: "UF", autoComplete: "address-level1", maxLength: 2, span: "short" },
-];
+const ADDRESS: FieldSpec[] = ADDRESS_FIELD_SPECS;
 
 const EMPTY: StoredDetails = {
   ...(Object.fromEntries(DETAILS_FIELDS.map((f) => [f, ""])) as Record<DetailsField, string>),

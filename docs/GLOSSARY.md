@@ -31,6 +31,7 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | `/conta` | `AccountPage` |
 | `/conta/pedidos` (meus pedidos) | `MyOrdersPage` |
 | `/conta/dados` (dados pessoais) | `PersonalDetailsPage` |
+| `/conta/enderecos` (meus endereços) | `MyAddressesPage` |
 | `/pedido` (consultar pedido sem conta) | `OrderLookupPage` |
 | `/pedido/[numero]` (confirmação e acompanhamento) | `OrderPage` |
 | `?confirmado=1` (confirmação logo após o pagamento) | `confirmed` |
@@ -167,6 +168,12 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | dados de contato (nome, CPF, celular) | `contact` (`contactInput`, `CONTACT_FIELDS`) |
 | conta (registro) e cliente de compra sem conta (lead) | `is_account` = 1 / 0 in `customer` |
 | meus pedidos | `MyOrders`, `listMyOrders`, `MyOrderView` |
+| meus endereços, endereço salvo, favorito | `MyAddresses`, `listMyAddresses`, `AddressView`, `SavedAddress`, `favorite` (`is_favorite`), `makeFavorite` |
+| adicionar/editar endereço, remover endereço, limite de endereços | `saveAddress` (action), `removeAddress`, `address_limit` |
+| salvar este endereço na minha conta (caixa do checkout) | `saveAddress` (field of the customer step) |
+| campos de endereço | `addressInput`, `ADDRESS_FIELDS`, `ADDRESS_FIELD_SPECS` |
+| histórico de CEPs (pesquisados recentemente) | `cepHistory` (`helena_ceps` in `localStorage`; `CepSuggestions`, `rememberCep`, `clearCepHistory`) |
+| cookies funcionais | `functional` (in the consent cookie) |
 | dados pessoais | `PersonalDetails`, `updateContact`, `requestEmailChange`, `confirmEmailChange`, `setPassword` |
 | WhatsApp da loja | `STORE_WHATSAPP` |
 | consentimento, canal, versão do texto | `consent`, `channel`, `textVersion` |

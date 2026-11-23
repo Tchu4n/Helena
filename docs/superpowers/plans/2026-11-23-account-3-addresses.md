@@ -1,6 +1,6 @@
 # Account, plan 3: saved addresses, the favorite and the CEP history — implementation plan
 
-> **Status:** written on 2026-11-23, waiting for the owner's review. Same way of working as plans 1 and 2: tasks run inline, one at a time; finish a task, report, stop and wait for the go-ahead. The owner makes every commit; "Commit" steps mean "leave the changes in the working tree and suggest the message in Portuguese". Tests (owner's rule of 2026-11-23): at the end of each task only the tests that task touches, plus lint and tsc; the whole suite at the end of Task 4, which closes the block.
+> **Status:** approved by the owner on 2026-11-23. Task 1 done on 2026-11-23, waiting for the owner's commit; Tasks 2 to 4 to do. Same way of working as plans 1 and 2: tasks run inline, one at a time; finish a task, report, stop and wait for the go-ahead. The owner makes every commit; "Commit" steps mean "leave the changes in the working tree and suggest the message in Portuguese". Tests (owner's rule of 2026-11-23): at the end of each task only the tests that task touches, plus lint and tsc; the whole suite at the end of Task 4, which closes the block.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

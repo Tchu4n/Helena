@@ -589,10 +589,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My addresses (CTA-05) */
+        /** My addresses (CTA-05), the favorite first, then the newest first */
         get: operations["listMyAddresses"];
         put?: never;
-        /** Adds an address (CTA-05) */
+        /**
+         * Adds an address (CTA-05)
+         * @description At most 10 addresses per account; the first one saved becomes the
+         *     favorite.
+         */
         post: operations["addAddress"];
         delete?: never;
         options?: never;
@@ -613,8 +617,27 @@ export interface paths {
         /** Edits an address (CTA-05) */
         put: operations["updateAddress"];
         post?: never;
-        /** Removes an address (CTA-05) */
+        /** Removes an address (CTA-05); removing the favorite passes it to the newest remaining one */
         delete: operations["removeAddress"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/account/addresses/{addressId}/favorite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addressId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Makes this address the account's only favorite (CTA-05) */
+        put: operations["makeFavoriteAddress"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -717,7 +740,7 @@ export interface components {
             detail?: string;
             instance?: string;
             /** @enum {string} */
-            code: "invalid_data" | "not_authenticated" | "not_found" | "out_of_stock" | "invalid_coupon" | "delivery_unavailable" | "incomplete_cart" | "order_already_paid" | "return_already_requested" | "return_period_ended" | "order_not_delivered" | "email_in_use" | "too_many_requests" | "email_not_verified" | "invalid_code" | "cpf_in_use" | "details_already_set" | "details_missing" | "internal_error";
+            code: "invalid_data" | "not_authenticated" | "not_found" | "out_of_stock" | "invalid_coupon" | "delivery_unavailable" | "incomplete_cart" | "order_already_paid" | "return_already_requested" | "return_period_ended" | "order_not_delivered" | "email_in_use" | "too_many_requests" | "email_not_verified" | "invalid_code" | "cpf_in_use" | "details_already_set" | "details_missing" | "address_limit" | "internal_error";
             /** @description Present in `invalid_data` */
             errors?: {
                 /** @example cpf */
@@ -1046,6 +1069,11 @@ export interface components {
         SavedAddress: components["schemas"]["Address"] & {
             /** Format: uuid */
             id: string;
+            /**
+             * @description At most one per account (CTA-05)
+             * @example false
+             */
+            favorite: boolean;
         };
         /**
          * @description `name`, `cpf` and `phone` are required without a customer session and
@@ -1062,6 +1090,14 @@ export interface components {
             email: string;
             phone?: components["schemas"]["Phone"];
             address: components["schemas"]["Address"];
+            /**
+             * @description Only with a customer session, and only from "Ir para pagamento"
+             *     (CTA-12; ignored without a session). `true` also saves `address` in
+             *     the account, unless an equal one (CEP, street, number, complement)
+             *     is already there or the account has 10; either way the step
+             *     succeeds. The first address saved becomes the favorite.
+             */
+            saveAddress?: boolean;
             /** @description One consent per channel, both false by default (CHK-07) */
             consents: {
                 /** @example false */
@@ -2561,6 +2597,23 @@ export interface operations {
                 };
             };
             401: components["responses"]["NotAuthenticated"];
+            /** @description The account already has 10 addresses (`address_limit`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "https://helena.example/problems/address-limit",
+                     *       "title": "Você chegou ao limite de 10 endereços",
+                     *       "status": 409,
+                     *       "code": "address_limit"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             422: components["responses"]["InvalidData"];
             500: components["responses"]["InternalError"];
         };
@@ -2612,6 +2665,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["NotAuthenticated"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    makeFavoriteAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addressId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The addresses, in the list's order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAddress"][];
+                };
             };
             401: components["responses"]["NotAuthenticated"];
             404: components["responses"]["NotFound"];
