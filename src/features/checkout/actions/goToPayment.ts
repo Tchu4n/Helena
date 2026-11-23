@@ -7,7 +7,7 @@ import { readCartId, saveCep } from "@/src/features/cart";
 import { apiGet, apiPost, apiPut } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
 import { saveOrderAccess } from "@/src/lib/order-cookie";
-import { forwardedFor } from "../request-ip.ts";
+import { forwardedFor } from "@/src/lib/request-ip";
 import { customerDetailsInput, fieldErrors } from "../schemas/customerDetails.ts";
 import type { GoToPaymentState } from "../types.ts";
 

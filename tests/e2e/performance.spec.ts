@@ -28,7 +28,7 @@ async function largestContentfulPaint(page: Page, path: string): Promise<number>
 
 test.beforeEach(async ({ context }) => skipCookieBanner(context));
 
-for (const path of ["/", "/catalogo", "/produto/jaqueta-sarja-verde"]) {
+for (const path of ["/", "/catalogo", "/produto/jaqueta-sarja-verde", "/pedido"]) {
   test(`GER-08 main content of ${path} under 3 s on slow 4G`, async ({ page }) => {
     test.setTimeout(60_000);
     const lcp = await largestContentfulPaint(page, path);

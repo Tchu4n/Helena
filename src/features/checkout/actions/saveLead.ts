@@ -3,7 +3,7 @@
 import { apiPut } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
 import { readCartId } from "@/src/features/cart";
-import { forwardedFor } from "../request-ip.ts";
+import { forwardedFor } from "@/src/lib/request-ip";
 import { customerDetailsInput } from "../schemas/customerDetails.ts";
 
 // CHK-05: saves her details as a lead once every required field is valid, before payment.

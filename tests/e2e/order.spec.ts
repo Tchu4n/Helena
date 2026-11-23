@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { skipCookieBanner } from "./consent";
-import { FAKE_API, fillCard, startPayment } from "./order-helpers";
+import { FAKE_API, fillCard, paths, startPayment } from "./order-helpers";
 
 test.beforeEach(async ({ context, request }) => {
   await skipCookieBanner(context);
@@ -76,6 +76,8 @@ test("Review focus 1: a made-up or someone else's order shows no order data", as
   for (const url of [`/pedido/${number}?confirmado=1`, `/pedido/${number}`, "/pedido/HL-100000?confirmado=1"]) {
     await other.goto(url);
     await expect(other.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(other.getByLabel("Número do pedido")).toHaveValue(url.match(/HL-\d+/)![0]);
+    await expect(other.getByLabel("E-mail")).toHaveValue("");
     await expect(other.getByText("Pedido confirmado")).toHaveCount(0);
     await expect(other.getByText(/Enviamos/)).toHaveCount(0);
     await expect(other.getByText("Jaqueta sarja")).toHaveCount(0);
@@ -99,11 +101,13 @@ async function openTracking(page: Page, number: string) {
   await expect(page.getByRole("heading", { level: 1, name: "Acompanhar pedido" })).toBeVisible();
 }
 
-const today = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date());
+// Read when the step is dated, not when the file loads, so a run that crosses midnight still agrees.
+const today = () => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date());
 
 test("PED-03 the four steps in order, the current one in text, dates on the done ones", async ({ context, page, request }) => {
   const number = await payByCard(context, page, request);
   await advance(request, number, "preparing");
+  const date = today();
   await openTracking(page, number);
   const main = page.getByRole("main");
   await expect(main.getByText(`Pedido ${number}`, { exact: true })).toBeVisible();
@@ -115,12 +119,12 @@ test("PED-03 the four steps in order, the current one in text, dates on the done
   await expect(steps.nth(2)).toContainText("Enviado");
   await expect(steps.nth(3)).toContainText("Entregue");
   for (const i of [0, 1]) {
-    await expect(steps.nth(i)).toContainText(today);
+    await expect(steps.nth(i)).toContainText(date);
     await expect(steps.nth(i)).toContainText("concluída"); // text, not color alone
     await expect(steps.nth(i).locator("svg")).toBeVisible();
   }
   for (const i of [2, 3]) {
-    await expect(steps.nth(i)).not.toContainText(today);
+    await expect(steps.nth(i)).not.toContainText(date);
     await expect(steps.nth(i)).not.toContainText("concluída");
   }
 });
@@ -182,4 +186,87 @@ test("PED-08 delivered offers Solicitar devolução; before delivery it doesn't"
   await page.reload();
   await expect(page.getByRole("main").getByText("Etapa atual: Entregue")).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Solicitar devolução" })).toHaveAttribute("href", "/devolucao");
+});
+
+// Lookup without an account (PED-05, PED-06): number + e-mail, from any device.
+async function lookUp(page: Page, number: string, email: string) {
+  await page.getByLabel("Número do pedido").fill(number);
+  await page.getByLabel("E-mail").fill(email);
+  await page.getByRole("button", { name: "Ver pedido" }).click();
+}
+
+async function newCustomerPage(browser: import("@playwright/test").Browser) {
+  const other = await browser.newContext();
+  await skipCookieBanner(other);
+  return { other, page: await other.newPage() };
+}
+
+test("PED-05 from the footer, number + e-mail open the order on another device, with no CPF, phone or street", async ({ browser, context, page, request }) => {
+  const number = await payByCard(context, page, request);
+  const { other, page: phone } = await newCustomerPage(browser);
+  await phone.goto("/");
+  await phone.getByRole("contentinfo").getByRole("link", { name: "Acompanhar pedido" }).click();
+  await expect(phone).toHaveURL(/\/pedido$/);
+  await lookUp(phone, number, "maria@exemplo.com");
+  await expect(phone).toHaveURL(new RegExp(`/pedido/${number}$`));
+  await expect(phone.getByRole("main").getByText("Etapa atual: Pagamento confirmado")).toBeVisible();
+  const text = await phone.locator("body").innerText();
+  for (const secret of ["529.982.247-25", "98765-4321", "Avenida Paulista"]) expect(text).not.toContain(secret);
+  await other.close();
+});
+
+test("Review focus 5: spaces and lowercase in the number, uppercase in the e-mail still find the order", async ({ browser, context, page, request }) => {
+  const number = await payByCard(context, page, request);
+  const { other, page: phone } = await newCustomerPage(browser);
+  await phone.goto("/pedido");
+  await lookUp(phone, `  ${number.toLowerCase()}  `, "MARIA@Exemplo.com");
+  await expect(phone).toHaveURL(new RegExp(`/pedido/${number}$`));
+  await expect(phone.getByRole("main").getByText(`Pedido ${number}`, { exact: true })).toBeVisible();
+  await other.close();
+});
+
+test("PED-06 a wrong e-mail or a wrong number get the same answer", async ({ browser, context, page, request }) => {
+  const number = await payByCard(context, page, request);
+  const { other, page: phone } = await newCustomerPage(browser);
+  await phone.goto("/pedido");
+  for (const [n, e] of [[number, "outra@exemplo.com"], ["HL-999999", "maria@exemplo.com"]]) {
+    await lookUp(phone, n, e);
+    await expect(phone.getByRole("main").getByRole("alert")).toHaveText("Não encontramos um pedido com esses dados");
+    await expect(phone).toHaveURL(/\/pedido$/);
+  }
+  await other.close();
+});
+
+test("lookup field checks: required, number format and e-mail, with nothing sent", async ({ page, request }) => {
+  await page.goto("/pedido");
+  await page.getByRole("button", { name: "Ver pedido" }).click();
+  await expect(page.getByText("Campo obrigatório")).toHaveCount(2);
+  await expect(page.getByLabel("Número do pedido")).toBeFocused();
+  await lookUp(page, "100482", "maria@exemplo.com");
+  await expect(page.getByText("Confira o número do pedido")).toBeVisible();
+  await lookUp(page, "HL-100482", "maria.exemplo.com");
+  await expect(page.getByText("Digite um e-mail válido")).toBeVisible();
+  await expect(page.getByLabel("E-mail")).toBeFocused();
+  expect((await paths(request)).filter((p) => p === "/v1/orders/access")).toHaveLength(0);
+});
+
+test("lookup: too many attempts shows the API's message", async ({ page }) => {
+  await page.goto("/pedido");
+  await lookUp(page, "HL-100001", "limite@exemplo.com");
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("Muitas tentativas. Aguarde um pouco e tente de novo");
+});
+
+test("Review focus 4: a lookup during a new checkout leaves the payment in progress untouched", async ({ browser, context, page, request }) => {
+  const { other, page: first } = await newCustomerPage(browser);
+  const older = await payByCard(other, first, request);
+  await other.close();
+  const current = await startPayment(context, page, request);
+  expect(current).not.toBe(older);
+  await page.goto("/pedido");
+  await lookUp(page, older, "maria@exemplo.com");
+  await expect(page).toHaveURL(new RegExp(`/pedido/${older}$`));
+  await expect(page.getByRole("main").getByText(`Pedido ${older}`, { exact: true })).toBeVisible();
+  await page.goto("/checkout/pagamento");
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+  await expect(page.getByRole("timer")).toHaveText(/Sua reserva termina em 1[45]:\d\d/);
 });

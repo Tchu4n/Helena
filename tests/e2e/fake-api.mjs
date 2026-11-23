@@ -224,6 +224,12 @@ const DECLINED_MESSAGE = "O banco do cartão não aprovou esta compra. Tente out
 const QR_CODE =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 const NOT_FOUND = { type: "about:blank", title: "Não encontrado", status: 404, code: "not_found" };
+const LOOKUP_NOT_FOUND = {
+  type: "https://helena.example/problems/not-found",
+  title: "Não encontramos um pedido com esses dados",
+  status: 404,
+  code: "not_found",
+};
 
 const carts = new Map();
 const requests = [];
@@ -485,6 +491,14 @@ async function route(req, url) {
     const cart = { id: randomUUID(), items: [], cep: null, chosen: null, coupon: null, customer: null };
     carts.set(cart.id, cart);
     return [201, cartBody(cart)];
+  }
+  // PED-05, PED-06: same 404 for any wrong pair; limite@exemplo.com hits the attempt limit.
+  if (req.method === "POST" && url.pathname === "/v1/orders/access") {
+    const { number, email } = await readJson(req);
+    if (email === "limite@exemplo.com") return [429, TOO_MANY_REQUESTS];
+    const order = orders.get(number);
+    if (!order || order.email.toLowerCase() !== String(email).toLowerCase()) return [404, LOOKUP_NOT_FOUND];
+    return [201, { access: order.access, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() }];
   }
   if (req.method === "POST" && url.pathname === "/v1/orders") {
     const { cartId } = await readJson(req);
