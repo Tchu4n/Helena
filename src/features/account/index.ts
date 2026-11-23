@@ -1,7 +1,10 @@
 export { IdentificationForm } from "./components/IdentificationForm.tsx";
 export { requestCode } from "./actions/requestCode.ts";
 export { confirmCode } from "./actions/confirmCode.ts";
+export { createPassword } from "./actions/createPassword.ts";
+export { signInWithPassword } from "./actions/signInWithPassword.ts";
+export { finishIdentification } from "./actions/finishIdentification.ts";
 export { changeEmail } from "./actions/changeEmail.ts";
 export { readIdentification } from "./identification-cookie.ts";
-export { START } from "./types.ts";
+export { EXISTING_ACCOUNT, START } from "./types.ts";
 export type { IdentificationState } from "./types.ts";

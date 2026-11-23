@@ -6,6 +6,7 @@ import { ErrorMessage } from "@/src/components/ui";
 import { changeEmail } from "@/src/features/account";
 import { chooseDelivery, getCart } from "@/src/features/cart";
 import { DetailsForm, goToPayment, OrderSummary, saveCheckoutCep, saveLead, summaryFromCart } from "@/src/features/checkout";
+import { readSession } from "@/src/lib/session-cookie";
 
 export const metadata: Metadata = { title: "Dados e entrega · Helena" };
 
@@ -14,15 +15,18 @@ async function CheckoutContent() {
   if (!result.ok) return <ErrorMessage title={result.title} retryHref="/checkout" />;
   const cart = result.cart;
   if (!cart || cart.items.length === 0) redirect("/sacola");
+  // IDT-11: signed in, the e-mail is the session's (a new bag isn't confirmed yet; the customer step confirms it).
+  const session = await readSession();
+  const email = session?.email ?? cart.verifiedEmail;
   // IDT-12: no confirmed e-mail, no "Dados e entrega".
-  if (!cart.verifiedEmail) redirect("/checkout/identificacao");
+  if (!email) redirect("/checkout/identificacao");
   return (
     <div className="flex flex-col gap-3 px-4 pt-2 pb-6">
       <h1 className="sr-only">Dados e entrega</h1>
       <OrderSummary summary={summaryFromCart(cart)} />
       <DetailsForm
-        email={cart.verifiedEmail}
-        changeEmail={changeEmail}
+        email={email}
+        changeEmail={session ? undefined : changeEmail}
         total={cart.total}
         cep={cart.cep}
         deliveryOptions={cart.deliveryOptions}

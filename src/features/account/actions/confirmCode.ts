@@ -3,13 +3,13 @@
 import { redirect } from "next/navigation";
 import { readCartId } from "@/src/features/cart";
 import { apiPost } from "@/src/lib/api";
-import { clearIdentification, readIdentification } from "../identification-cookie.ts";
+import type { components } from "@/src/lib/api-types";
+import { saveSession } from "@/src/lib/session-cookie";
+import { clearIdentification, readIdentification, saveIdentification } from "../identification-cookie.ts";
 import { codeInput } from "../schemas/identification.ts";
-import { START, type IdentificationState } from "../types.ts";
+import { EXISTING_ACCOUNT, START, type IdentificationState } from "../types.ts";
 
-const FAILED = "Não foi possível concluir. Tente de novo";
-
-// IDT-03, IDT-04. The e-mail and the way come only from her own httpOnly cookie, never from the form.
+// IDT-03, IDT-04, IDT-08, IDT-09. The e-mail and the way come only from her own httpOnly cookie, never from the form.
 export async function confirmCode(prev: IdentificationState, formData: FormData): Promise<IdentificationState> {
   const pending = await readIdentification();
   if (!pending) return START; // the 10 minutes ran out: start again
@@ -17,11 +17,26 @@ export async function confirmCode(prev: IdentificationState, formData: FormData)
   const code = codeInput.safeParse(String(formData.get("code") ?? "").slice(0, 20));
   if (!code.success) return { ...base, errors: { code: code.error.issues[0]?.message } };
 
-  // shortcut: the account way (session and password) arrives with Task 3 of the account plan 1.
-  if (pending.way === "account") return { ...base, error: FAILED };
-
   // Authorization: only her own bag, from the httpOnly cart cookie.
   const cartId = await readCartId();
+
+  // IDT-08, IDT-09: the code starts a session (the account is created if missing) and confirms the bag's e-mail.
+  if (pending.way === "account") {
+    const session = await apiPost<components["schemas"]["Session"]>("/v1/sessions", {
+      email: pending.email,
+      code: code.data,
+      ...(cartId ? { cartId } : {}),
+    });
+    if (!session.ok) {
+      if (session.problem.status === 401) return { ...base, errors: { code: "Código inválido ou vencido" } };
+      return { ...base, error: session.problem.title };
+    }
+    await saveSession({ token: session.data.token, email: pending.email }, session.data.expiresAt);
+    const done = session.data.newAccount ? "password" : "existing";
+    await saveIdentification({ ...pending, done });
+    return { ...base, step: done, sentAt: null, notice: done === "existing" ? EXISTING_ACCOUNT : null };
+  }
+
   if (!cartId) redirect("/sacola");
   const result = await apiPost(`/v1/carts/${cartId}/email-verification`, { email: pending.email, code: code.data });
   if (!result.ok) {

@@ -8,6 +8,7 @@ import { apiGet, apiPost, apiPut } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
 import { saveOrderAccess } from "@/src/lib/order-cookie";
 import { forwardedFor } from "@/src/lib/request-ip";
+import { bearer, clearSession, readSession } from "@/src/lib/session-cookie";
 import { customerDetailsInput, fieldErrors } from "../schemas/customerDetails.ts";
 import type { GoToPaymentState } from "../types.ts";
 
@@ -30,8 +31,9 @@ export async function goToPayment(_prev: GoToPaymentState, formData: FormData): 
     if (cart.problem.status === 404) redirect("/sacola");
     return { errors: {}, error: cart.problem.title };
   }
-  // IDT-12: the e-mail is the one confirmed for this bag, read here, never a form value.
-  const email = cart.data.verifiedEmail;
+  // IDT-11, IDT-12: the e-mail is her session's or the one confirmed for this bag, read here, never a form value.
+  const session = await readSession();
+  const email = session?.email ?? cart.data.verifiedEmail;
   if (!email) redirect("/checkout/identificacao");
   // Rare race: the CEP she typed isn't the cart's yet. Save it and stop, so the CHK-10 note shows the new total first.
   if (cart.data.cep !== parsed.data.address.cep) {
@@ -42,8 +44,13 @@ export async function goToPayment(_prev: GoToPaymentState, formData: FormData): 
   }
   if (!cart.data.chosenDelivery) return { errors: { delivery: "Escolha a entrega" }, error: null };
 
-  const details = await apiPut(`/v1/carts/${cartId}/customer`, { ...parsed.data, email }, await forwardedFor());
+  const details = await apiPut(`/v1/carts/${cartId}/customer`, { ...parsed.data, email }, { ...(await forwardedFor()), ...bearer(session) });
   if (!details.ok) {
+    // The session ended on the API: signed out here, so identification shows its first step instead of bouncing back.
+    if (details.problem.status === 401) {
+      await clearSession();
+      redirect("/checkout/identificacao");
+    }
     if (details.problem.code === "email_not_verified") redirect("/checkout/identificacao");
     return { errors: {}, error: details.problem.title };
   }

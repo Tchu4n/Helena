@@ -12,6 +12,9 @@ type Props = {
   whatsapp: string; // digits for https://wa.me/
   requestCode: Action;
   confirmCode: Action;
+  createPassword: Action;
+  signInWithPassword: Action;
+  finishIdentification: (formData: FormData) => Promise<void>;
   changeEmail: () => Promise<void>;
 };
 
@@ -32,14 +35,20 @@ function Alert({ children }: { children: React.ReactNode }) {
   );
 }
 
-// IDT-01 to IDT-07, IDT-13, CTA-01. Codes and passwords never stay in this state; the e-mail being confirmed
+// IDT-01 to IDT-10, IDT-13, CTA-01. Codes and passwords never stay in this state; the e-mail being confirmed
 // comes back from the server after a reload (IDT-07).
-export function IdentificationForm({ initial, mode, whatsapp, requestCode, confirmCode, changeEmail }: Props) {
-  // One state for both steps: the submitted form says which server action answers.
-  const [state, dispatch, pending] = useActionState<IdentificationState, FormData>(
-    (prev, formData) => (formData.get("intent") === "confirm" ? confirmCode(prev, formData) : requestCode(prev, formData)),
-    initial,
-  );
+export function IdentificationForm({ initial, mode, whatsapp, requestCode, confirmCode, createPassword, signInWithPassword, finishIdentification, changeEmail }: Props) {
+  // One state for every step: the submitted form says which server action answers.
+  const [state, dispatch, pending] = useActionState<IdentificationState, FormData>((prev, formData) => {
+    const intent = formData.get("intent");
+    if (intent === "confirm") return confirmCode(prev, formData);
+    if (intent === "password") return createPassword(prev, formData);
+    if (intent === "signin") return signInWithPassword(prev, formData);
+    return requestCode(prev, formData);
+  }, initial);
+  // IDT-10: "Já tem senha? Entrar com senha" swaps the e-mail step for the password sign-in.
+  const [withPassword, setWithPassword] = useState(false);
+  const next = mode === "checkout" ? "/checkout" : "/conta";
 
   // Time since the code was sent, refreshed only at the two moments that change the screen.
   const [elapsed, setElapsed] = useState(0);
@@ -54,11 +63,52 @@ export function IdentificationForm({ initial, mode, whatsapp, requestCode, confi
 
   // Focus goes to the first wrong field (DESIGN.md: errors with border, icon and text).
   useEffect(() => {
-    const first = state.errors.email ? "email" : state.errors.way ? "way-guest" : state.errors.code ? "code" : null;
+    const first = state.errors.email ? "email" : state.errors.way ? "way-guest" : state.errors.code ? "code" : state.errors.password ? "password" : null;
     if (first) document.getElementById(first)?.focus();
   }, [state]);
 
   const heading = mode === "checkout" ? "Identificação" : "Minha conta";
+
+  // IDT-08: only for an account the code has just created.
+  if (state.step === "password") {
+    return (
+      <div className="flex flex-col gap-4 px-4 pt-6 pb-8">
+        <h1 className="font-serif text-[1.75rem] font-normal">{heading}</h1>
+        <form action={dispatch} noValidate className="flex flex-col gap-4 bg-card p-4">
+          <input type="hidden" name="intent" value="password" />
+          <input type="hidden" name="next" value={next} />
+          <Field
+            label="Crie sua senha"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            hint="Mínimo de 8 caracteres"
+            error={state.errors.password}
+          />
+          {state.error && <Alert>{state.error}</Alert>}
+          <Button variant="primary" type="submit" disabled={pending}>
+            {pending ? "Processando" : "Continuar"}
+          </Button>
+        </form>
+      </div>
+    );
+  }
+
+  // IDT-09: "Criar conta" on an e-mail that has one signs her in and keeps the old password.
+  if (state.step === "existing") {
+    return (
+      <div className="flex flex-col gap-4 px-4 pt-6 pb-8">
+        <h1 className="font-serif text-[1.75rem] font-normal">{heading}</h1>
+        <form action={finishIdentification} className="flex flex-col gap-4 bg-card p-4">
+          <input type="hidden" name="next" value={next} />
+          <p role="status">{state.notice}</p>
+          <Button variant="primary" type="submit">
+            Continuar
+          </Button>
+        </form>
+      </div>
+    );
+  }
 
   if (state.step === "code") {
     return (
@@ -93,6 +143,33 @@ export function IdentificationForm({ initial, mode, whatsapp, requestCode, confi
             Trocar e-mail
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  if (withPassword || state.step === "signin") {
+    return (
+      <div className="flex flex-col gap-4 px-4 pt-6 pb-8">
+        <h1 className="font-serif text-[1.75rem] font-normal">{heading}</h1>
+        <form action={dispatch} noValidate className="flex flex-col gap-4 bg-card p-4">
+          <input type="hidden" name="intent" value="signin" />
+          <input type="hidden" name="next" value={next} />
+          <Field
+            label="E-mail"
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            maxLength={150}
+            defaultValue={state.email}
+            error={state.errors.email}
+          />
+          <Field label="Senha" name="password" type="password" autoComplete="current-password" error={state.errors.password} />
+          {state.error && <Alert>{state.error}</Alert>}
+          <Button variant="primary" type="submit" disabled={pending}>
+            {pending ? "Processando" : "Entrar"}
+          </Button>
+        </form>
       </div>
     );
   }
@@ -154,6 +231,9 @@ export function IdentificationForm({ initial, mode, whatsapp, requestCode, confi
           {pending ? "Processando" : "Receber código"}
         </Button>
       </form>
+      <Button variant="secondary" onClick={() => setWithPassword(true)}>
+        Já tem senha? Entrar com senha
+      </Button>
     </div>
   );
 }

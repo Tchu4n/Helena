@@ -3,7 +3,8 @@ import { AlertIcon } from "./icons.tsx";
 // `name` sends the value with its form; `id` alone leaves it out (the simulated card fields).
 type FieldProps = ({ name: string; id?: string } | { name?: undefined; id: string }) & {
   label: string;
-  type?: "text" | "email" | "tel" | "search";
+  type?: "text" | "email" | "tel" | "search" | "password";
+  hint?: string; // a short rule shown under the label (IDT-08: "Mínimo de 8 caracteres")
   defaultValue?: string;
   error?: string | null;
   inputMode?: "text" | "numeric" | "email" | "tel" | "search";
@@ -23,6 +24,7 @@ export function Field({
   id = name!,
   type = "text",
   defaultValue,
+  hint,
   error,
   inputMode,
   autoComplete,
@@ -33,11 +35,18 @@ export function Field({
   onBlur,
 }: FieldProps) {
   const errorId = `${id}-error`;
+  const hintId = `${id}-hint`;
+  const describedBy = [hint && hintId, error && errorId].filter(Boolean).join(" ") || undefined;
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-sm font-medium">
         {label}
       </label>
+      {hint && (
+        <p id={hintId} className="text-sm text-muted">
+          {hint}
+        </p>
+      )}
       <input
         id={id}
         name={name}
@@ -51,7 +60,7 @@ export function Field({
         maxLength={maxLength}
         readOnly={readOnly}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={describedBy}
         className={`min-h-12 w-full min-w-0 rounded-control border bg-card px-4 text-base ${error ? "border-2 border-error" : "border-control"} read-only:bg-surface`}
       />
       {error && (

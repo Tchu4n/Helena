@@ -7,7 +7,14 @@ import { z } from "zod";
 const IDENTIFICATION_COOKIE = "helena_identification";
 const MAX_AGE = 10 * 60; // the code's own life
 
-const Pending = z.object({ email: z.email(), way: z.enum(["guest", "account"]), sentAt: z.number().int().positive() });
+// `done`: the code already signed her in (IDT-08, IDT-09); the step after it survives the page refresh a new session
+// cookie causes, and a reload, until she finishes.
+const Pending = z.object({
+  email: z.email(),
+  way: z.enum(["guest", "account"]),
+  sentAt: z.number().int().positive(),
+  done: z.enum(["password", "existing"]).optional(),
+});
 export type PendingIdentification = z.infer<typeof Pending>;
 
 export async function readIdentification(): Promise<PendingIdentification | null> {

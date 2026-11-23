@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { apiGet } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
+import { readSession } from "@/src/lib/session-cookie";
 import { readCartId } from "../cart-session.ts";
 import type { CheckoutState } from "../types.ts";
 import { toCartView } from "../views.ts";
@@ -22,8 +23,8 @@ export async function goToCheckout(): Promise<CheckoutState> {
   }
   // The API's own answer (for example, a bag emptied in another tab): back to the bag, which shows why.
   if (!result.data.canCheckout) redirect("/sacola");
-  // CHK-01, IDT-01: straight to identification when the bag's e-mail isn't confirmed. Going through /checkout
+  // CHK-01, IDT-01, IDT-11: straight to identification when the bag's e-mail isn't confirmed and she isn't signed in. Going through /checkout
   // first would leave its streamed redirect in the page Next keeps hidden, and coming back after the code
   // would replay it.
-  redirect(result.data.verifiedEmail ? "/checkout" : "/checkout/identificacao");
+  redirect(result.data.verifiedEmail || (await readSession()) ? "/checkout" : "/checkout/identificacao");
 }

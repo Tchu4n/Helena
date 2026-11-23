@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { skipCookieBanner } from "./consent";
-import { FAKE_API, JACKET_M } from "./order-helpers";
+import { FAKE_API, JACKET_M, VALID } from "./order-helpers";
 
 test.beforeEach(async ({ context, request }) => {
   await skipCookieBanner(context);
@@ -195,4 +195,129 @@ test("too many codes: the API's message", async ({ context, page }) => {
   await page.getByRole("radio", { name: /Comprar só com e-mail/ }).check();
   await page.getByRole("button", { name: "Receber código" }).click();
   await expect(page.getByRole("main").getByRole("alert")).toHaveText("Muitas tentativas. Aguarde um pouco e tente de novo");
+});
+
+// Signs her up through the screen ("Criar conta", code, password) and lands on Dados e entrega.
+async function signUp(context: BrowserContext, page: Page, request: APIRequestContext, email: string) {
+  await openIdentification(context, page);
+  await askCode(page, email, /Criar conta/);
+  await typeCode(page, await codeFor(request, email));
+  await page.getByLabel("Crie sua senha", { exact: true }).fill("senha-segura");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+}
+
+// A second bag, started another day: its e-mail is not confirmed yet.
+async function newBag(context: BrowserContext): Promise<string> {
+  const { id } = await (await context.request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId: JACKET_M }] } })).json();
+  await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
+  return id;
+}
+
+async function fillDetails(page: Page) {
+  for (const [label, value] of VALID) await page.getByLabel(label, { exact: true }).fill(value);
+  await expect(page.getByRole("radio", { name: /PAC/ })).toBeChecked();
+}
+
+const sessionCookie = async (context: BrowserContext) => (await context.cookies()).find((c) => c.name === "helena_session");
+
+test("IDT-08 Criar conta with a new e-mail: the password after the code, then Dados e entrega signed in", async ({ context, page, request }) => {
+  await openIdentification(context, page);
+  await askCode(page, "nova@exemplo.com", /Criar conta/);
+  await typeCode(page, await codeFor(request, "nova@exemplo.com"));
+  const password = page.getByLabel("Crie sua senha", { exact: true });
+  await expect(password).toHaveAttribute("type", "password");
+  await expect(page.getByText("Mínimo de 8 caracteres")).toBeVisible();
+  await password.fill("curta");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.getByText("A senha precisa ter pelo menos 8 caracteres")).toBeVisible();
+  await expect(password).toHaveValue("");
+  await password.fill("senha-segura");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByLabel("E-mail", { exact: true })).toHaveValue("nova@exemplo.com");
+  const session = await sessionCookie(context);
+  expect(session?.httpOnly).toBe(true);
+  expect(session?.sameSite).toBe("Lax");
+  const stored = await page.evaluate(() => JSON.stringify({ ...sessionStorage }) + JSON.stringify({ ...localStorage }));
+  expect(stored).not.toContain("senha-segura");
+  expect(stored).not.toContain(decodeURIComponent(session!.value));
+});
+
+test("IDT-09 Criar conta on an e-mail that has one: signed in, no password asked, the old one kept", async ({ context, page, request }) => {
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "antiga-123" } });
+  await openIdentification(context, page);
+  await askCode(page, "maria@exemplo.com", /Criar conta/);
+  await typeCode(page, await codeFor(request, "maria@exemplo.com"));
+  await expect(page.getByText("Este e-mail já tem uma conta. Você entrou nela e sua senha não mudou.")).toBeVisible();
+  await expect(page.locator('input[type="password"]')).toHaveCount(0);
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  expect(await sessionCookie(context)).toBeDefined();
+  // "Sair" arrives with Task 4; dropping the cookie signs her out here.
+  await context.clearCookies({ name: "helena_session" });
+  await page.goto("/checkout/identificacao");
+  await page.getByRole("button", { name: "Já tem senha? Entrar com senha" }).click();
+  await page.getByLabel("E-mail", { exact: true }).fill("maria@exemplo.com");
+  await page.getByLabel("Senha", { exact: true }).fill("antiga-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+});
+
+test("IDT-10 sign in with a password: a wrong one keeps the e-mail and clears the password", async ({ context, page, request }) => {
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "certa-123" } });
+  await openIdentification(context, page);
+  await page.getByRole("button", { name: "Já tem senha? Entrar com senha" }).click();
+  const email = page.getByLabel("E-mail", { exact: true });
+  const password = page.getByLabel("Senha", { exact: true });
+  // The browser itself trims an e-mail field; the store lowercases it before the call.
+  await email.fill("Maria@Exemplo.com");
+  await password.fill("errada-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page.getByText("E-mail ou senha não conferem")).toBeVisible();
+  await expect(email).toHaveValue("Maria@Exemplo.com");
+  await expect(password).toHaveValue("");
+  await password.fill("certa-123");
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByRole("textbox", { name: "E-mail", exact: true })).toHaveValue("maria@exemplo.com");
+});
+
+test("IDT-11 Review focus 5: signed in, a new bag skips identification and pays with the account's e-mail", async ({ context, page, request }) => {
+  await signUp(context, page, request, "nova@exemplo.com");
+  await page.goto("/checkout/identificacao");
+  await expect(page).toHaveURL(/\/checkout$/);
+  await newBag(context);
+  await page.goto("/sacola");
+  await page.getByRole("button", { name: "Finalizar compra" }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  const email = page.getByLabel("E-mail", { exact: true });
+  await expect(email).toHaveValue("nova@exemplo.com");
+  await expect(email).toHaveAttribute("readonly", "");
+  await expect(page.getByRole("button", { name: "Trocar e-mail" })).toHaveCount(0);
+  await fillDetails(page);
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+});
+
+test("Review focus 1 (account): an e-mail with an account shows nothing of it before the code", async ({ context, page, request }) => {
+  await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "antiga-123" } });
+  await openIdentification(context, page);
+  await askCode(page, "maria@exemplo.com", /Criar conta/);
+  await expect(page.getByText("Este e-mail já tem uma conta", { exact: false })).toHaveCount(0);
+  await expect(page.locator('input[type="password"]')).toHaveCount(0);
+  expect(await sessionCookie(context)).toBeUndefined();
+});
+
+test("a session ended on the API sends her to the first step, once, and drops the cookie", async ({ context, page, request }) => {
+  await signUp(context, page, request, "nova@exemplo.com");
+  const { token } = JSON.parse(decodeURIComponent((await sessionCookie(context))!.value)) as { token: string };
+  await request.post(`${FAKE_API}/__end-session?token=${token}`);
+  await newBag(context);
+  await page.goto("/checkout");
+  await fillDetails(page);
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/checkout\/identificacao$/);
+  await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
+  expect(await sessionCookie(context)).toBeUndefined();
 });

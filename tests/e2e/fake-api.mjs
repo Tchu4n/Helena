@@ -248,6 +248,9 @@ const orders = new Map();
 const codes = new Map();
 const codeTimes = new Map();
 const answered = new Map();
+// IDT-08 to IDT-11: accounts by e-mail ({ password: string | null }) and sessions by token (→ e-mail).
+const accounts = new Map();
+const sessions = new Map();
 let nextOrder = 100001;
 
 // Test hooks: sizes marked sold out and quantity limits apply to every cart.
@@ -407,6 +410,32 @@ function sendCode(email) {
   return [202, null];
 }
 
+// IDT-08 to IDT-10: with `code` the account is created if missing; with `password` it must match.
+// One 401 for every failure, so nobody learns which e-mails have an account.
+function startSession({ email, code, password, cartId }) {
+  if (typeof email !== "string") return [401, NOT_AUTHENTICATED];
+  let newAccount = false;
+  if (typeof code === "string") {
+    if (!takeCode(email, code)) return [401, NOT_AUTHENTICATED];
+    newAccount = !accounts.has(email);
+    if (newAccount) accounts.set(email, { password: null });
+  } else if (typeof password !== "string" || !accounts.get(email)?.password || accounts.get(email).password !== password) {
+    return [401, NOT_AUTHENTICATED];
+  }
+  const cart = cartId ? carts.get(cartId) : null;
+  if (cart) cart.verifiedEmail = email;
+  const token = randomUUID();
+  sessions.set(token, email);
+  return [201, { token, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), newAccount }];
+}
+
+// The e-mail of the bearer session; undefined without the header, null for an unknown token.
+function sessionEmail(req) {
+  const auth = req.headers.authorization;
+  if (!auth) return undefined;
+  return sessions.get(auth.replace(/^Bearer /, "")) ?? null;
+}
+
 function createOrder(cartId) {
   const cart = carts.get(cartId);
   if (!cart) return [404, NOT_FOUND];
@@ -526,6 +555,15 @@ async function route(req, url) {
     return [201, cartBody(cart)];
   }
   if (req.method === "POST" && url.pathname === "/v1/email-codes") return sendCode((await readJson(req)).email);
+  if (req.method === "POST" && url.pathname === "/v1/sessions") return startSession(await readJson(req));
+  if (req.method === "PUT" && url.pathname === "/v1/account/password") {
+    const email = sessionEmail(req);
+    if (!email) return [401, NOT_AUTHENTICATED];
+    const { password } = await readJson(req);
+    if (typeof password !== "string" || password.length < 8 || password.length > 72) return [422, INVALID_DATA];
+    accounts.get(email).password = password;
+    return [204, null];
+  }
   // PED-05, PED-06: same 404 for any wrong pair; limite@exemplo.com hits the attempt limit.
   if (req.method === "POST" && url.pathname === "/v1/orders/access") {
     const { number, email } = await readJson(req);
@@ -562,6 +600,10 @@ async function route(req, url) {
     if (req.method === "PUT" && parts[3] === "customer") {
       const body = await readJson(req);
       if (!validCustomer(body)) return [422, INVALID_DATA];
+      const signedIn = sessionEmail(req);
+      if (signedIn === null) return [401, NOT_AUTHENTICATED];
+      // IDT-11: a session whose e-mail is the body's confirms it for this bag.
+      if (signedIn === body.email) cart.verifiedEmail = body.email;
       if (body.email !== cart.verifiedEmail) return [422, emailNotVerified(422)];
       cart.customer = body;
       return [200, cartBody(cart)];
@@ -680,6 +722,8 @@ createServer(async (req, res) => {
     orders.clear();
     codes.clear();
     codeTimes.clear();
+    accounts.clear();
+    sessions.clear();
     answered.clear();
     requests.length = 0;
     paymentBodies.length = 0;
@@ -728,6 +772,14 @@ createServer(async (req, res) => {
     const cart = carts.get(url.searchParams.get("cartId"));
     if (cart) cart.verifiedEmail = null;
     return send(res, 200, { ok: Boolean(cart) });
+  }
+  if (req.method === "POST" && url.pathname === "/__accounts") {
+    const { email, password = null } = await readJson(req);
+    accounts.set(email, { password });
+    return send(res, 200, { ok: true });
+  }
+  if (req.method === "POST" && url.pathname === "/__end-session") {
+    return send(res, 200, { ok: sessions.delete(url.searchParams.get("token")) });
   }
   if (url.pathname === "/__customer") return send(res, 200, carts.get(url.searchParams.get("cartId"))?.customer ?? null);
   // Lets a test check which API paths the store called.
