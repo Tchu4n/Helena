@@ -10,6 +10,8 @@ import { customerDetailsInput, DETAILS_FIELDS, digits, fieldErrors, type Details
 import type { GoToPaymentState } from "../types.ts";
 
 type Props = {
+  email: string; // IDT-03: the confirmed e-mail, read-only here
+  changeEmail?: () => Promise<void>; // IDT-13; absent when signed in
   total: string;
   // The bag's CEP, options and choice, as the API last calculated them.
   cep: string | null;
@@ -44,7 +46,6 @@ type FieldSpec = {
 const CONTACT: FieldSpec[] = [
   { name: "name", label: "Nome completo", autoComplete: "name", maxLength: 100 },
   { name: "cpf", label: "CPF", autoComplete: "off", maxLength: 14, inputMode: "numeric" },
-  { name: "email", label: "E-mail", autoComplete: "email", maxLength: 150, type: "email", inputMode: "email" },
   { name: "phone", label: "Celular", autoComplete: "tel-national", maxLength: 15, type: "tel", inputMode: "tel" },
 ];
 const ADDRESS: FieldSpec[] = [
@@ -217,11 +218,27 @@ export function DetailsForm(props: Props) {
         <h2 id="details-contact" className={heading}>
           Seus dados
         </h2>
-        <div className="grid grid-cols-3 gap-3">{CONTACT.map(field)}</div>
-        {/* CHK-06 (LGPD) */}
+        <div className="grid grid-cols-3 gap-3">
+          {CONTACT.slice(0, 2).map(field)}
+          {/* IDT-03: confirmed at identification; not stored in the tab nor sent from here (the server adds it). */}
+          <div className="col-span-3 flex flex-col gap-1">
+            <Field id="verified-email" label="E-mail" type="email" value={props.email} readOnly />
+            {props.changeEmail && (
+              <button
+                type="button"
+                onClick={() => startTransition(() => props.changeEmail!())}
+                className="flex min-h-12 w-fit items-center text-sm text-primary underline"
+              >
+                Trocar e-mail
+              </button>
+            )}
+          </div>
+          {CONTACT.slice(2).map(field)}
+        </div>
+        {/* CHK-06 (LGPD): the e-mail part of the notice is at identification (IDT-01). */}
         <p className="text-[0.8125rem] text-muted">
-          Podemos usar seu e-mail e celular para lembrar você desta compra, se ela não for concluída. Cada lembrete traz
-          a opção de parar de receber.
+          Podemos usar seu celular para lembrar você desta compra, se ela não for concluída. Cada lembrete traz a opção de
+          parar de receber.
         </p>
         <a href="/privacidade" className="-mt-3 flex min-h-12 w-fit items-center text-[0.8125rem] text-primary underline">
           Política de privacidade

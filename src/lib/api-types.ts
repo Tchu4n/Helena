@@ -671,7 +671,7 @@ export interface components {
             detail?: string;
             instance?: string;
             /** @enum {string} */
-            code: "invalid_data" | "not_authenticated" | "not_found" | "out_of_stock" | "invalid_coupon" | "delivery_unavailable" | "incomplete_cart" | "order_already_paid" | "return_already_requested" | "return_period_ended" | "order_not_delivered" | "email_in_use" | "too_many_requests" | "internal_error";
+            code: "invalid_data" | "not_authenticated" | "not_found" | "out_of_stock" | "invalid_coupon" | "delivery_unavailable" | "incomplete_cart" | "order_already_paid" | "return_already_requested" | "return_period_ended" | "order_not_delivered" | "email_in_use" | "too_many_requests" | "email_not_verified" | "invalid_code" | "internal_error";
             /** @description Present in `invalid_data` */
             errors?: {
                 /** @example cpf */

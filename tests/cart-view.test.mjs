@@ -167,3 +167,8 @@ test("SAC-17 the reservation time only shows when she has an order being paid", 
   assert.equal(toCartView(cart).reservationExpiresAt, null);
   assert.equal(toCartView(cart, true).reservationExpiresAt, "2026-11-21T12:15:00.000Z");
 });
+
+test("IDT-03 the view carries the bag's confirmed e-mail, or null", () => {
+  assert.equal(toCartView(cartWith({ verifiedEmail: "maria@exemplo.com" })).verifiedEmail, "maria@exemplo.com");
+  assert.equal(toCartView(cartWith({})).verifiedEmail, null);
+});

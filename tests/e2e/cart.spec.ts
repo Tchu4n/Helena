@@ -42,7 +42,7 @@ async function openBag(
 test("SAC-02 bag page", async ({ context, page }) => {
   await openBag(context, page, [{ productSizeId: JACKET_M }]);
   const steps = page.getByRole("list", { name: "Etapas da compra" });
-  await expect(steps.getByRole("listitem")).toHaveText(["Sacola", "Dados e entrega", "Pagamento"]);
+  await expect(steps.getByRole("listitem")).toHaveText(["Sacola", "Identificação", "Dados e entrega", "Pagamento"]);
   await expect(steps.getByRole("listitem").first()).toHaveAttribute("aria-current", "step");
   await expect(page.getByRole("heading", { name: "Sua sacola · 1 peça" })).toBeVisible();
   const item = page.getByRole("article", { name: "Jaqueta sarja" });
@@ -345,7 +345,7 @@ test("SAC-07 sold-out piece blocks checkout until removed", async ({ context, pa
   await striped.getByRole("button", { name: "Remover" }).click();
   await expect(striped).toHaveCount(0);
   await checkoutButton(page).click();
-  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page).toHaveURL(/\/checkout\/identificacao$/); // CHK-01: the bag's e-mail isn't confirmed yet
 });
 
 test("SAC-07 sold out after the page opened", async ({ context, page, request }) => {

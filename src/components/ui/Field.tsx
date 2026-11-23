@@ -9,6 +9,7 @@ type FieldProps = ({ name: string; id?: string } | { name?: undefined; id: strin
   inputMode?: "text" | "numeric" | "email" | "tel" | "search";
   autoComplete?: string;
   maxLength?: number;
+  readOnly?: boolean; // IDT-03: the confirmed e-mail, shown but not editable
   // Controlled use (checkout form): the value lives in the parent's state.
   value?: string;
   onChange?: (value: string) => void;
@@ -26,6 +27,7 @@ export function Field({
   inputMode,
   autoComplete,
   maxLength,
+  readOnly,
   value,
   onChange,
   onBlur,
@@ -47,9 +49,10 @@ export function Field({
         inputMode={inputMode}
         autoComplete={autoComplete}
         maxLength={maxLength}
+        readOnly={readOnly}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className={`min-h-12 w-full min-w-0 rounded-control border bg-card px-4 text-base ${error ? "border-2 border-error" : "border-control"}`}
+        className={`min-h-12 w-full min-w-0 rounded-control border bg-card px-4 text-base ${error ? "border-2 border-error" : "border-control"} read-only:bg-surface`}
       />
       {error && (
         <p id={errorId} className="flex items-start gap-1 text-sm text-error">

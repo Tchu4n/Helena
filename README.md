@@ -7,12 +7,12 @@ Helena is a fictional store selling t-shirts, pants, jackets and accessories to 
 ## What the store does
 
 - **Catalog:** filters by category, size, color and price; sorting; low-stock and sold-out size notices.
-- **Guest checkout:** no account and no password, designed for the phone.
+- **Checkout without an account:** the customer confirms her e-mail with a 6-digit code and buys with no password, or creates an account. Designed for the phone.
 - **Payment:** PIX with instant confirmation, or card in up to 6 interest-free installments.
 - **No double selling:** the item is reserved for 15 minutes during payment, and the purchase is blocked if stock hits zero.
 - **Shipping:** by CEP, with same-day courier, PAC or Sedex. If the shipping API goes down, a fixed fee applies and checkout keeps going.
 - **Coupon and free shipping:** one coupon per purchase and free shipping from R$ 300.00.
-- **After sale:** order tracking and returns requested by the customer herself.
+- **After sale:** order confirmation, order tracking (also without an account, by order number + e-mail) and returns requested by the customer herself.
 - **Privacy:** minimal data collection and separate consents, following the LGPD.
 - **Admin panel** (next stage): batch stock intake, stock, labels, leads and metrics.
 
@@ -35,7 +35,7 @@ Browser ──> Front end (Next.js) ──> REST API (Java) ──> SQL Server
 | Back end | Java (another repository) |
 | Database | SQL Server |
 | API contract | OpenAPI 3.0.3, mock server with Prism |
-| Tests | `node:test` |
+| Tests | `node:test` (unit) and Playwright (screens, against a fake API) |
 
 ## How to run
 
@@ -49,9 +49,11 @@ npm run mock       # mock API at http://localhost:4010
 
 | Command | What it does |
 |---|---|
-| `npm test` | Runs the tests |
+| `npm test` | Runs the unit tests |
+| `npx playwright test` | Runs the screen tests (builds the store and starts a fake API) |
 | `npm run lint` | Checks the code |
 | `npm run build` | Builds for production |
+| `npm run types` | Generates the API types from the contract |
 
 ## How the project is built
 
@@ -67,7 +69,7 @@ Code and docs are written in plain English, so any dev, beginners included, can 
 
 | File | Content |
 |---|---|
-| `docs/SPEC-CLIENT.md` | The 8 customer screens, in 103 scenarios |
+| `docs/SPEC-CLIENT.md` | The 8 customer screens plus the identification step, in 117 scenarios |
 | `docs/DESIGN.md` | Colors, type and interface components |
 | `contract/openapi.yaml` | Contract of the API used by the customer screens |
 | `database/schema.sql` | Database schema (draft) |
@@ -81,7 +83,7 @@ Code and docs are written in plain English, so any dev, beginners included, can 
 - [x] Customer screens spec
 - [x] API contract
 - [x] Database schema draft
-- [ ] Customer screens
+- [ ] Customer screens: home, catalog, search, product, bag, checkout, order confirmation and tracking done; identification and account in progress; returns and privacy page to do
 - [ ] Java back end
 - [ ] Schema run on SQL Server
 - [ ] Integrations (payment, shipping, invoice)

@@ -10,6 +10,10 @@ const server = createServer(async (req, res) => {
   let raw = "";
   for await (const chunk of req) raw += chunk;
   lastRequest = { method: req.method, type: req.headers["content-type"], body: raw, headers: req.headers };
+  if (req.url.startsWith("/accepted")) {
+    res.writeHead(202);
+    return res.end();
+  }
   if (req.url.startsWith("/created")) {
     res.writeHead(201);
     return res.end();
@@ -84,6 +88,10 @@ test("apiPost maps problem+json", async () => {
 
 test("apiPost accepts 201 without body", async () => {
   assert.deepEqual(await apiPost("/created", {}), { ok: true, data: null });
+});
+
+test("IDT-02 apiPost accepts 202 without body (a code sent)", async () => {
+  assert.deepEqual(await apiPost("/accepted", {}), { ok: true, data: null });
 });
 
 test("GER-06 apiPost timeout becomes internal_error", { timeout: 10_000 }, async () => {

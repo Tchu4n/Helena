@@ -1,15 +1,16 @@
 const STEPS = [
   { key: "cart", label: "Sacola" },
+  { key: "identification", label: "Identificação" },
   { key: "details", label: "Dados e entrega" },
   { key: "payment", label: "Pagamento" },
 ] as const;
 
-// SAC-02: the 3-step progress of bag and checkout. Its presence also hides the announcement,
+// SAC-02: the 4-step progress of bag and checkout. Its presence also hides the announcement,
 // the search and the bag icon of the header (GER-02, rule in app/globals.css).
 export function PurchaseSteps({ current }: { current: (typeof STEPS)[number]["key"] }) {
   return (
-    <ol data-purchase-steps aria-label="Etapas da compra" className="relative grid grid-cols-3 px-4 pt-4 pb-2">
-      <span aria-hidden className="absolute inset-x-[16.6%] top-[1.3rem] border-t border-control" />
+    <ol data-purchase-steps aria-label="Etapas da compra" className="relative grid grid-cols-4 px-4 pt-4 pb-2">
+      <span aria-hidden className="absolute inset-x-[12.5%] top-[1.3rem] border-t border-control" />
       {STEPS.map((step) => {
         const on = step.key === current;
         return (

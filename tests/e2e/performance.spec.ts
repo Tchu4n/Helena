@@ -61,7 +61,12 @@ test("GER-08 main content of /sacola under 3 s on slow 4G", async ({ context, pa
 test("GER-08 main content of /checkout under 3 s on slow 4G", async ({ context, page }) => {
   test.setTimeout(60_000);
   const response = await context.request.post("http://localhost:4011/__carts", {
-    data: { lines: [{ productSizeId: "5a1e0000-0000-4000-8000-000000000002" }], cep: "01310100", chosen: "pac" },
+    data: {
+      lines: [{ productSizeId: "5a1e0000-0000-4000-8000-000000000002" }],
+      cep: "01310100",
+      chosen: "pac",
+      verifiedEmail: "maria@exemplo.com",
+    },
   });
   const { id } = await response.json();
   await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);

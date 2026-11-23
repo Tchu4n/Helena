@@ -62,8 +62,8 @@ async function request<T>(url: URL, init: { method: string; body?: string; heade
         ...(init.body ? { "Content-Type": "application/json" } : {}),
       },
     });
-    // 201 without a body (for example, a saved restock alert) still counts as success.
-    if (response.status === 201 || response.status === 204) {
+    // 201, 202 and 204 without a body (a saved restock alert, a code sent) still count as success.
+    if (response.status === 201 || response.status === 202 || response.status === 204) {
       const text = await response.text();
       return { ok: true, data: (text ? JSON.parse(text) : null) as T };
     }

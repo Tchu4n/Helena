@@ -3,7 +3,8 @@
 import { z } from "zod";
 import type { components } from "../../../lib/api-types.ts";
 
-type CustomerDetails = components["schemas"]["CustomerDetails"];
+// IDT-03: the e-mail is not a form field; the server adds the one confirmed with the code.
+type CustomerDetails = Omit<components["schemas"]["CustomerDetails"], "email">;
 
 // Version of the consent text the boxes show (CHK-07); bump it when the text changes.
 export const CONSENT_TEXT_VERSION = "2026-11";
@@ -11,7 +12,6 @@ export const CONSENT_TEXT_VERSION = "2026-11";
 export const DETAILS_FIELDS = [
   "name",
   "cpf",
-  "email",
   "phone",
   "cep",
   "street",
@@ -60,7 +60,6 @@ export const customerDetailsInput = z
         .transform(digits)
         .pipe(z.string().regex(/^\d{11}$/, "CPF deve ter 11 números").refine(isValidCpf, "CPF inválido")),
     ),
-    email: text(z.string().trim().min(1, REQUIRED).max(150, TOO_LONG).regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "Digite um e-mail válido")),
     phone: text(
       z
         .string()
@@ -96,7 +95,6 @@ export const customerDetailsInput = z
     (v): CustomerDetails => ({
       name: v.name,
       cpf: v.cpf,
-      email: v.email,
       phone: v.phone,
       address: {
         cep: v.cep,

@@ -1,6 +1,6 @@
 "use server";
 
-import { apiPut } from "@/src/lib/api";
+import { apiGet, apiPut } from "@/src/lib/api";
 import type { components } from "@/src/lib/api-types";
 import { readCartId } from "@/src/features/cart";
 import { forwardedFor } from "@/src/lib/request-ip";
@@ -14,9 +14,12 @@ export async function saveLead(formData: FormData): Promise<{ ok: boolean }> {
   if (!cartId) return { ok: false };
   const parsed = customerDetailsInput.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false };
+  // IDT-03: the e-mail is the one confirmed for this bag, read on the server, never a form value.
+  const cart = await apiGet<components["schemas"]["Cart"]>(`/v1/carts/${cartId}`);
+  if (!cart.ok || !cart.data.verifiedEmail) return { ok: false };
   const result = await apiPut<components["schemas"]["Cart"]>(
     `/v1/carts/${cartId}/customer`,
-    parsed.data,
+    { ...parsed.data, email: cart.data.verifiedEmail },
     await forwardedFor(),
   );
   return { ok: result.ok };

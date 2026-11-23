@@ -17,7 +17,7 @@ export default defineConfig({
     {
       command: "npm run build && npx next start -p 3100",
       url: "http://localhost:3100",
-      env: { API_URL: "http://localhost:4011" },
+      env: { API_URL: "http://localhost:4011", STORE_WHATSAPP: "5511900000000" },
       timeout: 240_000,
       // Never reuse: a server left running from an older build would test old code.
       reuseExistingServer: false,

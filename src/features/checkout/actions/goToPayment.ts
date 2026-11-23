@@ -30,6 +30,9 @@ export async function goToPayment(_prev: GoToPaymentState, formData: FormData): 
     if (cart.problem.status === 404) redirect("/sacola");
     return { errors: {}, error: cart.problem.title };
   }
+  // IDT-12: the e-mail is the one confirmed for this bag, read here, never a form value.
+  const email = cart.data.verifiedEmail;
+  if (!email) redirect("/checkout/identificacao");
   // Rare race: the CEP she typed isn't the cart's yet. Save it and stop, so the CHK-10 note shows the new total first.
   if (cart.data.cep !== parsed.data.address.cep) {
     const saved = await saveCep(parsed.data.address.cep);
@@ -39,8 +42,11 @@ export async function goToPayment(_prev: GoToPaymentState, formData: FormData): 
   }
   if (!cart.data.chosenDelivery) return { errors: { delivery: "Escolha a entrega" }, error: null };
 
-  const details = await apiPut(`/v1/carts/${cartId}/customer`, parsed.data, await forwardedFor());
-  if (!details.ok) return { errors: {}, error: details.problem.title };
+  const details = await apiPut(`/v1/carts/${cartId}/customer`, { ...parsed.data, email }, await forwardedFor());
+  if (!details.ok) {
+    if (details.problem.code === "email_not_verified") redirect("/checkout/identificacao");
+    return { errors: {}, error: details.problem.title };
+  }
 
   const order = await apiPost<components["schemas"]["CreatedOrder"]>(
     "/v1/orders",
@@ -48,6 +54,7 @@ export async function goToPayment(_prev: GoToPaymentState, formData: FormData): 
     { "Idempotency-Key": idempotencyKey.data },
   );
   if (!order.ok) {
+    if (order.problem.code === "email_not_verified") redirect("/checkout/identificacao"); // IDT-12
     // 409: a piece sold out (the bag shows which, SAC-07); 404: the cart is gone.
     if (order.problem.status === 409 || order.problem.status === 404) redirect("/sacola");
     return { errors: {}, error: order.problem.title };

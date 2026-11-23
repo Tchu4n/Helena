@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PurchaseSteps } from "@/src/components/layout";
 import { ErrorMessage } from "@/src/components/ui";
+import { changeEmail } from "@/src/features/account";
 import { chooseDelivery, getCart } from "@/src/features/cart";
 import { DetailsForm, goToPayment, OrderSummary, saveCheckoutCep, saveLead, summaryFromCart } from "@/src/features/checkout";
 
@@ -13,11 +14,15 @@ async function CheckoutContent() {
   if (!result.ok) return <ErrorMessage title={result.title} retryHref="/checkout" />;
   const cart = result.cart;
   if (!cart || cart.items.length === 0) redirect("/sacola");
+  // IDT-12: no confirmed e-mail, no "Dados e entrega".
+  if (!cart.verifiedEmail) redirect("/checkout/identificacao");
   return (
     <div className="flex flex-col gap-3 px-4 pt-2 pb-6">
       <h1 className="sr-only">Dados e entrega</h1>
       <OrderSummary summary={summaryFromCart(cart)} />
       <DetailsForm
+        email={cart.verifiedEmail}
+        changeEmail={changeEmail}
         total={cart.total}
         cep={cart.cep}
         deliveryOptions={cart.deliveryOptions}
@@ -31,7 +36,7 @@ async function CheckoutContent() {
   );
 }
 
-// CHK-01: straight from the bag, no account. Reading the cookie and the API goes inside Suspense (cacheComponents).
+// CHK-01, IDT-03: after identification, with the confirmed e-mail. Reading the cookie and the API goes inside Suspense (cacheComponents).
 export default function CheckoutPage() {
   return (
     <>

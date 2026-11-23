@@ -59,6 +59,7 @@ export type CartView = {
   installments: string;
   soldOutMessages: { itemId: string; text: string }[];
   reservationExpiresAt: string | null;
+  verifiedEmail: string | null; // IDT-03: the e-mail confirmed with the code for this bag
 };
 
 export type CartPanelView = {
@@ -138,6 +139,7 @@ export function toCartView(cart: Cart, hasOrder = false): CartView {
         text: `A peça ${i.name} (${i.color} · ${i.size}) esgotou. Remova da sacola para finalizar a compra.`,
       })),
     reservationExpiresAt: hasOrder ? (cart.reservationExpiresAt ?? null) : null,
+    verifiedEmail: cart.verifiedEmail ?? null,
   };
 }
 

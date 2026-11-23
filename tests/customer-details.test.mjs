@@ -6,7 +6,6 @@ import { customerDetailsInput, digits, fieldErrors, isValidCpf } from "../src/fe
 const VALID = {
   name: "Maria Souza",
   cpf: "52998224725",
-  email: "maria@exemplo.com",
   phone: "11987654321",
   cep: "01310100",
   street: "Avenida Paulista",
@@ -27,7 +26,6 @@ function errorsFor(overrides) {
 const ROWS = [
   ["cpf", "123.456.789-0", "CPF deve ter 11 números"],
   ["cpf", "1234567890a", "CPF deve ter 11 números"],
-  ["email", "maria.exemplo.com", "Digite um e-mail válido"],
   ["phone", "(11) 9abc-0000", "Digite só números"],
   ["cep", "0131010", "Digite um CEP com 8 números"],
   ["name", "", "Campo obrigatório"],
@@ -56,11 +54,11 @@ test("CHK-03 separators are dropped before validating", () => {
   assert.equal(r.data.address.cep, "01310100");
 });
 
-test("CHK-02 the result is the contract's CustomerDetails", () => {
+// IDT-03, CHK-03: the e-mail is not a form field anymore; the server adds the confirmed one.
+test("CHK-02 the result is the contract's CustomerDetails without the e-mail", () => {
   assert.deepEqual(customerDetailsInput.parse(VALID), {
     name: "Maria Souza",
     cpf: "52998224725",
-    email: "maria@exemplo.com",
     phone: "11987654321",
     address: {
       cep: "01310100",
@@ -107,4 +105,8 @@ test("isValidCpf checks both check digits and rejects repeated digits", () => {
   assert.equal(isValidCpf("52998224725"), true);
   assert.equal(isValidCpf("52998224724"), false);
   assert.equal(isValidCpf("11111111111"), false);
+});
+
+test("IDT-03 an e-mail sent in the form is ignored", () => {
+  assert.equal("email" in customerDetailsInput.parse({ ...VALID, email: "outra@exemplo.com" }), false);
 });

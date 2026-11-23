@@ -19,7 +19,8 @@ async function openCheckout(
   lines: Line[] = [{ productSizeId: JACKET_M }],
   extra: { cep?: string; chosen?: string; coupon?: string } = {},
 ): Promise<string> {
-  const response = await context.request.post(`${FAKE_API}/__carts`, { data: { lines, ...extra } });
+  // IDT-03: "Dados e entrega" opens only for a bag whose e-mail was confirmed with the code.
+  const response = await context.request.post(`${FAKE_API}/__carts`, { data: { lines, verifiedEmail: "maria@exemplo.com", ...extra } });
   const { id } = await response.json();
   await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
   await page.goto("/checkout");
@@ -29,7 +30,6 @@ async function openCheckout(
 const VALID: [string, string][] = [
   ["Nome completo", "Maria Souza"],
   ["CPF", "529.982.247-25"],
-  ["E-mail", "maria@exemplo.com"],
   ["Celular", "(11) 98765-4321"],
   ["CEP", "01310-100"],
   ["Rua", "Avenida Paulista"],
@@ -52,14 +52,15 @@ const savedLead = (context: BrowserContext, cartId: string) =>
     .then((r) => r.text())
     .then((text) => (text ? JSON.parse(text) : null));
 
-test("CHK-01 Finalizar compra goes straight to the details form, no login", async ({ context, page }) => {
-  await openCheckout(context, page);
+test("CHK-01 Finalizar compra goes to identification, where buying needs no account or password", async ({ context, page }) => {
+  const response = await context.request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId: JACKET_M }] } });
+  const { id } = await response.json();
+  await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
   await page.goto("/sacola");
   await page.getByRole("button", { name: "Finalizar compra" }).click();
-  await expect(page).toHaveURL(/\/checkout$/);
-  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await expect(page).toHaveURL(/\/checkout\/identificacao$/);
+  await expect(page.getByRole("radio", { name: /Comprar só com e-mail/ })).toBeVisible();
   await expect(page.locator('input[type="password"]')).toHaveCount(0);
-  await expect(page.getByText("Entrar", { exact: true })).toHaveCount(0);
 });
 
 test("CHK-02 the fields, their autocomplete, and an empty CEP", async ({ context, page }) => {
@@ -69,7 +70,6 @@ test("CHK-02 the fields, their autocomplete, and an empty CEP", async ({ context
   const autocomplete: [string, string][] = [
     ["Nome completo", "name"],
     ["CPF", "off"],
-    ["E-mail", "email"],
     ["Celular", "tel-national"],
     ["CEP", "postal-code"],
     ["Rua", "address-line1"],
@@ -83,12 +83,14 @@ test("CHK-02 the fields, their autocomplete, and an empty CEP", async ({ context
     await expect(page.getByLabel(label, { exact: true })).toHaveAttribute("autocomplete", value);
   }
   await expect(page.getByLabel("CEP", { exact: true })).toHaveValue("");
+  // CHK-03, IDT-03: the confirmed e-mail, read-only.
+  await expect(page.getByLabel("E-mail", { exact: true })).toHaveValue("maria@exemplo.com");
+  await expect(page.getByLabel("E-mail", { exact: true })).toHaveAttribute("readonly", "");
 });
 
 const ROWS: [string, string, string][] = [
   ["CPF", "123.456.789-0", "CPF deve ter 11 números"],
   ["CPF", "1234567890a", "CPF deve ter 11 números"],
-  ["E-mail", "maria.exemplo.com", "Digite um e-mail válido"],
   ["Celular", "(11) 9abc-0000", "Digite só números"],
   ["CEP", "0131010", "Digite um CEP com 8 números"],
   ["Nome completo", "", "Campo obrigatório"],
@@ -117,9 +119,9 @@ for (const [label, value, message] of ROWS) {
 
 test("CHK-03 focus goes to the first field with an error", async ({ context, page }) => {
   await openCheckout(context, page);
-  await fillValid(page, ["E-mail", "Bairro"]);
+  await fillValid(page, ["Celular", "Bairro"]);
   await page.getByRole("button", { name: "Ir para pagamento" }).click();
-  await expect(page.getByLabel("E-mail", { exact: true })).toBeFocused();
+  await expect(page.getByLabel("Celular", { exact: true })).toBeFocused();
   await expect(page.getByLabel("Bairro", { exact: true })).toHaveAttribute("aria-invalid", "true");
 });
 
@@ -138,12 +140,12 @@ test("CHK-05 the lead is saved when every required field is valid and she leaves
   });
 });
 
-test("CHK-06 the reminder notice sits with the contact fields, with the privacy link", async ({ context, page }) => {
+test("CHK-06 the reminder notice for the phone sits with the contact fields, with the privacy link", async ({ context, page }) => {
   await openCheckout(context, page);
   const contact = page.getByRole("group", { name: "Seus dados" });
   await expect(
     contact.getByText(
-      "Podemos usar seu e-mail e celular para lembrar você desta compra, se ela não for concluída. Cada lembrete traz a opção de parar de receber.",
+      "Podemos usar seu celular para lembrar você desta compra, se ela não for concluída. Cada lembrete traz a opção de parar de receber.",
     ),
   ).toBeVisible();
   await expect(contact.getByRole("link", { name: "Política de privacidade" })).toHaveAttribute("href", "/privacidade");
@@ -166,7 +168,9 @@ test("CHK-07 two separate boxes, unchecked; only the checked channel is recorded
 
 test("CHK-08 a CPF already on record: no error and nothing filled in for her", async ({ context, page, request }) => {
   // Someone else's purchase with the same CPF and e-mail.
-  const other = await (await request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId: JACKET_M }] } })).json();
+  const other = await (
+    await request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId: JACKET_M }], verifiedEmail: "maria@exemplo.com" } })
+  ).json();
   await request.put(`${FAKE_API}/v1/carts/${other.id}/customer`, {
     data: {
       name: "Outra Pessoa",
@@ -179,7 +183,6 @@ test("CHK-08 a CPF already on record: no error and nothing filled in for her", a
   });
   await openCheckout(context, page);
   await page.getByLabel("CPF", { exact: true }).fill("529.982.247-25");
-  await page.getByLabel("E-mail", { exact: true }).fill("maria@exemplo.com");
   await page.getByLabel("Celular", { exact: true }).focus();
   for (const label of ["Nome completo", "Celular", "Rua", "Cidade"]) {
     await expect(page.getByLabel(label, { exact: true })).toHaveValue("");

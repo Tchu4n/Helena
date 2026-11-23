@@ -7,7 +7,6 @@ export const JACKET_M = "5a1e0000-0000-4000-8000-000000000002";
 export const VALID: [string, string][] = [
   ["Nome completo", "Maria Souza"],
   ["CPF", "529.982.247-25"],
-  ["E-mail", "maria@exemplo.com"],
   ["Celular", "(11) 98765-4321"],
   ["CEP", "01310-100"],
   ["Rua", "Avenida Paulista"],
@@ -26,7 +25,10 @@ export async function startPayment(
   request: APIRequestContext,
   { productSizeId = JACKET_M, cep = "01310-100", delivery }: { productSizeId?: string; cep?: string; delivery?: RegExp } = {},
 ): Promise<string> {
-  const response = await context.request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId }] } });
+  // IDT-03: a bag whose e-mail was already confirmed with the code (the code screen has its own tests).
+  const response = await context.request.post(`${FAKE_API}/__carts`, {
+    data: { lines: [{ productSizeId }], verifiedEmail: "maria@exemplo.com" },
+  });
   const { id } = await response.json();
   await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
   await page.goto("/checkout");

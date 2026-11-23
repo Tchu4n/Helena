@@ -1,7 +1,7 @@
 // Fake store API for screen tests: fixed data in the shape of contract/openapi.yaml.
 // Control routes (/__fail, /__reset) exist only here, so tests can simulate an API outage.
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { cartTotals } from "./fake-cart.mjs";
 import { RESERVATION_MS, canReserve, isReserved, orderStatus } from "./fake-order.mjs";
 
@@ -224,6 +224,13 @@ const DECLINED_MESSAGE = "O banco do cartão não aprovou esta compra. Tente out
 const QR_CODE =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 const NOT_FOUND = { type: "about:blank", title: "Não encontrado", status: 404, code: "not_found" };
+const INVALID_CODE = { type: "https://helena.example/problems/invalid-code", title: "Código inválido ou vencido", status: 401, code: "invalid_code" };
+const emailNotVerified = (status) => ({
+  type: "https://helena.example/problems/email-not-verified",
+  title: "Confirme seu e-mail para continuar",
+  status,
+  code: "email_not_verified",
+});
 const LOOKUP_NOT_FOUND = {
   type: "https://helena.example/problems/not-found",
   title: "Não encontramos um pedido com esses dados",
@@ -237,6 +244,9 @@ const requests = [];
 const paymentBodies = [];
 // Orders by number, and the first answer given to each Idempotency-Key (CHK-22).
 const orders = new Map();
+// IDT-02 to IDT-05: the pending code per e-mail, and when each code was sent (5 per hour).
+const codes = new Map();
+const codeTimes = new Map();
 const answered = new Map();
 let nextOrder = 100001;
 
@@ -279,6 +289,7 @@ function cartBody(cart) {
     pieceCount: items.filter((i) => !i.soldOut).reduce((sum, i) => sum + i.quantity, 0),
     coupon: cart.coupon ? { code: cart.coupon, percent: couponPercent } : null,
     cep: cart.cep,
+    verifiedEmail: cart.verifiedEmail ?? null,
     chosenDelivery: cart.chosen,
     reservationExpiresAt: reservedOrderEnd(cart.id),
     ...totals,
@@ -375,9 +386,31 @@ async function once(req, path, run) {
   return answer;
 }
 
+// A code works once, for 10 minutes; 5 wrong tries kill it (IDT-04).
+function takeCode(email, code) {
+  const pending = codes.get(email);
+  if (!pending || pending.expiresAt < Date.now() || pending.tries >= 5) return false;
+  if (pending.code !== code) {
+    pending.tries += 1;
+    return false;
+  }
+  codes.delete(email);
+  return true;
+}
+
+function sendCode(email) {
+  const hourAgo = Date.now() - 60 * 60 * 1000;
+  const times = (codeTimes.get(email) ?? []).filter((t) => t > hourAgo);
+  if (email === "limite@exemplo.com" || times.length >= 5) return [429, TOO_MANY_REQUESTS];
+  codeTimes.set(email, [...times, Date.now()]);
+  codes.set(email, { code: String(randomInt(0, 1_000_000)).padStart(6, "0"), tries: 0, expiresAt: Date.now() + 10 * 60 * 1000 });
+  return [202, null];
+}
+
 function createOrder(cartId) {
   const cart = carts.get(cartId);
   if (!cart) return [404, NOT_FOUND];
+  if (!cart.verifiedEmail) return [409, emailNotVerified(409)];
   if (!cart.customer || !cart.chosen || cart.items.length === 0) return [422, INCOMPLETE_CART];
   // Going to payment again replaces the cart's order still awaiting payment and frees its pieces.
   for (const [number, o] of orders) if (o.cartId === cartId && o.status === "awaiting_payment") orders.delete(number);
@@ -492,6 +525,7 @@ async function route(req, url) {
     carts.set(cart.id, cart);
     return [201, cartBody(cart)];
   }
+  if (req.method === "POST" && url.pathname === "/v1/email-codes") return sendCode((await readJson(req)).email);
   // PED-05, PED-06: same 404 for any wrong pair; limite@exemplo.com hits the attempt limit.
   if (req.method === "POST" && url.pathname === "/v1/orders/access") {
     const { number, email } = await readJson(req);
@@ -528,8 +562,19 @@ async function route(req, url) {
     if (req.method === "PUT" && parts[3] === "customer") {
       const body = await readJson(req);
       if (!validCustomer(body)) return [422, INVALID_DATA];
+      if (body.email !== cart.verifiedEmail) return [422, emailNotVerified(422)];
       cart.customer = body;
       return [200, cartBody(cart)];
+    }
+    if (parts[3] === "email-verification") {
+      if (req.method === "DELETE") {
+        cart.verifiedEmail = null;
+        return [204, null];
+      }
+      const { email, code } = await readJson(req);
+      if (!takeCode(email, code)) return [401, INVALID_CODE];
+      cart.verifiedEmail = email;
+      return [204, null];
     }
     if (req.method === "PUT" && parts[3] === "delivery") {
       const { type } = await readJson(req);
@@ -633,14 +678,16 @@ createServer(async (req, res) => {
     soldOutIds.clear();
     maxById.clear();
     orders.clear();
+    codes.clear();
+    codeTimes.clear();
     answered.clear();
     requests.length = 0;
     paymentBodies.length = 0;
     return send(res, 200, { ok: true });
   }
   if (req.method === "POST" && url.pathname === "/__carts") {
-    const { lines = [], cep = null, chosen = null, coupon = null } = await readJson(req);
-    const cart = { id: randomUUID(), cep, chosen, coupon, customer: null, items: [] };
+    const { lines = [], cep = null, chosen = null, coupon = null, verifiedEmail = null } = await readJson(req);
+    const cart = { id: randomUUID(), cep, chosen, coupon, verifiedEmail, customer: null, items: [] };
     for (const { productSizeId, ...extra } of lines) {
       const size = ALL_SIZES.find((s) => s.id === productSizeId);
       cart.items.push(newItem(size, extra.quantity ?? 1, { productSizeId, ...extra }));
@@ -674,6 +721,13 @@ createServer(async (req, res) => {
     const order = orders.get(url.searchParams.get("number"));
     if (order) order.reservationEndsAt = Date.now();
     return send(res, 200, { ok: Boolean(order) });
+  }
+  // IDT-*: the pending code of an e-mail, and a bag losing its confirmation behind the screen's back.
+  if (url.pathname === "/__codes") return send(res, 200, codes.get(url.searchParams.get("email")) ?? null);
+  if (req.method === "POST" && url.pathname === "/__unverify") {
+    const cart = carts.get(url.searchParams.get("cartId"));
+    if (cart) cart.verifiedEmail = null;
+    return send(res, 200, { ok: Boolean(cart) });
   }
   if (url.pathname === "/__customer") return send(res, 200, carts.get(url.searchParams.get("cartId"))?.customer ?? null);
   // Lets a test check which API paths the store called.

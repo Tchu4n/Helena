@@ -61,9 +61,10 @@ Owner's decision on 2026-11-19, extending the one from 2026-11-15:
 | `contract/openapi.yaml` | OpenAPI 3.0.3 contract of the API for the customer screens (approved on 2026-11-14; names moved to English on 2026-11-15, by the owner's decision, before any consumer existed) |
 | `database/schema.sql` | SQL Server DDL (draft, not run yet; moves to the back-end repository once it exists) |
 | `docs/referencias/` | Owner's research material (requirements, guides, screenshots, flowcharts). Local only, outside Git. Read it, never commit it |
-| `docs/superpowers/plans/` | Implementation plans: base design system and shared layout + catalog (done), product page (done, minor review items pending), bag (done and committed on 2026-11-20), checkout (approved 2026-11-20, not started) |
+| `docs/superpowers/specs/` | Design docs written before each plan: checkout (2026-11-20), order confirmation and tracking (2026-11-22), account and identification before buying (2026-11-23) |
+| `docs/superpowers/plans/` | Implementation plans, each with its status at the top: base design system and shared layout + catalog (done), product page (done, minor review items pending), bag (done), checkout (done), order confirmation and tracking (done), account plan 1, identification and session (in progress). Account plans 2 to 4 (orders and details, addresses, privacy) come next |
 
-Still missing: running and approving the DDL on a SQL Server, sandbox credentials (payment, shipping, invoice). The mock server came up and answered according to the contract on 2026-11-15.
+Still missing: running and approving the DDL on a SQL Server, sandbox credentials (payment, shipping, invoice), and the store's WhatsApp number (`STORE_WHATSAPP`; a placeholder is used until then). The mock server came up and answered according to the contract on 2026-11-15.
 
 The guides in `docs/referencias/` were written for Next.js 15 and Tailwind 3. Where they differ from this file or from the docs in `node_modules/next/dist/docs/`, they lose.
 
@@ -105,7 +106,7 @@ Long output: filter before reading (`npm run build 2>&1 | tail -20`).
 
 ```
 src/
-  features/<domain>/   catalog, cart, checkout, account, returns, privacy
+  features/<domain>/   catalog, cart, checkout, orders, account, returns, privacy
     components/  actions/  queries/  schemas/  index.ts
   components/ui/       primitives (Button, Field, Badge...)
   lib/                 API client, environment validation

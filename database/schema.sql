@@ -252,6 +252,8 @@ CREATE TABLE dbo.cart (
     delivery_type  VARCHAR(10)       NULL,
     name           NVARCHAR(100)     NULL,
     email          NVARCHAR(150)     NULL,
+    verified_email NVARCHAR(150)     NULL,    -- confirmed with a code (IDT-03); no order without it (IDT-12)
+    verified_at    DATETIME2(3)      NULL,
     phone          VARCHAR(15)       NULL,
     cep            CHAR(8)           NULL,
     street         NVARCHAR(100)     NULL,
@@ -512,9 +514,34 @@ GO
 
 /* ---------- Tokens and idempotency ---------- */
 
+-- 6-digit code sent to an e-mail (IDT-02 to IDT-05, CTA-01, CTA-06; owner's
+-- decision of 2026-11-23). Stored only as an HMAC-SHA256 with a back-end
+-- secret: a plain hash of 6 digits would be easy to reverse. Valid for 10
+-- minutes and once; 5 wrong tries kill it; a new code replaces the pending one
+-- (replaced_at). The limits of 5 codes per hour per e-mail and per IP count
+-- rows by sent_at.
+CREATE TABLE dbo.email_code (
+    email_code_id  BIGINT IDENTITY(1,1) NOT NULL,
+    email          NVARCHAR(150)        NOT NULL,
+    code_hash      BINARY(32)           NOT NULL,
+    wrong_tries    TINYINT              NOT NULL CONSTRAINT df_email_code_tries DEFAULT 0,
+    request_ip     VARCHAR(45)          NULL,
+    sent_at        DATETIME2(3)         NOT NULL CONSTRAINT df_email_code_sent DEFAULT SYSUTCDATETIME(),
+    expires_at     DATETIME2(3)         NOT NULL,
+    used_at        DATETIME2(3)         NULL,
+    replaced_at    DATETIME2(3)         NULL,
+    CONSTRAINT pk_email_code PRIMARY KEY CLUSTERED (email_code_id),
+    CONSTRAINT ck_email_code_tries CHECK (wrong_tries BETWEEN 0 AND 5)
+);
+CREATE NONCLUSTERED INDEX ix_email_code_email_sent ON dbo.email_code (email, sent_at);
+CREATE NONCLUSTERED INDEX ix_email_code_ip_sent ON dbo.email_code (request_ip, sent_at);
+GO
+
 -- Customer session, access link sent by e-mail, and access to one order
 -- without an account. Only the SHA-256 of the token is stored; the original
--- value exists only in the cookie or in the e-mail.
+-- value exists only in the cookie or in the e-mail. Since 2026-11-23 the store
+-- signs in with the e-mail code (dbo.email_code); the 'link' type stays for
+-- the contract's /v1/sessions/links, which the store no longer uses.
 CREATE TABLE dbo.access_token (
     token_id     BIGINT IDENTITY(1,1) NOT NULL,
     type         VARCHAR(10)          NOT NULL,

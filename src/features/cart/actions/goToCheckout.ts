@@ -22,5 +22,8 @@ export async function goToCheckout(): Promise<CheckoutState> {
   }
   // The API's own answer (for example, a bag emptied in another tab): back to the bag, which shows why.
   if (!result.data.canCheckout) redirect("/sacola");
-  redirect("/checkout");
+  // CHK-01, IDT-01: straight to identification when the bag's e-mail isn't confirmed. Going through /checkout
+  // first would leave its streamed redirect in the page Next keeps hidden, and coming back after the code
+  // would replay it.
+  redirect(result.data.verifiedEmail ? "/checkout" : "/checkout/identificacao");
 }
