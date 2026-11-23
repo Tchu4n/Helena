@@ -24,7 +24,7 @@ export async function startPayment(
   context: BrowserContext,
   page: Page,
   request: APIRequestContext,
-  { productSizeId = JACKET_M, cep = "01310-100" } = {},
+  { productSizeId = JACKET_M, cep = "01310-100", delivery }: { productSizeId?: string; cep?: string; delivery?: RegExp } = {},
 ): Promise<string> {
   const response = await context.request.post(`${FAKE_API}/__carts`, { data: { lines: [{ productSizeId }] } });
   const { id } = await response.json();
@@ -32,6 +32,7 @@ export async function startPayment(
   await page.goto("/checkout");
   for (const [label, value] of VALID) await page.getByLabel(label, { exact: true }).fill(label === "CEP" ? cep : value);
   await expect(page.getByRole("radio", { name: /PAC/ })).toBeChecked();
+  if (delivery) await page.getByRole("radio", { name: delivery }).check();
   await page.getByRole("button", { name: "Ir para pagamento" }).click();
   await expect(page).toHaveURL(/\/checkout\/pagamento$/);
   const read = (await paths(request)).findLast((p) => /^\/v1\/orders\/HL-\d+$/.test(p));

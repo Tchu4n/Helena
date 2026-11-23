@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { NotFoundMessage } from "@/src/components/layout";
 import { ErrorMessage } from "@/src/components/ui";
 import { finishPurchase, OrderSummary } from "@/src/features/checkout";
-import { getOrder, OrderConfirmation } from "@/src/features/orders";
+import { getOrder, OrderConfirmation, OrderTracking } from "@/src/features/orders";
 
 export const metadata: Metadata = { title: "Pedido · Helena" };
 
@@ -17,13 +17,7 @@ async function OrderContent({ params, searchParams }: PageProps<"/pedido/[numero
   if (confirmado === "1" && order.paid) {
     return <OrderConfirmation order={order} summary={<OrderSummary summary={summary} open />} finishPurchase={finishPurchase} />;
   }
-  // shortcut: the summary alone until Task 3 of the order plan brings the tracking view.
-  return (
-    <div className="flex flex-col gap-4 px-4 pt-6 pb-8">
-      <h1 className="font-serif text-[1.75rem] font-normal">Pedido {order.number}</h1>
-      <OrderSummary summary={summary} open />
-    </div>
-  );
+  return <OrderTracking order={order} summary={<OrderSummary summary={summary} open />} />;
 }
 
 // PED-01 to PED-08: the order is read with her own access cookie (inside Suspense: cacheComponents).

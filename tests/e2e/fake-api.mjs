@@ -299,17 +299,41 @@ function maskEmail(email) {
   return `${local[0]}***${local.length > 1 ? local.at(-1) : ""}@${domain}`;
 }
 
+const ORDER_STEPS = ["payment_confirmed", "preparing", "shipped", "delivered"];
+
+// PED-03 to PED-08: moves a paid order forward, dating every step up to `to` now.
+function advanceOrder(order, to, code) {
+  if (!order?.paidAt || !["preparing", "shipped", "delivered", "support_in_progress"].includes(to)) return false;
+  const now = new Date();
+  const last = to === "support_in_progress" ? "delivered" : to;
+  order.stepDates ??= {};
+  for (const step of ORDER_STEPS.slice(1, ORDER_STEPS.indexOf(last) + 1)) order.stepDates[step] ??= now.toISOString();
+  order.status = to;
+  if (to === "shipped" && code && order.delivery.type !== "courier") {
+    order.delivery = { ...order.delivery, trackingCode: code, trackingLink: `https://rastreio.exemplo/${code}` };
+  }
+  if (to === "delivered") {
+    order.delivery = { ...order.delivery, deliveredAt: now.toISOString() };
+    const deadline = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    order.returnAvailability = { allowed: true, deadline, reason: null };
+  }
+  if (to === "support_in_progress") {
+    order.return = { reason: "wrong_size", status: "in_progress", requestedAt: now.toISOString() };
+    order.returnAvailability = { allowed: false, deadline: null, reason: "return_already_requested" };
+  }
+  return true;
+}
+
 function orderBody(order) {
   const now = Date.now();
   const status = orderStatus(order, now);
-  const paid = status === "payment_confirmed";
   return {
     number: order.number,
     createdAt: order.createdAt,
     status,
-    steps: ["payment_confirmed", "preparing", "shipped", "delivered"].map((step) => ({
+    steps: ORDER_STEPS.map((step) => ({
       step,
-      completedAt: paid && step === "payment_confirmed" ? order.paidAt : null,
+      completedAt: step === "payment_confirmed" ? order.paidAt : (order.stepDates?.[step] ?? null),
     })),
     items: order.items,
     ...order.totals,
@@ -317,8 +341,8 @@ function orderBody(order) {
     payment: order.payment,
     delivery: order.delivery,
     maskedEmail: maskEmail(order.email),
-    return: null,
-    returnAvailability: { allowed: false, deadline: null, reason: "order_not_delivered" },
+    return: order.return ?? null,
+    returnAvailability: order.returnAvailability ?? { allowed: false, deadline: null, reason: "order_not_delivered" },
   };
 }
 
@@ -627,6 +651,10 @@ createServer(async (req, res) => {
       order.paidAt = new Date().toISOString();
     }
     return send(res, 200, { ok: Boolean(order) });
+  }
+  if (req.method === "POST" && url.pathname === "/__advance") {
+    const order = orders.get(url.searchParams.get("number"));
+    return send(res, 200, { ok: advanceOrder(order, url.searchParams.get("to"), url.searchParams.get("code")) });
   }
   if (req.method === "POST" && url.pathname === "/__expire") {
     const order = orders.get(url.searchParams.get("number"));
