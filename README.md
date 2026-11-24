@@ -83,7 +83,7 @@ Code and docs are written in plain English, so any dev, beginners included, can 
 - [x] Customer screens spec
 - [x] API contract
 - [x] Database schema draft
-- [ ] Customer screens: home, catalog, search, product, bag, checkout, order confirmation and tracking done; identification, sign-in, the account home, sign-up details, signed-in checkout, my orders and personal details done; saved addresses (with a favorite) and the CEP history done; account privacy, returns and privacy page to do
+- [ ] Customer screens: home, catalog, search, product, bag, checkout, order confirmation and tracking done; identification, sign-in, the account home, sign-up details, signed-in checkout, my orders and personal details done; saved addresses (with a favorite), the CEP history and account privacy (consents, copy and deletion of her data) done; returns and privacy policy page to do
 - [ ] Java back end
 - [ ] Schema run on SQL Server
 - [ ] Integrations (payment, shipping, invoice)

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PurchaseSteps } from "@/src/components/layout";
 import { ErrorMessage } from "@/src/components/ui";
-import { changeEmail, getAccount, listMyAddresses } from "@/src/features/account";
+import { changeEmail, DeletionNotice, getAccount, listMyAddresses } from "@/src/features/account";
 import { chooseDelivery, getCart } from "@/src/features/cart";
 import { DetailsForm, goToPayment, OrderSummary, saveCheckoutCep, saveLead, summaryFromCart } from "@/src/features/checkout";
 import { formatPhone } from "@/src/lib/format";
@@ -11,7 +11,7 @@ import { readSession } from "@/src/lib/session-cookie";
 
 export const metadata: Metadata = { title: "Dados e entrega · Helena" };
 
-async function CheckoutContent() {
+async function CheckoutContent({ searchParams }: { searchParams: PageProps<"/checkout">["searchParams"] }) {
   const result = await getCart();
   if (!result.ok) return <ErrorMessage title={result.title} retryHref="/checkout" />;
   const cart = result.cart;
@@ -34,6 +34,8 @@ async function CheckoutContent() {
   return (
     <div className="flex flex-col gap-3 px-4 pt-2 pb-6">
       <h1 className="sr-only">Dados e entrega</h1>
+      {/* CTA-09: the sign-in at identification cancelled a pending deletion. */}
+      {(await searchParams).exclusao === "cancelada" && <DeletionNotice value="cancelada" />}
       <OrderSummary summary={summaryFromCart(cart)} />
       <DetailsForm
         email={email}
@@ -54,12 +56,12 @@ async function CheckoutContent() {
 }
 
 // CHK-01, IDT-03: after identification, with the confirmed e-mail. Reading the cookie and the API goes inside Suspense (cacheComponents).
-export default function CheckoutPage() {
+export default function CheckoutPage({ searchParams }: PageProps<"/checkout">) {
   return (
     <>
       <PurchaseSteps current="details" />
       <Suspense fallback={null}>
-        <CheckoutContent />
+        <CheckoutContent searchParams={searchParams} />
       </Suspense>
     </>
   );

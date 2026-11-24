@@ -8,7 +8,7 @@ import { saveSession } from "@/src/lib/session-cookie";
 import { clearIdentification, readIdentification, saveIdentification } from "../identification-cookie.ts";
 import { codeInput } from "../schemas/identification.ts";
 import { nextPath } from "../next-path.ts";
-import { EXISTING_ACCOUNT, START, type IdentificationState } from "../types.ts";
+import { DELETION_NOTICES, EXISTING_ACCOUNT, START, type IdentificationState } from "../types.ts";
 
 // IDT-03, IDT-04, IDT-08, IDT-09, IDT-14, CTA-01. The e-mail and the way come only from her own httpOnly cookie, never from the form.
 export async function confirmCode(prev: IdentificationState, formData: FormData): Promise<IdentificationState> {
@@ -38,12 +38,14 @@ export async function confirmCode(prev: IdentificationState, formData: FormData)
     await saveSession({ token: session.data.token, email: pending.email, detailsComplete, expiresAt: session.data.expiresAt });
     if (atAccount && !session.data.newAccount) {
       await clearIdentification();
-      if (detailsComplete) redirect("/conta");
+      // CTA-09: this sign-in cancelled a pending deletion; /conta says so once.
+      if (detailsComplete) redirect(session.data.deletionCancelled ? "/conta?exclusao=cancelada" : "/conta");
       return { ...base, step: "details", sentAt: null }; // IDT-14
     }
     const done = session.data.newAccount ? "password" : "existing";
     await saveIdentification({ ...pending, done });
-    return { ...base, step: done, sentAt: null, notice: done === "existing" ? EXISTING_ACCOUNT : null };
+    const cancelled = session.data.deletionCancelled ? ` ${DELETION_NOTICES.cancelada}` : "";
+    return { ...base, step: done, sentAt: null, notice: done === "existing" ? `${EXISTING_ACCOUNT}${cancelled}` : null };
   }
 
   if (!cartId) redirect("/sacola");

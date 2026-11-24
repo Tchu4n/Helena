@@ -3,6 +3,7 @@ export { AccountHome } from "./components/AccountHome.tsx";
 export { MyOrders } from "./components/MyOrders.tsx";
 export { PersonalDetails } from "./components/PersonalDetails.tsx";
 export { MyAddresses } from "./components/MyAddresses.tsx";
+export { DeletionNotice } from "./components/DeletionNotice.tsx";
 export { listMyAddresses } from "./queries/listMyAddresses.ts";
 export { saveAddress } from "./actions/saveAddress.ts";
 export { removeAddress } from "./actions/removeAddress.ts";

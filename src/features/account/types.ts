@@ -27,6 +27,12 @@ export type PasswordState = { errors: { password?: string }; error: string | nul
 // IDT-14: neutral, says nothing about the other account; the form adds the WhatsApp link under it.
 export const CPF_IN_USE = "Não foi possível usar este CPF.";
 
+// CTA-09: the texts of `?exclusao=` (after asking for deletion; after a sign-in that cancelled it).
+export const DELETION_NOTICES = {
+  pedida: "Pedido de exclusão registrado. Você saiu da conta em todos os aparelhos.",
+  cancelada: "Seu pedido de exclusão foi cancelado porque você entrou de novo.",
+} as const;
+
 export const EXISTING_ACCOUNT = "Este e-mail já tem uma conta. Você entrou nela e sua senha não mudou.";
 
 export const START: IdentificationState = { step: "email", email: "", way: null, sentAt: null, errors: {}, error: null, notice: null };

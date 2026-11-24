@@ -404,6 +404,8 @@ function addressList(account) {
     .sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.createdAt - a.createdAt)
     .map((a) => ({ id: a.id, favorite: a.favorite, ...Object.fromEntries(ADDRESS_KEYS.map((key) => [key, a[key]])) }));
 }
+const consentBody = ({ channel, accepted, recordedAt }) => ({ channel, accepted, recordedAt });
+
 function validAddress(body) {
   return ["cep", "street", "number", "neighborhood", "city", "state"].every((key) => filled(body?.[key]));
 }
@@ -478,7 +480,7 @@ function startSession({ email, code, password, cartId }) {
   if (typeof code === "string") {
     if (!takeCode(email, code)) return [401, NOT_AUTHENTICATED];
     newAccount = !accounts.has(email);
-    if (newAccount) accounts.set(email, { password: null, details: null, addresses: [] });
+    if (newAccount) accounts.set(email, { password: null, details: null, addresses: [], consents: [] });
   } else if (typeof password !== "string" || !accounts.get(email)?.password || accounts.get(email).password !== password) {
     return [401, NOT_AUTHENTICATED];
   }
@@ -487,7 +489,11 @@ function startSession({ email, code, password, cartId }) {
   const token = randomUUID();
   sessions.set(token, email);
   const detailsComplete = Boolean(accounts.get(email).details);
-  return [201, { token, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), newAccount, detailsComplete }];
+  // CTA-09: a sign-in before the team deletes the account cancels the request.
+  const deletion = accounts.get(email).dataRequests?.find((r) => r.type === "deletion" && r.status === "open");
+  if (deletion) deletion.status = "cancelled";
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  return [201, { token, expiresAt, newAccount, detailsComplete, ...(deletion ? { deletionCancelled: true } : {}) }];
 }
 
 // The Customer schema of an account (IDT-11, IDT-14, CTA-06).
@@ -670,6 +676,35 @@ async function route(req, url) {
     }
     if (account.details) account.details = { ...account.details, ...(name !== undefined ? { name } : {}), ...(phone !== undefined ? { phone } : {}) };
     return [200, customerBody(newEmail ?? email)];
+  }
+  // CTA-09: a copy or a deletion for the team; a deletion ends every session of the account.
+  if (req.method === "POST" && url.pathname === "/v1/account/data-requests") {
+    const email = sessionEmail(req);
+    if (!email) return [401, NOT_AUTHENTICATED];
+    const { type } = await readJson(req);
+    if (type !== "copy" && type !== "deletion") return [422, INVALID_DATA];
+    const list = (accounts.get(email).dataRequests ??= []);
+    if (!list.some((r) => r.type === type && r.status === "open")) list.push({ type, status: "open", createdAt: new Date().toISOString() });
+    if (type === "deletion") for (const [token, owner] of sessions) if (owner === email) sessions.delete(token);
+    return [201, null];
+  }
+  // CTA-08: the latest consent per channel; each change is a new entry, with the text version and the IP.
+  if (parts[1] === "account" && parts[2] === "consents") {
+    const email = sessionEmail(req);
+    if (!email) return [401, NOT_AUTHENTICATED];
+    const history = accounts.get(email).consents;
+    const latest = (channel) => history.findLast((c) => c.channel === channel);
+    if (req.method === "GET" && !parts[3]) {
+      return [200, ["email", "whatsapp"].map((channel) => latest(channel) ?? { channel, accepted: false, recordedAt: null }).map(consentBody)];
+    }
+    if (req.method === "PUT" && ["email", "whatsapp"].includes(parts[3])) {
+      const { accepted, textVersion } = await readJson(req);
+      if (typeof accepted !== "boolean" || !filled(textVersion)) return [422, INVALID_DATA];
+      const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ?? null;
+      history.push({ channel: parts[3], accepted, textVersion, ip, recordedAt: new Date().toISOString() });
+      return [200, consentBody(latest(parts[3]))];
+    }
+    return null;
   }
   // CTA-05, CTA-11: the account's addresses; another account's id is a 404, like one that doesn't exist.
   if (parts[1] === "account" && parts[2] === "addresses") {
@@ -933,16 +968,18 @@ createServer(async (req, res) => {
     return send(res, 200, { ok: Boolean(cart) });
   }
   if (req.method === "POST" && url.pathname === "/__accounts") {
-    const { email, password = null, details = null, addresses = [] } = await readJson(req);
+    const { email, password = null, details = null, addresses = [], consents = [] } = await readJson(req);
     // Listed oldest first; the first becomes the favorite unless one says otherwise (CTA-05).
     const saved = addresses.map((a) => newAddress(a, a.id ? { id: a.id } : {}));
     if (saved.length) (addresses.some((a) => a.favorite) ? saved[addresses.findIndex((a) => a.favorite)] : saved[0]).favorite = true;
-    accounts.set(email, { password, details, addresses: saved });
+    accounts.set(email, { password, details, addresses: saved, consents });
     return send(res, 200, { ok: true });
   }
   if (req.method === "POST" && url.pathname === "/__end-session") {
     return send(res, 200, { ok: sessions.delete(url.searchParams.get("token")) });
   }
+  if (url.pathname === "/__data-requests") return send(res, 200, accounts.get(url.searchParams.get("email"))?.dataRequests ?? []);
+  if (url.pathname === "/__consents") return send(res, 200, accounts.get(url.searchParams.get("email"))?.consents ?? []);
   if (url.pathname === "/__customer") return send(res, 200, carts.get(url.searchParams.get("cartId"))?.customer ?? null);
   // Lets a test check which API paths the store called.
   if (url.pathname === "/__requests") return send(res, 200, requests);

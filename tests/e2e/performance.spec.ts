@@ -88,8 +88,8 @@ test("GER-08 main content of /checkout/identificacao under 3 s on slow 4G", asyn
   expect(lcp).toBeLessThan(3000);
 });
 
-// /conta/pedidos, /conta/dados and /conta/enderecos need a session: started on the fake API with a password, as the store would.
-for (const path of ["/conta/pedidos", "/conta/dados", "/conta/enderecos"]) {
+// The account pages need a session: started on the fake API with a password, as the store would.
+for (const path of ["/conta/pedidos", "/conta/dados", "/conta/enderecos", "/conta/privacidade"]) {
   test(`GER-08 main content of ${path} signed in under 3 s on slow 4G`, async ({ context, page }) => {
     test.setTimeout(60_000);
     const details = { name: "Maria Souza", cpf: "52998224725", phone: "11987654321" };

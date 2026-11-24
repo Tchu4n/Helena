@@ -37,5 +37,6 @@ export async function signInWithPassword(prev: IdentificationState, formData: Fo
   await saveSession({ token: session.data.token, email: email.data, detailsComplete, expiresAt: session.data.expiresAt });
   await clearIdentification();
   if (!detailsComplete) return { ...base, step: "details", email: email.data };
-  redirect(nextPath(formData));
+  // CTA-09: this sign-in cancelled a pending deletion; the next screen says so once.
+  redirect(session.data.deletionCancelled ? `${nextPath(formData)}?exclusao=cancelada` : nextPath(formData));
 }
