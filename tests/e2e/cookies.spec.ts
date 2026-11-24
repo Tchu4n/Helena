@@ -26,7 +26,7 @@ test("GER-04 reject keeps the store working", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Aviso de cookies" })).toHaveCount(0);
 
   const cookie = await consentCookie(page);
-  expect(JSON.parse(decodeURIComponent(cookie!.value))).toEqual({ v: 1, analytics: false, marketing: false });
+  expect(JSON.parse(decodeURIComponent(cookie!.value))).toEqual({ v: 1, analytics: false, marketing: false, functional: false });
 
   await page.goto("/catalogo");
   await expect(page.getByRole("region", { name: "Aviso de cookies" })).toHaveCount(0);
@@ -42,12 +42,15 @@ test("GER-05 manage preferences", async ({ page }) => {
   await expect(page.getByRole("checkbox", { name: "Necessários" })).toBeDisabled();
   await expect(page.getByRole("checkbox", { name: "Análise" })).not.toBeChecked();
   await expect(page.getByRole("checkbox", { name: "Marketing" })).not.toBeChecked();
+  // Added on 2026-11-23 (PRO-15): "Funcionais", described and unchecked like the other optional ones.
+  await expect(page.getByRole("checkbox", { name: /^Funcionais/ })).not.toBeChecked();
+  await expect(page.getByText("Lembram os CEPs que você pesquisou para calcular o frete, só neste aparelho.")).toBeVisible();
 
   await page.getByRole("checkbox", { name: "Análise" }).check();
   await page.getByRole("button", { name: "Salvar preferências" }).click();
   await expect(page.getByText("Preferências salvas.")).toBeVisible();
   const cookie = await consentCookie(page);
-  expect(JSON.parse(decodeURIComponent(cookie!.value))).toEqual({ v: 1, analytics: true, marketing: false });
+  expect(JSON.parse(decodeURIComponent(cookie!.value))).toEqual({ v: 1, analytics: true, marketing: false, functional: false });
 
   await expect(page.getByRole("contentinfo").getByRole("link", { name: "Preferências de cookies" })).toHaveAttribute(
     "href",

@@ -13,6 +13,11 @@ const OPTIONAL = [
     label: "Marketing",
     text: "Permitem mostrar anúncios da Helena em outros sites e redes sociais.",
   },
+  {
+    name: "functional",
+    label: "Funcionais",
+    text: "Lembram os CEPs que você pesquisou para calcular o frete, só neste aparelho.",
+  },
 ] as const;
 
 const BOX = "size-6 shrink-0 accent-primary";

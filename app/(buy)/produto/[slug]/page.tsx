@@ -11,10 +11,11 @@ import {
   ProductPurchase,
   SizeGuide,
 } from "@/src/features/catalog";
+import { getConsent } from "@/src/features/privacy";
 
 async function ProductContent({ params }: { params: PageProps<"/produto/[slug]">["params"] }) {
   const { slug } = await params;
-  const [result, cart] = await Promise.all([getProduct(slug), getCartSummary()]);
+  const [result, cart, consent] = await Promise.all([getProduct(slug), getCartSummary(), getConsent()]);
   if (!result.ok) {
     if (result.problem.status === 404) notFound();
     return <ErrorMessage title={result.problem.title} retryHref={`/produto/${encodeURIComponent(slug)}`} />;
@@ -27,7 +28,7 @@ async function ProductContent({ params }: { params: PageProps<"/produto/[slug]">
         <ProductHeading product={product} />
         <ProductColors product={product} />
         <ProductPurchase sizes={product.sizes} soldOut={product.soldOut} addToCart={addToCart} />
-        <ShippingCalculator productId={product.id} savedCep={cart?.cep ?? null} />
+        <ShippingCalculator productId={product.id} savedCep={cart?.cep ?? null} remembersCeps={consent?.functional === true} />
         {product.sizeGuide && <SizeGuide guide={product.sizeGuide} />}
         <ProductDetails product={product} />
       </div>

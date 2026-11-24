@@ -12,6 +12,7 @@ const input = z.discriminatedUnion("choice", [
     choice: z.literal("custom"),
     analytics: z.literal("on").optional(),
     marketing: z.literal("on").optional(),
+    functional: z.literal("on").optional(),
   }),
 ]);
 
@@ -23,8 +24,8 @@ export async function saveConsent(formData: FormData): Promise<void> {
   const data = parsed.data;
   const consent: Consent =
     data.choice === "custom"
-      ? { v: 1, analytics: data.analytics === "on", marketing: data.marketing === "on" }
-      : { v: 1, analytics: data.choice === "accept", marketing: data.choice === "accept" };
+      ? { v: 1, analytics: data.analytics === "on", marketing: data.marketing === "on", functional: data.functional === "on" }
+      : { v: 1, analytics: data.choice === "accept", marketing: data.choice === "accept", functional: data.choice === "accept" };
 
   const cookieStore = await cookies();
   cookieStore.set(CONSENT_COOKIE, serializeConsent(consent), {

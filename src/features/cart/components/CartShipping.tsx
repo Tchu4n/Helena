@@ -6,10 +6,12 @@ import { Field } from "@/src/components/ui/Field.tsx";
 import { AlertIcon } from "@/src/components/ui/icons.tsx";
 import type { ShippingState } from "../types.ts";
 import type { CartView } from "../views.ts";
+import { CepSuggestions } from "./CepSuggestions.tsx";
 
 type Props = Pick<CartView, "cep" | "deliveryOptions" | "chosenDelivery" | "freeShipping"> & {
   saveCartCep: (prev: ShippingState, formData: FormData) => Promise<ShippingState>;
   chooseDelivery: (prev: { message: string | null }, formData: FormData) => Promise<{ message: string | null }>;
+  remembersCeps: boolean; // SAC-18: the "Funcionais" consent
 };
 
 const TITLE = "Frete e prazo";
@@ -24,7 +26,7 @@ function Alert({ children }: { children: React.ReactNode }) {
 }
 
 // SAC-08 to SAC-10: CEP, options with price and time, and what is missing for free shipping.
-export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShipping, saveCartCep, chooseDelivery }: Props) {
+export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShipping, saveCartCep, chooseDelivery, remembersCeps }: Props) {
   const [cepState, cepAction, savingCep] = useActionState(saveCartCep, {
     status: "idle",
     cep: cep ?? "",
@@ -44,22 +46,26 @@ export function CartShipping({ cep, deliveryOptions, chosenDelivery, freeShippin
     setStaleState(deliveryState);
   }
   const deliveryMessage = deliveryState !== staleState ? deliveryState.message : null;
+  // SAC-18: a CEP saved here goes into the history without city/UF (the bag's answer doesn't carry it).
+  const calculated = cepState.status === "ok" ? { cep: cepState.cep.replace(/\D/g, ""), place: null } : null;
 
   return (
     <section aria-label={TITLE} className="flex flex-col gap-3 bg-card p-4">
       <h2 className="font-mono text-xs font-medium uppercase tracking-[0.08em]">{TITLE}</h2>
       <form action={cepAction} className="flex items-end gap-2">
         <div className="min-w-0 flex-1">
-          <Field
-            label="CEP"
-            name="cep"
-            inputMode="numeric"
-            autoComplete="postal-code"
-            maxLength={10}
-            // React resets the form after the action: the typed CEP comes back in the state.
-            defaultValue={cepState.status === "idle" ? (cep ?? "") : cepState.cep}
-            error={cepState.status === "invalid" ? cepState.message : null}
-          />
+          <CepSuggestions remembers={remembersCeps} calculated={calculated}>
+            <Field
+              label="CEP"
+              name="cep"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              maxLength={10}
+              // React resets the form after the action: the typed CEP comes back in the state.
+              defaultValue={cepState.status === "idle" ? (cep ?? "") : cepState.cep}
+              error={cepState.status === "invalid" ? cepState.message : null}
+            />
+          </CepSuggestions>
         </div>
         <div className={`shrink-0 ${cepState.status === "invalid" ? "self-start pt-6" : ""}`}>
           <Button variant="secondary" type="submit" disabled={savingCep} className="whitespace-nowrap">

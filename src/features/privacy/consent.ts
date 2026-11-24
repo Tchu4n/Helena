@@ -1,6 +1,7 @@
 // LGPD cookie consent. Only optional categories are stored; necessary cookies (cart, session)
 // never need consent.
-export type Consent = { v: 1; analytics: boolean; marketing: boolean };
+// `functional` ("Funcionais", PRO-15) came on 2026-11-23: a cookie from before reads as not accepted.
+export type Consent = { v: 1; analytics: boolean; marketing: boolean; functional: boolean };
 
 export const CONSENT_COOKIE = "helena_consent";
 export const CONSENT_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
@@ -19,7 +20,8 @@ export function parseConsent(raw: string | undefined): Consent | null {
       "marketing" in value &&
       typeof value.marketing === "boolean"
     ) {
-      return { v: 1, analytics: value.analytics, marketing: value.marketing };
+      const functional = "functional" in value && value.functional === true;
+      return { v: 1, analytics: value.analytics, marketing: value.marketing, functional };
     }
   } catch {
     // invalid JSON: treated as no choice yet
@@ -28,5 +30,5 @@ export function parseConsent(raw: string | undefined): Consent | null {
 }
 
 export function serializeConsent(consent: Consent): string {
-  return JSON.stringify({ v: 1, analytics: consent.analytics, marketing: consent.marketing });
+  return JSON.stringify({ v: 1, analytics: consent.analytics, marketing: consent.marketing, functional: consent.functional });
 }

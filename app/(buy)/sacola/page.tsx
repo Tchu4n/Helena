@@ -20,11 +20,12 @@ import {
   updateQuantity,
 } from "@/src/features/cart";
 import { ReservationTimer } from "@/src/features/checkout";
+import { getConsent } from "@/src/features/privacy";
 
 export const metadata: Metadata = { title: "Sacola · Helena" };
 
 async function CartContent() {
-  const result = await getCart();
+  const [result, consent] = await Promise.all([getCart(), getConsent()]);
   if (!result.ok) return <ErrorMessage title={result.title} retryHref="/sacola" />;
   const cart = result.cart;
   if (!cart || cart.items.length === 0) return <EmptyCart />;
@@ -46,6 +47,7 @@ async function CartContent() {
         freeShipping={cart.freeShipping}
         saveCartCep={saveCartCep}
         chooseDelivery={chooseDelivery}
+        remembersCeps={consent?.functional === true}
       />
       <CouponForm coupon={cart.coupon} applyCoupon={applyCoupon} removeCoupon={removeCoupon} />
       <CartSummary cart={cart} />
