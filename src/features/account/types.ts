@@ -1,3 +1,5 @@
+import type { AddressField } from "@/src/features/checkout/client";
+
 export type IdentificationWay = "guest" | "account";
 
 // One state for the steps of identification (IDT-01 to IDT-10, IDT-14). Never holds a code, a password or a token.
@@ -28,3 +30,9 @@ export const CPF_IN_USE = "Não foi possível usar este CPF.";
 export const EXISTING_ACCOUNT = "Este e-mail já tem uma conta. Você entrou nela e sua senha não mudou.";
 
 export const START: IdentificationState = { step: "email", email: "", way: null, sentAt: null, errors: {}, error: null, notice: null };
+
+// CTA-05: the address form of Meus endereços, and the notice of "Remover" and "Tornar favorito".
+export type AddressFormState = { errors: Partial<Record<AddressField, string>>; error: string | null; saved: boolean };
+export type AddressNotice = { notice: string | null; error: string | null };
+export const ADDRESS_NOT_FOUND = "Endereço não encontrado";
+export const ADDRESS_LIMIT = "Você chegou ao limite de 10 endereços. Remova um para adicionar outro.";

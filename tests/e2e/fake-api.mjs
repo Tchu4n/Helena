@@ -389,6 +389,56 @@ function validCustomer(body) {
   );
 }
 
+// CTA-05: the favorite first, then the newest first; the first address becomes the favorite, and removing
+// the favorite passes it to the newest remaining one. At most 10 per account.
+const ADDRESS_LIMIT = conflict("address_limit", "Você chegou ao limite de 10 endereços");
+const ADDRESS_KEYS = ["cep", "street", "number", "complement", "neighborhood", "city", "state"];
+let addressClock = 0; // creation order, so two addresses saved in the same millisecond still sort
+function newAddress(fields, extra = {}) {
+  const address = { id: randomUUID(), favorite: false, createdAt: ++addressClock };
+  for (const key of ADDRESS_KEYS) address[key] = fields[key] ?? null;
+  return { ...address, ...extra };
+}
+function addressList(account) {
+  return [...account.addresses]
+    .sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.createdAt - a.createdAt)
+    .map((a) => ({ id: a.id, favorite: a.favorite, ...Object.fromEntries(ADDRESS_KEYS.map((key) => [key, a[key]])) }));
+}
+function validAddress(body) {
+  return ["cep", "street", "number", "neighborhood", "city", "state"].every((key) => filled(body?.[key]));
+}
+async function addressRoute(req, account, id, action) {
+  const list = account.addresses;
+  if (!id && req.method === "GET") return [200, addressList(account)];
+  if (!id && req.method === "POST") {
+    const body = await readJson(req);
+    if (!validAddress(body)) return [422, INVALID_DATA];
+    if (list.length >= 10) return [409, ADDRESS_LIMIT];
+    const address = newAddress(body, { favorite: list.length === 0 });
+    list.push(address);
+    return [201, addressList(account).find((a) => a.id === address.id)];
+  }
+  const address = list.find((a) => a.id === id);
+  if (!address) return [404, NOT_FOUND];
+  if (action === "favorite" && req.method === "PUT") {
+    for (const a of list) a.favorite = a === address;
+    return [200, addressList(account)];
+  }
+  if (action) return null;
+  if (req.method === "PUT") {
+    const body = await readJson(req);
+    if (!validAddress(body)) return [422, INVALID_DATA];
+    for (const key of ADDRESS_KEYS) address[key] = body[key] ?? null;
+    return [200, addressList(account).find((a) => a.id === id)];
+  }
+  if (req.method === "DELETE") {
+    list.splice(list.indexOf(address), 1);
+    if (address.favorite && list.length) list.reduce((newest, a) => (a.createdAt > newest.createdAt ? a : newest)).favorite = true;
+    return [204, null];
+  }
+  return null;
+}
+
 // Same Idempotency-Key on the same path: the first answer again, with nothing done twice.
 async function once(req, path, run) {
   const key = req.headers["idempotency-key"];
@@ -428,7 +478,7 @@ function startSession({ email, code, password, cartId }) {
   if (typeof code === "string") {
     if (!takeCode(email, code)) return [401, NOT_AUTHENTICATED];
     newAccount = !accounts.has(email);
-    if (newAccount) accounts.set(email, { password: null, details: null });
+    if (newAccount) accounts.set(email, { password: null, details: null, addresses: [] });
   } else if (typeof password !== "string" || !accounts.get(email)?.password || accounts.get(email).password !== password) {
     return [401, NOT_AUTHENTICATED];
   }
@@ -620,6 +670,12 @@ async function route(req, url) {
     }
     if (account.details) account.details = { ...account.details, ...(name !== undefined ? { name } : {}), ...(phone !== undefined ? { phone } : {}) };
     return [200, customerBody(newEmail ?? email)];
+  }
+  // CTA-05, CTA-11: the account's addresses; another account's id is a 404, like one that doesn't exist.
+  if (parts[1] === "account" && parts[2] === "addresses") {
+    const email = sessionEmail(req);
+    if (!email) return [401, NOT_AUTHENTICATED];
+    return addressRoute(req, accounts.get(email), parts[3] ? decodeURIComponent(parts[3]) : null, parts[4]);
   }
   // CTA-03, CTA-04: the account's orders, newest first.
   if (req.method === "GET" && url.pathname === "/v1/account/orders") {
@@ -869,8 +925,11 @@ createServer(async (req, res) => {
     return send(res, 200, { ok: Boolean(cart) });
   }
   if (req.method === "POST" && url.pathname === "/__accounts") {
-    const { email, password = null, details = null } = await readJson(req);
-    accounts.set(email, { password, details });
+    const { email, password = null, details = null, addresses = [] } = await readJson(req);
+    // Listed oldest first; the first becomes the favorite unless one says otherwise (CTA-05).
+    const saved = addresses.map((a) => newAddress(a, a.id ? { id: a.id } : {}));
+    if (saved.length) (addresses.some((a) => a.favorite) ? saved[addresses.findIndex((a) => a.favorite)] : saved[0]).favorite = true;
+    accounts.set(email, { password, details, addresses: saved });
     return send(res, 200, { ok: true });
   }
   if (req.method === "POST" && url.pathname === "/__end-session") {
