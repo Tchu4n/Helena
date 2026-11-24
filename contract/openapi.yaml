@@ -738,6 +738,10 @@ paths:
         (`newAccount: true`). With `cartId`, the cart's `verifiedEmail` becomes
         the session's e-mail in the same call. `detailsComplete: false` sends
         her to "Seus dados" first (IDT-14). `linkToken` is deprecated.
+        A sign-in (code or password) on an account with an open deletion
+        request cancels it and answers `deletionCancelled: true` (CTA-09).
+        Confirming a cart's e-mail (`/v1/carts/{cartId}/email-verification`)
+        is not a sign-in and cancels nothing.
       requestBody:
         required: true
         content:
@@ -1077,6 +1081,11 @@ paths:
       tags: [Account]
       operationId: updateConsent
       summary: Accepts or revokes one channel, without touching the other (CTA-08)
+      description: |
+        The front end forwards the customer's IP in `X-Forwarded-For`. Every
+        change is recorded as a new entry (channel, accepted, text version,
+        IP, time); the history only grows. It never touches the other channel
+        nor the order messages.
       security:
         - customerSession: []
       parameters:
@@ -1109,6 +1118,12 @@ paths:
       tags: [Account]
       operationId: requestMyData
       summary: Asks for a copy or deletion of personal data (CTA-09)
+      description: |
+        `copy` is sent only to the account's e-mail, within 15 days.
+        `deletion` also ends every session of the account: their tokens answer
+        `401` from then on. A sign-in before the team deletes the account
+        cancels the request (see `startSession`). A request of a type that is
+        already open answers `201` again, without a duplicate.
       security:
         - customerSession: []
       requestBody:
@@ -1841,6 +1856,7 @@ components:
         expiresAt: { type: string, format: date-time }
         newAccount: { type: boolean, description: "`true` only when this call created the account (IDT-08, IDT-09)", example: false }
         detailsComplete: { type: boolean, description: "`true` when the account has name, CPF and phone (IDT-14)", example: true }
+        deletionCancelled: { type: boolean, description: "`true` when this sign-in cancelled an open deletion request (CTA-09)", example: false }
 
     AccountDetails:
       type: object

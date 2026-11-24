@@ -122,10 +122,11 @@ CREATE TABLE dbo.data_request (
     status           VARCHAR(12)       NOT NULL CONSTRAINT df_data_request_status DEFAULT 'open',
     created_at       DATETIME2(3)      NOT NULL CONSTRAINT df_data_request_created DEFAULT SYSUTCDATETIME(),
     completed_at     DATETIME2(3)      NULL,
+    cancelled_at     DATETIME2(3)      NULL, -- a sign-in before the team deleted the account cancels a deletion (API)
     CONSTRAINT pk_data_request PRIMARY KEY CLUSTERED (data_request_id),
     CONSTRAINT fk_data_request_customer FOREIGN KEY (customer_id) REFERENCES dbo.customer (customer_id),
     CONSTRAINT ck_data_request_type CHECK (type IN ('copy', 'deletion')),
-    CONSTRAINT ck_data_request_status CHECK (status IN ('open', 'completed'))
+    CONSTRAINT ck_data_request_status CHECK (status IN ('open', 'completed', 'cancelled'))
 );
 GO
 

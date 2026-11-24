@@ -32,6 +32,7 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | `/conta/pedidos` (meus pedidos) | `MyOrdersPage` |
 | `/conta/dados` (dados pessoais) | `PersonalDetailsPage` |
 | `/conta/enderecos` (meus endereços) | `MyAddressesPage` |
+| `/conta/privacidade` (privacidade da conta) | `AccountPrivacyPage` |
 | `/pedido` (consultar pedido sem conta) | `OrderLookupPage` |
 | `/pedido/[numero]` (confirmação e acompanhamento) | `OrderPage` |
 | `?confirmado=1` (confirmação logo após o pagamento) | `confirmed` |
@@ -43,6 +44,7 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | `?ordem=` | `sort` |
 | `?pagina=` (catálogo, busca, meus pedidos) | `page` |
 | `?sessao=encerrada` (identificação depois de a sessão terminar na API) | `sessionEnded` |
+| `?exclusao=pedida`, `?exclusao=cancelada` (`/conta` depois de pedir a exclusão; `/conta` ou `/checkout` depois de um login que a cancelou) | `deletion`: `requested`, `cancelled` |
 | `ordem`: `novidades`, `menor-preco`, `maior-preco`, `maior-desconto`, `mais-vendidos` | `newest`, `lowest_price`, `highest_price`, `biggest_discount`, `best_sellers` |
 | `categoria`: `camisetas`, `calcas`, `jaquetas`, `acessorios` | `tshirts`, `pants`, `jackets`, `accessories` |
 
@@ -177,7 +179,9 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 | dados pessoais | `PersonalDetails`, `updateContact`, `requestEmailChange`, `confirmEmailChange`, `setPassword` |
 | WhatsApp da loja | `STORE_WHATSAPP` |
 | consentimento, canal, versão do texto | `consent`, `channel`, `textVersion` |
-| pedido de dados: cópia, exclusão (status: aberto, concluído) | `dataRequest`: `copy`, `deletion` (`open`, `completed`) |
+| aceite de novidades (vindo da API; não confundir com o cookie) | `MarketingConsent` |
+| pedido de dados: cópia, exclusão (status: aberto, concluído, cancelado) | `dataRequest`: `copy`, `deletion` (`open`, `completed`, `cancelled`) |
+| exclusão cancelada por um novo login | `deletionCancelled` |
 | usuário do painel; perfis: administrador, atendimento, operacional | `adminUser` / `admin_user`; `admin`, `support`, `operations` |
 | notificação: confirmação, rastreio, estoque reposto; envio: enviado, falha | `notification`: `confirmation`, `tracking`, `back_in_stock`; `sent`, `failed` |
 

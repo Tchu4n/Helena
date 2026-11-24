@@ -705,15 +705,26 @@ Owner's decisions of 2026-11-23: every purchase needs an email confirmed with a 
 - **And** in Dados pessoais the button says "Criar senha" or "Trocar senha", the field "Nova senha", and the screen confirms "Senha salva"
 - **And** nothing in the account or the purchase depends on having a password
 
-**CTA-08 — Privacy: consents** (LGPD)
-- **Then** the customer sees, per channel (email and WhatsApp), whether she agreed to receive news and when
-- **When** she unchecks a channel
-- **Then** that channel's consent is revoked right away, without affecting the other one or the order messages
+**CTA-08 — Privacy: consents** (LGPD; owner's decisions of 2026-11-24)
+- **Given** the customer is signed in, in "Privacidade" (`/conta/privacidade`)
+- **Then** "Novidades" shows one box per channel, with checkout's texts ("Quero receber novidades por e-mail", "Quero receber novidades por WhatsApp", `CHK-07`), each with a line under it: "Aceito em {dd/mm/aaaa}", "Cancelado em {dd/mm/aaaa}" or "Nunca aceito"; then "As mensagens dos seus pedidos continuam chegando."
+- **When** she taps a box
+- **Then** that channel is accepted or revoked right away (no "Salvar"), says "Preferência salva", and the line shows the new date; the other channel and the order messages don't change
+- **And** each change is recorded as a new entry with the text version and her IP; a failed change shows the error and the box keeps the state the API has
+- **And** the page links to "Preferências de cookies" (`/cookies`)
+- **And** every news message, by email or WhatsApp, with or without an account, carries an option to stop receiving them
 
-**CTA-09 — Privacy: my data** (LGPD)
-- **Then** the customer can ask for a copy of her data or for its deletion
-- **When** she sends the request
-- **Then** the screen confirms it was recorded and says invoice data is kept for the period the law requires
+**CTA-09 — Privacy: my data** (LGPD; owner's decisions of 2026-11-24)
+- **Then** "Meus dados" says "Você pode pedir uma cópia dos seus dados ou a exclusão da sua conta." and "Os dados das notas fiscais ficam guardados pelo prazo que a lei exige.", with "Pedir cópia dos meus dados" and "Excluir minha conta"
+- **When** she taps "Pedir cópia dos meus dados"
+- **Then** the screen says "Pedido registrado. Enviaremos a cópia para {e-mail da conta} em até 15 dias." and she stays signed in; the copy goes only to the account's email
+- **When** she taps "Excluir minha conta"
+- **Then** "Excluir minha conta?" asks first, saying "Nossa equipe exclui sua conta em até 15 dias. Você sai da conta agora, em todos os aparelhos.", "Se entrar de novo antes disso, o pedido é cancelado." and the invoice line, with "Excluir" and "Cancelar" the same size and color
+- **When** she taps "Excluir"
+- **Then** the request is recorded, every session of the account ends (on every device), and `/conta` says "Pedido de exclusão registrado. Você saiu da conta em todos os aparelhos."
+- **When** she signs in again (code or password) before the team deletes the account
+- **Then** the request is cancelled and the screen she lands on says "Seu pedido de exclusão foi cancelado porque você entrou de novo." once; to delete, she asks again
+- **And** confirming the email of a guest purchase is not a sign-in and cancels nothing
 
 **CTA-10 — Sign out**
 - **When** the customer taps "Sair"
@@ -759,6 +770,7 @@ The requirements didn't settle these points. The owner decided on 2026-11-14; th
 | 27 | How long an unfinished purchase is kept (decided on 2026-11-23) | The details of a bag that never became an order, and a lead that never bought, are deleted 30 days after the last interaction. Orders keep their details for the invoice (`CHK-05`) |
 | 28 | Saving the checkout address in the account (decided on 2026-11-23) | A box "Salvar este endereço na minha conta", **checked by default**, signed in only. It is not a marketing or cookie box (those stay unchecked): it serves the account she chose to create ("Sua conta guarda pedidos e endereços") and the purchase (LGPD art. 7, V). At most 10 addresses, one favorite (`CTA-05`, `CTA-12`) |
 | 29 | CEP history (decided on 2026-11-23) | The shipping calculator remembers the last 5 CEPs, on her device only, and only with the optional "Funcionais" cookies, unchecked by default (`PRO-15`, `SAC-18`, `GER-05`). Nothing is ever filled in without her tap |
+| 30 | Privacy and the right to one's data (decided on 2026-11-24) | Only a customer with an account gets the "Privacidade" screen (`CTA-08`, `CTA-09`). A guest asks for a copy or deletion through the contact channel on `/privacidade`, and stops news through the option in every message; an unfinished purchase is deleted after 30 days anyway (row 27). Asking for deletion ends every session at once; signing in again before the team deletes the account cancels the request |
 
 **Settled in the contract (`contract/openapi.yaml`):** the delivery time of each option, including the courier cutoff time, comes as ready-made text from the API; the catalog is paginated (24 per page, 48 max). Sorting is in the launch by the owner's decision (`CAT-09`).
 

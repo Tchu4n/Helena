@@ -476,6 +476,10 @@ export interface paths {
          *     (`newAccount: true`). With `cartId`, the cart's `verifiedEmail` becomes
          *     the session's e-mail in the same call. `detailsComplete: false` sends
          *     her to "Seus dados" first (IDT-14). `linkToken` is deprecated.
+         *     A sign-in (code or password) on an account with an open deletion
+         *     request cancels it and answers `deletionCancelled: true` (CTA-09).
+         *     Confirming a cart's e-mail (`/v1/carts/{cartId}/email-verification`)
+         *     is not a sign-in and cancels nothing.
          */
         post: operations["startSession"];
         delete?: never;
@@ -668,7 +672,13 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Accepts or revokes one channel, without touching the other (CTA-08) */
+        /**
+         * Accepts or revokes one channel, without touching the other (CTA-08)
+         * @description The front end forwards the customer's IP in `X-Forwarded-For`. Every
+         *     change is recorded as a new entry (channel, accepted, text version,
+         *     IP, time); the history only grows. It never touches the other channel
+         *     nor the order messages.
+         */
         put: operations["updateConsent"];
         post?: never;
         delete?: never;
@@ -686,7 +696,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Asks for a copy or deletion of personal data (CTA-09) */
+        /**
+         * Asks for a copy or deletion of personal data (CTA-09)
+         * @description `copy` is sent only to the account's e-mail, within 15 days.
+         *     `deletion` also ends every session of the account: their tokens answer
+         *     `401` from then on. A sign-in before the team deletes the account
+         *     cancels the request (see `startSession`). A request of a type that is
+         *     already open answers `201` again, without a duplicate.
+         */
         post: operations["requestMyData"];
         delete?: never;
         options?: never;
@@ -1300,6 +1317,11 @@ export interface components {
              * @example true
              */
             detailsComplete?: boolean;
+            /**
+             * @description `true` when this sign-in cancelled an open deletion request (CTA-09)
+             * @example false
+             */
+            deletionCancelled?: boolean;
         };
         AccountDetails: {
             /** @example Maria Souza */
