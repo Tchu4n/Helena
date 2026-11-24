@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/src/components/ui/Button.tsx";
 import { Field } from "@/src/components/ui/Field.tsx";
-import { AlertIcon } from "@/src/components/ui/icons.tsx";
+import { AlertIcon, CheckIcon } from "@/src/components/ui/icons.tsx";
 import type { DeliveryOptionView } from "@/src/features/cart/client.ts";
 import { ADDRESS_FIELD_SPECS } from "../address-fields.ts";
 import { readDetails, writeDetails, type StoredDetails } from "../checkout-storage.ts";
@@ -11,8 +11,10 @@ import {
   addressDetailsInput,
   CONTACT_FIELDS,
   customerDetailsInput,
+  ADDRESS_FIELDS,
   DETAILS_FIELDS,
   digits,
+  type AddressField,
   fieldErrors,
   type DetailsField,
 } from "../schemas/customerDetails.ts";
@@ -23,6 +25,8 @@ type Props = {
   changeEmail?: () => Promise<void>; // IDT-13; absent when signed in
   // IDT-11: signed in, the account's name, CPF (partly hidden) and phone (formatted), shown read-only.
   account?: { name: string; maskedCpf: string; phone: string };
+  // CTA-12: signed in, her saved addresses (the favorite first), offered as choices; nothing is filled in by itself.
+  savedAddresses?: SavedAddressChoice[];
   total: string;
   // The bag's CEP, options and choice, as the API last calculated them.
   cep: string | null;
@@ -33,6 +37,10 @@ type Props = {
   chooseDelivery: (prev: { message: string | null }, formData: FormData) => Promise<{ message: string | null }>;
   goToPayment: (prev: GoToPaymentState, formData: FormData) => Promise<GoToPaymentState>;
 };
+
+export type SavedAddressChoice = { id: string; favorite: boolean; line: string; place: string; fields: Record<AddressField, string> };
+
+const isAddress = (field: DetailsField) => (ADDRESS_FIELDS as readonly string[]).includes(field);
 
 function Alert({ children }: { children: React.ReactNode }) {
   return (
@@ -97,6 +105,10 @@ export function DetailsForm(props: Props) {
   const [totalBefore, setTotalBefore] = useState<string | null>(null);
   const [picked, setPicked] = useState<DeliveryOptionView["type"] | null>(null);
   const [deliveryMessage, setDeliveryMessage] = useState<string | null>(null);
+  // CTA-12: the saved address she tapped (cleared once she edits a field), and the box, checked by default
+  // and never kept in the tab.
+  const [chosenAddress, setChosenAddress] = useState<string | null>(null);
+  const [saveAddress, setSaveAddress] = useState(true);
 
   // CHK-12: one Idempotency-Key per attempt, so a second tap or a retry of the same request makes one order.
   const [state, dispatch, pending] = useActionState(props.goToPayment, { errors: {}, error: null });
@@ -170,6 +182,13 @@ export function DetailsForm(props: Props) {
     });
   }
 
+  // CTA-12: a tap fills the address as if she had typed it, so the CEP check (CHK-09, CHK-10) and the tab storage run.
+  function chooseAddress(address: SavedAddressChoice) {
+    setChosenAddress(address.id);
+    update(address.fields);
+    watchCep(address.fields.cep);
+  }
+
   // Errors show once she leaves a field she typed in, or one already marked; nothing typed is cleared (CHK-04).
   // CHK-05: when everything required is valid, the lead is saved, once per change.
   function leave(field: DetailsField) {
@@ -198,6 +217,8 @@ export function DetailsForm(props: Props) {
       attemptKey.current ??= crypto.randomUUID();
       const data = toFormData(values, signedIn);
       data.set("idempotencyKey", attemptKey.current);
+      if (signedIn && saveAddress) data.set("saveAddress", "on"); // CTA-12: only from here, never with the lead
+
       startTransition(() => dispatch(data));
       return;
     }
@@ -228,6 +249,7 @@ export function DetailsForm(props: Props) {
         value={values[spec.name]}
         onChange={(value) => {
           update({ [spec.name]: value });
+          if (isAddress(spec.name)) setChosenAddress(null);
           if (spec.name === "cep") watchCep(value);
         }}
         onBlur={() => leave(spec.name)}
@@ -274,11 +296,49 @@ export function DetailsForm(props: Props) {
         <h2 id="details-address" className={heading}>
           Endereço de entrega
         </h2>
+        {signedIn && props.savedAddresses && props.savedAddresses.length > 0 && (
+          <div role="radiogroup" aria-labelledby="saved-addresses" className="flex flex-col">
+            <p id="saved-addresses" className="text-sm font-medium">
+              Seus endereços
+            </p>
+            {props.savedAddresses.map((address) => (
+              <label
+                key={address.id}
+                className="grid min-h-14 cursor-pointer grid-cols-[1.5rem_1fr] items-center gap-2.5 border-b border-line py-2.5 text-[0.9375rem] has-focus-visible:outline-2 has-focus-visible:outline-primary"
+              >
+                <input
+                  type="radio"
+                  name="savedAddress"
+                  value={address.id}
+                  checked={chosenAddress === address.id}
+                  onChange={() => chooseAddress(address)}
+                  className="size-5 accent-primary"
+                />
+                <span className="flex flex-col">
+                  {address.favorite && (
+                    <span className="flex items-center gap-1 font-mono text-xs font-medium uppercase tracking-[0.08em]">
+                      <CheckIcon className="size-4" />
+                      Favorito
+                    </span>
+                  )}
+                  <span>{address.line}</span>
+                  <span className="text-sm text-muted">{address.place}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-3">
           {field(ADDRESS[0])}
           <div aria-hidden />
           {ADDRESS.slice(1).map(field)}
         </div>
+        {signedIn && (
+          <label className="grid min-h-12 cursor-pointer grid-cols-[24px_1fr] items-center gap-2.5 text-[0.9375rem]">
+            <input type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} className="size-5 accent-primary" />
+            <span>Salvar este endereço na minha conta</span>
+          </label>
+        )}
       </fieldset>
 
       {/* CHK-09: options only for the CEP she typed, once the cart has it. */}

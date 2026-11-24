@@ -45,7 +45,9 @@ export async function goToPayment(_prev: GoToPaymentState, formData: FormData): 
   }
   if (!cart.data.chosenDelivery) return { errors: { delivery: "Escolha a entrega" }, error: null };
 
-  const details = await apiPut(`/v1/carts/${cartId}/customer`, { ...parsed.data, email }, { ...(await forwardedFor()), ...bearer(session) });
+  // CTA-12: signed in, the box also saves the address in the account (the API skips an equal one and the 11th).
+  const saveAddress = session ? { saveAddress: formData.get("saveAddress") === "on" } : {};
+  const details = await apiPut(`/v1/carts/${cartId}/customer`, { ...parsed.data, email, ...saveAddress }, { ...(await forwardedFor()), ...bearer(session) });
   if (!details.ok) {
     // The session ended on the API: signed out here, so identification shows its first step instead of bouncing back.
     if (details.problem.status === 401) {

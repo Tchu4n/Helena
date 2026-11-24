@@ -754,8 +754,16 @@ async function route(req, url) {
       // IDT-11: a session whose e-mail is the body's confirms it for this bag.
       if (signedIn === body.email) cart.verifiedEmail = body.email;
       if (body.email !== cart.verifiedEmail) return [422, emailNotVerified(422)];
-      cart.customer = body;
+      const { saveAddress, ...customer } = body;
+      cart.customer = customer;
       cart.accountEmail = signedIn ?? null;
+      // CTA-12: signed in and asked, the address also goes to the account, unless an equal one is there or it has 10.
+      const account = signedIn ? accounts.get(signedIn) : null;
+      const a = customer.address;
+      const same = (b) => ["cep", "street", "number"].every((k) => a[k] === b[k]) && (a.complement ?? null) === (b.complement ?? null);
+      if (saveAddress === true && account && account.addresses.length < 10 && !account.addresses.some(same)) {
+        account.addresses.push(newAddress(a, { favorite: account.addresses.length === 0 }));
+      }
       return [200, cartBody(cart)];
     }
     if (parts[3] === "email-verification") {

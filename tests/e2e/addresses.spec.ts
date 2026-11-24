@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { skipCookieBanner } from "./consent";
-import { FAKE_API } from "./order-helpers";
+import { FAKE_API, JACKET_M, VALID } from "./order-helpers";
 
 test.beforeEach(async ({ context, request }) => {
   await skipCookieBanner(context);
@@ -11,11 +11,12 @@ const DETAILS = { name: "Maria Souza", cpf: "52998224725", phone: "11987654321" 
 const PAULISTA = { cep: "01310100", street: "Avenida Paulista", number: "1000", complement: null, neighborhood: "Bela Vista", city: "São Paulo", state: "SP" };
 
 // Signed in with details: a session started on the fake API with a password, as the store would (see performance.spec.ts).
-async function signIn(context: BrowserContext, request: APIRequestContext, addresses: object[] = []) {
+async function signIn(context: BrowserContext, request: APIRequestContext, addresses: object[] = []): Promise<string> {
   await request.post(`${FAKE_API}/__accounts`, { data: { email: "maria@exemplo.com", password: "certa-123", details: DETAILS, addresses } });
   const session = await (await request.post(`${FAKE_API}/v1/sessions`, { data: { email: "maria@exemplo.com", password: "certa-123" } })).json();
   const value = JSON.stringify({ token: session.token, email: "maria@exemplo.com", detailsComplete: true, expiresAt: session.expiresAt });
   await context.addCookies([{ name: "helena_session", value: encodeURIComponent(value), url: "http://localhost:3100" }]);
+  return session.token;
 }
 
 async function open(page: Page) {
@@ -146,4 +147,94 @@ test("CTA-05 signed out: /conta/enderecos goes to /conta", async ({ page }) => {
   await page.goto("/conta/enderecos");
   await expect(page).toHaveURL(/\/conta$/);
   await expect(page.getByRole("button", { name: "Receber código" })).toBeVisible();
+});
+
+// CTA-12: a bag at CEP 01310-100 with PAC chosen, and /checkout open.
+const RIO_BRANCO = { cep: "69900000", street: "Rua Acre", number: "50", complement: null, neighborhood: "Centro", city: "Rio Branco", state: "AC", favorite: true };
+
+async function openCheckout(context: BrowserContext, page: Page): Promise<string> {
+  const response = await context.request.post(`${FAKE_API}/__carts`, {
+    data: { lines: [{ productSizeId: JACKET_M }], cep: "01310100", chosen: "pac", verifiedEmail: "maria@exemplo.com" },
+  });
+  const { id } = await response.json();
+  await context.addCookies([{ name: "helena_cart", value: id, url: "http://localhost:3100" }]);
+  await page.goto("/checkout");
+  return id;
+}
+
+const myAddresses = async (request: APIRequestContext, token: string) =>
+  (await (await request.get(`${FAKE_API}/v1/account/addresses`, { headers: { authorization: `Bearer ${token}` } })).json()) as { number: string; cep: string }[];
+
+const savedChoices = (page: Page) => page.getByRole("radiogroup", { name: "Seus endereços" });
+
+test("CTA-12 signed in: Seus endereços as choices, favorite first, none chosen, fields empty", async ({ context, page, request }) => {
+  await signIn(context, request, [PAULISTA, RIO_BRANCO]);
+  await openCheckout(context, page);
+  const choices = savedChoices(page).getByRole("radio");
+  await expect(choices).toHaveCount(2);
+  await expect(choices.first()).toHaveAccessibleName(/Favorito.*Rua Acre, 50/);
+  for (const choice of await choices.all()) await expect(choice).not.toBeChecked();
+  await expect(page.getByLabel("CEP", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Rua", { exact: true })).toHaveValue("");
+  await expect(page.getByText("O frete mudou com o novo CEP")).toHaveCount(0);
+  await expect(page.getByRole("checkbox", { name: "Salvar este endereço na minha conta" })).toBeChecked();
+});
+
+test("CTA-12 review focus 2: a saved address with another CEP recalculates the shipping only after the tap", async ({ context, page, request }) => {
+  await signIn(context, request, [PAULISTA, RIO_BRANCO]);
+  await openCheckout(context, page);
+  await savedChoices(page).getByRole("radio", { name: /Rua Acre, 50/ }).check();
+  await expect(page.getByLabel("CEP", { exact: true })).toHaveValue("69900000");
+  await expect(page.getByLabel("Rua", { exact: true })).toHaveValue("Rua Acre");
+  await expect(page.getByLabel("Cidade", { exact: true })).toHaveValue("Rio Branco");
+  await expect(page.getByText("O frete mudou com o novo CEP")).toBeVisible();
+  await expect(page.getByRole("radio", { name: /PAC.*12 dias/ })).toBeVisible();
+});
+
+test("CTA-12 review focus 3: editing after the tap clears the choice; the edited address is saved once", async ({ context, page, request }) => {
+  const token = await signIn(context, request, [PAULISTA, RIO_BRANCO]);
+  const cartId = await openCheckout(context, page);
+  await savedChoices(page).getByRole("radio", { name: /Avenida Paulista, 1000/ }).check();
+  await expect(page.getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await page.getByLabel("Número", { exact: true }).fill("2000");
+  for (const choice of await savedChoices(page).getByRole("radio").all()) await expect(choice).not.toBeChecked();
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+  const customer = await (await request.get(`${FAKE_API}/__customer?cartId=${cartId}`)).json();
+  expect(customer.address.number).toBe("2000");
+  const numbers = (await myAddresses(request, token)).map((a) => a.number).sort();
+  expect(numbers).toEqual(["1000", "2000", "50"]);
+  // CHK-05: the lead save never sends the box; only "Ir para pagamento" does.
+  const bodies = (await (await request.get(`${FAKE_API}/__customer-bodies`)).json()) as { saveAddress?: boolean }[];
+  expect(bodies.at(-1)!.saveAddress).toBe(true);
+  for (const body of bodies.slice(0, -1)) expect(body).not.toHaveProperty("saveAddress");
+});
+
+test("CTA-12 the box unchecked: the account's addresses stay as they were", async ({ context, page, request }) => {
+  const token = await signIn(context, request, [RIO_BRANCO]);
+  await openCheckout(context, page);
+  for (const [label, value] of VALID.slice(3)) await page.getByLabel(label, { exact: true }).fill(value);
+  await expect(page.getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await page.getByRole("checkbox", { name: "Salvar este endereço na minha conta" }).uncheck();
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+  expect(await myAddresses(request, token)).toHaveLength(1);
+});
+
+test("CTA-12 at 10 addresses the box is skipped and the purchase goes on", async ({ context, page, request }) => {
+  const token = await signIn(context, request, Array.from({ length: 10 }, (_, i) => ({ ...PAULISTA, number: String(100 + i) })));
+  await openCheckout(context, page);
+  for (const [label, value] of VALID.slice(3)) await page.getByLabel(label, { exact: true }).fill(value);
+  await expect(page.getByRole("radio", { name: /PAC/ })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Salvar este endereço na minha conta" })).toBeChecked();
+  await page.getByRole("button", { name: "Ir para pagamento" }).click();
+  await expect(page).toHaveURL(/\/checkout\/pagamento$/);
+  expect(await myAddresses(request, token)).toHaveLength(10);
+});
+
+test("CTA-12 a guest sees neither the saved addresses nor the box", async ({ context, page }) => {
+  await openCheckout(context, page);
+  await expect(page.getByLabel("Nome completo", { exact: true })).toBeEditable();
+  await expect(savedChoices(page)).toHaveCount(0);
+  await expect(page.getByRole("checkbox", { name: "Salvar este endereço na minha conta" })).toHaveCount(0);
 });
