@@ -12,7 +12,7 @@ Helena is a fictional store selling t-shirts, pants, jackets and accessories to 
 - **No double selling:** the item is reserved for 15 minutes during payment, and the purchase is blocked if stock hits zero.
 - **Shipping:** by CEP, with same-day courier, PAC or Sedex. If the shipping API goes down, a fixed fee applies and checkout keeps going.
 - **Coupon and free shipping:** one coupon per purchase and free shipping from R$ 300.00.
-- **After sale:** order confirmation, order tracking (also without an account, by order number + e-mail) and returns requested by the customer herself.
+- **After sale:** order confirmation, order tracking (also without an account, by order number + e-mail). Returns requested by the customer herself come next.
 - **Privacy:** minimal data collection and separate consents, following the LGPD.
 - **Admin panel** (next stage): batch stock intake, stock, labels, leads and metrics.
 

@@ -438,29 +438,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/sessions/links": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Sends the access link by e-mail (CTA-01)
-         * @deprecated
-         * @description Not used by the store since 23/11/2026: the account is opened with the
-         *     e-mail code (`POST /v1/email-codes`, decision 10 of the spec). Kept
-         *     because changes are additive; the back end does not need to build it.
-         */
-        post: operations["requestAccessLink"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/sessions": {
         parameters: {
             query?: never;
@@ -475,7 +452,7 @@ export interface paths {
          * @description With `email` and `code`, an e-mail with no account gets a new account
          *     (`newAccount: true`). With `cartId`, the cart's `verifiedEmail` becomes
          *     the session's e-mail in the same call. `detailsComplete: false` sends
-         *     her to "Seus dados" first (IDT-14). `linkToken` is deprecated.
+         *     her to "Seus dados" first (IDT-14).
          *     A sign-in (code or password) on an account with an open deletion
          *     request cancels it and answers `deletionCancelled: true` (CTA-09).
          *     Confirming a cart's e-mail (`/v1/carts/{cartId}/email-verification`)
@@ -1284,13 +1261,8 @@ export interface components {
             /** @example 24 */
             perPage: number;
         };
-        /** @description Send `email` and `code`, or `email` and `password` (or the deprecated `linkToken`). `cartId` is optional with any of them. */
+        /** @description Send `email` and `code`, or `email` and `password`. `cartId` is optional with any of them. */
         NewSession: {
-            /**
-             * @deprecated
-             * @description Single use, short-lived. Not used by the store since 23/11/2026
-             */
-            linkToken?: string;
             /** Format: email */
             email?: string;
             /** Format: password */
@@ -2278,34 +2250,6 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    requestAccessLink: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: email */
-                    email: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Same response whether or not a customer with this e-mail exists */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            422: components["responses"]["InvalidData"];
-            429: components["responses"]["TooManyRequests"];
-            500: components["responses"]["InternalError"];
-        };
-    };
     startSession: {
         parameters: {
             query?: never;
@@ -2328,7 +2272,7 @@ export interface operations {
                     "application/json": components["schemas"]["Session"];
                 };
             };
-            /** @description Code or link used, expired or invalid; or e-mail and password do not match. Same response for every case (`not_authenticated`). */
+            /** @description Code used, expired or invalid; or e-mail and password do not match. Same response for every case (`not_authenticated`). */
             401: {
                 headers: {
                     [name: string]: unknown;

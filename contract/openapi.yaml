@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Helena — store API (customer screens)
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Contract between the front end (Next.js) and the back end (Java + SQL Server)
     for the 8 customer screens. Derived from `docs/SPEC-CLIENT.md`; the codes in
@@ -22,6 +22,9 @@ info:
       to English (owner decision, 15/11/2026), before any consumer existed.
       Version 0.3.0 (23/11/2026) added the e-mail code, the account's details
       and `Session.detailsComplete`, and marked the access link as deprecated.
+      Version 0.4.0 (26/11/2026) removed the access link
+      (`/v1/sessions/links`, `NewSession.linkToken`) by owner decision, before
+      the back end existed; no consumer used it.
     - Every `Problem.code` a response can send is named in that response.
 servers:
   - url: http://localhost:4010
@@ -702,32 +705,6 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
-  /v1/sessions/links:
-    post:
-      tags: [Account]
-      operationId: requestAccessLink
-      deprecated: true
-      summary: Sends the access link by e-mail (CTA-01)
-      description: |
-        Not used by the store since 23/11/2026: the account is opened with the
-        e-mail code (`POST /v1/email-codes`, decision 10 of the spec). Kept
-        because changes are additive; the back end does not need to build it.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email]
-              properties:
-                email: { type: string, format: email, maxLength: 150 }
-      responses:
-        "202":
-          description: Same response whether or not a customer with this e-mail exists
-        "422": { $ref: "#/components/responses/InvalidData" }
-        "429": { $ref: "#/components/responses/TooManyRequests" }
-        "500": { $ref: "#/components/responses/InternalError" }
-
   /v1/sessions:
     post:
       tags: [Account]
@@ -737,7 +714,7 @@ paths:
         With `email` and `code`, an e-mail with no account gets a new account
         (`newAccount: true`). With `cartId`, the cart's `verifiedEmail` becomes
         the session's e-mail in the same call. `detailsComplete: false` sends
-        her to "Seus dados" first (IDT-14). `linkToken` is deprecated.
+        her to "Seus dados" first (IDT-14).
         A sign-in (code or password) on an account with an open deletion
         request cancels it and answers `deletionCancelled: true` (CTA-09).
         Confirming a cart's e-mail (`/v1/carts/{cartId}/email-verification`)
@@ -754,7 +731,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Session" }
         "401":
-          description: Code or link used, expired or invalid; or e-mail and password do not match. Same response for every case (`not_authenticated`).
+          description: Code used, expired or invalid; or e-mail and password do not match. Same response for every case (`not_authenticated`).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -1840,9 +1817,8 @@ components:
 
     NewSession:
       type: object
-      description: Send `email` and `code`, or `email` and `password` (or the deprecated `linkToken`). `cartId` is optional with any of them.
+      description: Send `email` and `code`, or `email` and `password`. `cartId` is optional with any of them.
       properties:
-        linkToken: { type: string, deprecated: true, description: "Single use, short-lived. Not used by the store since 23/11/2026" }
         email: { type: string, format: email, maxLength: 150 }
         password: { type: string, format: password, maxLength: 72 }
         code: { type: string, pattern: "^[0-9]{6}$", description: "From `POST /v1/email-codes`" }

@@ -1,6 +1,6 @@
 # Account, plan 4: privacy (consents and my data) — implementation plan
 
-> **Status:** approved by the owner on 2026-11-24. Task 1 committed (`314bb79`); Tasks 2 and 3 done on 2026-11-24, waiting for the owner's commit. **Plan done**: full suite green (187 unit, 270 screen), lint, tsc and build clean. Same way of working as plans 1 to 3: tasks run inline, one at a time; finish a task, report, stop and wait for the go-ahead. The owner makes every commit; "Commit" steps mean "leave the changes in the working tree and suggest the message in Portuguese". Tests (owner's rule of 2026-11-23): at the end of each task only the tests that task touches, plus lint and tsc; the whole suite at the end of Task 3, which closes the block.
+> **Status:** approved by the owner on 2026-11-24. Task 1 committed (`314bb79`); Tasks 2 and 3 committed (`ea1f209`). **Plan done**: full suite green (187 unit, 270 screen), lint, tsc and build clean. Same way of working as plans 1 to 3: tasks run inline, one at a time; finish a task, report, stop and wait for the go-ahead. The owner makes every commit; "Commit" steps mean "leave the changes in the working tree and suggest the message in Portuguese". Tests (owner's rule of 2026-11-23): at the end of each task only the tests that task touches, plus lint and tsc; the whole suite at the end of Task 3, which closes the block.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

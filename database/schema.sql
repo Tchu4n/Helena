@@ -32,7 +32,7 @@ GO
 -- approved payment.
 -- Checkout without login never overwrites the name, e-mail or phone of an
 -- existing record: someone typing another person's CPF must not be able to
--- change her e-mail (which is where the access link goes). The typed details
+-- change her e-mail (which is where the sign-in code goes). The typed details
 -- stay in the cart and in the order.
 -- Rows 23, 24 (2026-11-23): a guest's lead (is_account = 0) and an account
 -- (is_account = 1) are different rows, so an account can use a CPF a guest
@@ -564,11 +564,9 @@ CREATE NONCLUSTERED INDEX ix_email_code_email_sent ON dbo.email_code (email, sen
 CREATE NONCLUSTERED INDEX ix_email_code_ip_sent ON dbo.email_code (request_ip, sent_at);
 GO
 
--- Customer session, access link sent by e-mail, and access to one order
--- without an account. Only the SHA-256 of the token is stored; the original
--- value exists only in the cookie or in the e-mail. Since 2026-11-23 the store
--- signs in with the e-mail code (dbo.email_code); the 'link' type stays for
--- the contract's /v1/sessions/links, which the store no longer uses.
+-- Customer session and access to one order without an account. Only the
+-- SHA-256 of the token is stored; the original value exists only in the
+-- cookie. Sign-in uses the e-mail code (dbo.email_code).
 CREATE TABLE dbo.access_token (
     token_id     BIGINT IDENTITY(1,1) NOT NULL,
     type         VARCHAR(10)          NOT NULL,
@@ -577,14 +575,13 @@ CREATE TABLE dbo.access_token (
     order_id     INT                  NULL,
     created_at   DATETIME2(3)         NOT NULL CONSTRAINT df_access_token_created DEFAULT SYSUTCDATETIME(),
     expires_at   DATETIME2(3)         NOT NULL,
-    used_at      DATETIME2(3)         NULL,    -- access link: single use
     revoked_at   DATETIME2(3)         NULL,    -- session ended
     CONSTRAINT pk_access_token PRIMARY KEY CLUSTERED (token_id),
     CONSTRAINT uq_access_token_hash UNIQUE (token_hash),
     CONSTRAINT fk_access_token_customer FOREIGN KEY (customer_id) REFERENCES dbo.customer (customer_id),
     CONSTRAINT fk_access_token_order FOREIGN KEY (order_id) REFERENCES dbo.customer_order (order_id),
-    CONSTRAINT ck_access_token_type CHECK (type IN ('session', 'link', 'order')),
-    CONSTRAINT ck_access_token_owner CHECK ((type IN ('session', 'link') AND customer_id IS NOT NULL AND order_id IS NULL) OR (type = 'order' AND order_id IS NOT NULL AND customer_id IS NULL))
+    CONSTRAINT ck_access_token_type CHECK (type IN ('session', 'order')),
+    CONSTRAINT ck_access_token_owner CHECK ((type = 'session' AND customer_id IS NOT NULL AND order_id IS NULL) OR (type = 'order' AND order_id IS NOT NULL AND customer_id IS NULL))
 );
 CREATE NONCLUSTERED INDEX ix_access_token_expires ON dbo.access_token (expires_at);
 GO

@@ -76,6 +76,9 @@ The guides in `docs/referencias/` were written for Next.js 15 and Tailwind 3. Wh
 - No branch is created without telling the owner first and getting the ok.
 - No new dependency for a few lines. Already installed with the owner's ok (2026-11-15): `zod`, `server-only` and `openapi-typescript`.
 - A visual decision is shown to the owner on a page, not described in text. Reference material is read in full before concluding.
+- Plans run one task at a time (owner's decision of 2026-11-19). At the end of each task the agent reports what changed and which tests ran, then stops and waits for the owner's go-ahead. It never starts the next task on its own.
+- Tests (owner's decision of 2026-11-23): during a task, run the new tests once to see them fail. At the end of a task, run only the tests that task touches (its screen tests and unit tests), plus lint and tsc. The whole suite (`npm test` and all screen tests) runs only at the last task of a plan, which closes the block.
+- At the end of each block or feature, update the owner's Obsidian vault (`~/Documents/Obsidian Vault/Helena Ecommerce/`; owner's decision of 2026-11-26): the full copies of `docs/SPEC-CLIENT.md`, `CLAUDE.md` and `docs/DESIGN.md`, the "Estado Atual" note and the block's line in "Planos e Designs".
 
 ## Commands
 

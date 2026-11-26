@@ -156,7 +156,7 @@ The business is talked about in Portuguese (by the owner, the customer and the s
 
 | Portuguese | Code |
 |---|---|
-| conta, sessão, link de acesso (não usado pela loja desde 2026-11-23) | `account`, `session`, `accessLink` |
+| conta, sessão | `account`, `session` |
 | identificação (etapa antes de "Dados e entrega") | `identification`, `IdentificationForm` |
 | comprar só com e-mail, criar conta | `way`: `guest`, `account` |
 | código enviado por e-mail, e-mail confirmado | `code`, `verifiedEmail` |
